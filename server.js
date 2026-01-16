@@ -24,6 +24,24 @@ app.post("/create-proof", (req, res) => {
     timestamp
   });
 });
+import crypto from "crypto";
+
+app.post("/create-proof", (req, res) => {
+  const { documentHash } = req.body;
+
+  if (!documentHash) {
+    return res.status(400).json({ error: "Document hash required" });
+  }
+
+  const proof = {
+    proofId: crypto.randomUUID(),
+    documentHash,
+    timestamp: new Date().toISOString(),
+    verification: "This proof confirms the document existed at the timestamp shown."
+  };
+
+  res.json(proof);
+});
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
