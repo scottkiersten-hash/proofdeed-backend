@@ -1,9 +1,9 @@
 {
   "name": "proofdeed-backend",
   "version": "1.0.0",
-  "main": "server.cjs",
+  "main": "server.js",
   "scripts": {
-    "start": "node server.cjs"
+    "start": "node server.js"
   },
   "dependencies": {
     "express": "^4.18.2"
