@@ -1,10 +1,10 @@
-import express from "express";
-import crypto from "crypto";
+const express = require("express");
+const crypto = require("crypto");
 
 const app = express();
 app.use(express.json());
 
-const proofs = []; // in-memory storage
+const proofs = [];
 
 // Health check
 app.get("/", (req, res) => {
@@ -27,12 +27,11 @@ app.post("/create-proof", (req, res) => {
   };
 
   proofs.push(proof);
-
   res.json(proof);
 });
 
 // Proof history
-app.get("/proof-history", (req, res) => {
+app.get("/proofs", (req, res) => {
   res.json(proofs);
 });
 
