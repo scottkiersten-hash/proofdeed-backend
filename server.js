@@ -1,11 +1,10 @@
-const express = require("express");
-const crypto = require("crypto");
+import express from "express";
+import crypto from "crypto";
 
 const app = express();
 app.use(express.json());
 
-// In-memory proof storage (temporary)
-const proofs = [];
+const proofs = []; // in-memory storage
 
 // Health check
 app.get("/", (req, res) => {
@@ -27,13 +26,12 @@ app.post("/create-proof", (req, res) => {
     verification: "Document existed at this timestamp"
   };
 
-  proofs.unshift(proof);
-  proofs.splice(10); // keep last 10 proofs only
+  proofs.push(proof);
 
   res.json(proof);
 });
 
-// Get proof history
+// Proof history
 app.get("/proof-history", (req, res) => {
   res.json(proofs);
 });
