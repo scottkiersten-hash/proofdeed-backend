@@ -30,8 +30,50 @@ app.get("/proofs", (req, res) => {
 });
 
 // Create proof
-app.post("/create-proof", (req, res) => {
-  const { documentHash } = req.body;
+app.post("/proofs", (req, res) => {
+  const { data, metadata } = req.body;
+
+  if (!data) {
+    return res.status(400).json({ error: "Data is required" });
+  }
+
+  const proof = {
+    id: uuidv4(),
+    data,
+    metadata: metadata || {},
+    hash: generateHash(data + JSON.stringify(metadata || {})),
+    timestamp: new Date().toISOString()
+  };
+
+  proofs.push(proof);
+
+  res.json({
+    message: "Proof created",
+    proof
+  });
+});
+
+
+  if (!data) {
+    return res.status(400).json({ error: "Data is required" });
+  }
+
+  const proof = {
+    id: uuidv4(),
+    data,
+    metadata: metadata || {},
+    hash: generateHash(data + JSON.stringify(metadata || {})),
+    timestamp: new Date().toISOString()
+  };
+
+  proofs.push(proof);
+
+  res.json({
+    message: "Proof created",
+    proof
+  });
+});
+
 
   if (!documentHash) {
     return res.status(400).json({ error: "Document hash required" });
