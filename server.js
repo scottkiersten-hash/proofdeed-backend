@@ -45,6 +45,30 @@ app.post("/create-proof", (req, res) => {
 app.get("/proofs", (req, res) => {
   res.json(proofs);
 });
+// Create proof
+app.post("/proofs", (req, res) => {
+  const { data } = req.body;
+
+  if (!data) {
+    return res.status(400).json({ error: "Data is required" });
+  }
+
+  const hash = generateHash(data);
+
+  const proof = {
+    id: uuidv4(),
+    data,
+    hash,
+    timestamp: new Date().toISOString()
+  };
+
+  proofs.push(proof);
+
+  res.json({
+    message: "Proof created",
+    proof
+  });
+});
 
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
