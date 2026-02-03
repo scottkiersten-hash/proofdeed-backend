@@ -1,3 +1,14 @@
+const crypto = require("crypto");
+const { v4: uuidv4 } = require("uuid");
+
+const proofLedger = [];
+
+function generateHash(data) {
+  return crypto
+    .createHash("sha256")
+    .update(data)
+    .digest("hex");
+}
 const express = require("express");
 const crypto = require("crypto");
 
