@@ -21,6 +21,13 @@ const proofs = [];
 app.get("/", (req, res) => {
   res.json({ status: "ProofDeed backend running" });
 });
+// Get all proofs
+app.get("/proofs", (req, res) => {
+  res.json({
+    count: proofs.length,
+    proofs: proofs
+  });
+});
 
 // Create proof
 app.post("/create-proof", (req, res) => {
