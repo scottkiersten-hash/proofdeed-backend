@@ -132,12 +132,17 @@ app.post("/assets", (req, res) => {
     return res.status(400).json({ error: "Title and type are required" });
   }
 
-  const asset = {
-    id: uuidv4(),
-    title,
-    type,
-    status: "draft",
-    createdAt: new Date().toISOString()
+const asset = {
+  id: uuidv4(),
+  title,
+  type,
+  status: "draft",
+  tokenSupply: 1000000,
+  tokensIssued: 0,
+  ownership: [],
+  createdAt: new Date().toISOString()
+};
+
   };
 
   assets.push(asset);
@@ -164,4 +169,37 @@ app.get("/assets", (req, res) => {
     count: assets.length,
     assets
   });
+});
+// Issue tokens to owner
+app.post("/assets/:id/issue", (req, res) => {
+  const { id } = req.params;
+  const { owner, amount } = req.body;
+
+  const asset = assets.find(a => a.id === id);
+
+  if (!asset) return res.status(404).json({ error: "Asset not found" });
+
+  if (asset.tokensIssued + amount > asset.tokenSupply) {
+    return res.status(400).json({ error: "Exceeds token supply" });
+  }
+
+  asset.tokensIssued += amount;
+
+  asset.ownership.push({
+    owner,
+    amount,
+    timestamp: new Date().toISOString()
+  });
+
+  const proof = {
+    id: uuidv4(),
+    data: "Tokens issued",
+    metadata: { assetId: id, owner, amount },
+    hash: generateHash(id + owner + amount),
+    timestamp: new Date().toISOString()
+  };
+
+  proofs.push(proof);
+
+  res.json({ asset, proof });
 });
