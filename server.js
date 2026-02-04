@@ -120,9 +120,7 @@ app.post("/proofs", (req, res) => {
   });
 });
 
-const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => {
-  console.log(`ProofDeed backend running on port ${PORT}`);
+
 });
 // Create asset
 app.post("/assets", (req, res) => {
@@ -200,6 +198,47 @@ app.post("/assets/:id/issue", (req, res) => {
   };
 
   proofs.push(proof);
+// =======================
+// Affiliate Signup
+// =======================
+
+const affiliates = [];
+
+app.post("/affiliates/signup", (req, res) => {
+  const { name, email } = req.body;
+
+  if (!name || !email) {
+    return res.status(400).json({ error: "Name and email required" });
+  }
+
+  const affiliate = {
+    id: uuidv4(),
+    name,
+    email,
+    referrals: 0,
+    createdAt: new Date()
+  };
+
+  affiliates.push(affiliate);
+
+  res.json({
+    success: true,
+    affiliate
+  });
+});
+
+// =======================
+// Affiliate Stats
+// =======================
+
+app.get("/affiliates", (req, res) => {
+  res.json(affiliates);
+});
+const PORT = process.env.PORT || 8080;
+
+app.listen(PORT, () => {
+  console.log(`ProofDeed backend running on port ${PORT}`);
+});
 
   res.json({ asset, proof });
 });
