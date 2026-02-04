@@ -1,3 +1,6 @@
+// ProofDeed Clean MVP Backend
+// Created Feb 4, 2026 – 2:00 PM (non-military time)
+
 const express = require("express");
 const crypto = require("crypto");
 const { v4: uuidv4 } = require("uuid");
@@ -6,7 +9,7 @@ const app = express();
 app.use(express.json());
 
 // =======================
-// In-memory storage (MVP)
+// In-Memory MVP Storage
 // =======================
 
 const proofs = [];
@@ -21,17 +24,46 @@ function generateHash(data) {
 }
 
 // =======================
-// Health Check (DigitalOcean needs this)
+// Health Check
 // =======================
 
 app.get("/", (req, res) => {
-  res.status(200).json({ status: "ProofDeed backend running" });
+  res.json({
+    status: "ProofDeed backend running",
+    time: new Date().toLocaleString()
+  });
 });
 
 // =======================
-// Proofs
+// Proof Endpoints
 // =======================
 
+// Create Proof
+app.post("/proofs", (req, res) => {
+  const { data, metadata } = req.body;
+
+  if (!data) {
+    return res.status(400).json({ error: "Missing data" });
+  }
+
+  const id = uuidv4();
+  const timestamp = new Date().toISOString();
+  const hash = generateHash(data + timestamp);
+
+  const proof = {
+    id,
+    data,
+    metadata: metadata || {},
+    hash,
+    timestamp
+  };
+
+  proofs.push(proof);
+
+  res.json(proof);
+});
+
+// Get All Proofs
 app.get("/proofs", (req, res) => {
   res.json({
     count: proofs.length,
@@ -39,50 +71,30 @@ app.get("/proofs", (req, res) => {
   });
 });
 
-app.post("/proofs", (req, res) => {
-  const { data, metadata } = req.body;
-
-  if (!data) {
-    return res.status(400).json({ error: "Data is required" });
-  }
-
-  const proof = {
-    id: uuidv4(),
-    data,
-    metadata: metadata || {},
-    hash: generateHash(data + JSON.stringify(metadata || {})),
-    timestamp: new Date().toISOString()
-  };
-
-  proofs.push(proof);
-
-  res.json({ success: true, proof });
-});
-
 // =======================
-// Affiliates
+// Affiliate MVP
 // =======================
 
-app.post("/affiliates/signup", (req, res) => {
-  const { name, email } = req.body;
+// Register Affiliate
+app.post("/affiliates", (req, res) => {
+  const { name } = req.body;
 
-  if (!name || !email) {
-    return res.status(400).json({ error: "Name and email required" });
+  if (!name) {
+    return res.status(400).json({ error: "Affiliate name required" });
   }
 
   const affiliate = {
     id: uuidv4(),
     name,
-    email,
-    referrals: 0,
-    createdAt: new Date().toISOString()
+    created: new Date().toISOString()
   };
 
   affiliates.push(affiliate);
 
-  res.json({ success: true, affiliate });
+  res.json(affiliate);
 });
 
+// Get Affiliates
 app.get("/affiliates", (req, res) => {
   res.json({
     count: affiliates.length,
@@ -91,11 +103,11 @@ app.get("/affiliates", (req, res) => {
 });
 
 // =======================
-// START SERVER (DO SAFE)
+// Server Boot
 // =======================
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 
-app.listen(PORT, "0.0.0.0", () => {
+app.listen(PORT, () => {
   console.log(`ProofDeed backend running on port ${PORT}`);
 });
