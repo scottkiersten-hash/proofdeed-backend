@@ -1,3 +1,4 @@
+const proofLedger = [];
 const crypto = require("crypto");
 const { v4: uuidv4 } = require("uuid");
 
@@ -122,4 +123,45 @@ app.post("/proofs", (req, res) => {
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log(`ProofDeed backend running on port ${PORT}`);
+});
+// Create asset
+app.post("/assets", (req, res) => {
+  const { title, type } = req.body;
+
+  if (!title || !type) {
+    return res.status(400).json({ error: "Title and type are required" });
+  }
+
+  const asset = {
+    id: uuidv4(),
+    title,
+    type,
+    status: "draft",
+    createdAt: new Date().toISOString()
+  };
+
+  assets.push(asset);
+
+  // Auto-create first proof
+  const proof = {
+    id: uuidv4(),
+    data: `Asset created: ${title}`,
+    metadata: { assetId: asset.id },
+    hash: generateHash(asset.id + asset.title),
+    timestamp: new Date().toISOString()
+  };
+
+  proofs.push(proof);
+
+  res.status(201).json({
+    asset,
+    proof
+  });
+});
+// Get all assets
+app.get("/assets", (req, res) => {
+  res.json({
+    count: assets.length,
+    assets
+  });
 });
