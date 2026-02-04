@@ -5,18 +5,12 @@ const { v4: uuidv4 } = require("uuid");
 const app = express();
 app.use(express.json());
 
-// =======================
-// In-memory storage (Phase 1)
-// =======================
-
+// In-memory stores
 const proofs = [];
 const assets = [];
 const affiliates = [];
 
-// =======================
-// Utilities
-// =======================
-
+// Hash helper
 function generateHash(data) {
   return crypto.createHash("sha256").update(data).digest("hex");
 }
@@ -24,28 +18,21 @@ function generateHash(data) {
 // =======================
 // Health Check
 // =======================
-
 app.get("/", (req, res) => {
-  res.json({ status: "ProofDeed backend running" });
+  res.status(200).json({ status: "ProofDeed backend running" });
 });
 
 // =======================
 // Proofs
 // =======================
-
 app.get("/proofs", (req, res) => {
-  res.json({
-    count: proofs.length,
-    proofs
-  });
+  res.json({ count: proofs.length, proofs });
 });
 
 app.post("/proofs", (req, res) => {
   const { data, metadata } = req.body;
 
-  if (!data) {
-    return res.status(400).json({ error: "Data is required" });
-  }
+  if (!data) return res.status(400).json({ error: "Data is required" });
 
   const proof = {
     id: uuidv4(),
@@ -63,20 +50,15 @@ app.post("/proofs", (req, res) => {
 // =======================
 // Assets
 // =======================
-
 app.get("/assets", (req, res) => {
-  res.json({
-    count: assets.length,
-    assets
-  });
+  res.json({ count: assets.length, assets });
 });
 
 app.post("/assets", (req, res) => {
   const { title, type } = req.body;
 
-  if (!title || !type) {
+  if (!title || !type)
     return res.status(400).json({ error: "Title and type required" });
-  }
 
   const asset = {
     id: uuidv4(),
@@ -91,46 +73,11 @@ app.post("/assets", (req, res) => {
 
   assets.push(asset);
 
-  // Auto-create proof
   const proof = {
     id: uuidv4(),
     data: `Asset created: ${title}`,
     metadata: { assetId: asset.id },
-    hash: generateHash(asset.id + title),
-    timestamp: new Date().toISOString()
-  };
-
-  proofs.push(proof);
-
-  res.status(201).json({ asset, proof });
-});
-
-// Issue tokens
-
-app.post("/assets/:id/issue", (req, res) => {
-  const { id } = req.params;
-  const { owner, amount } = req.body;
-
-  const asset = assets.find(a => a.id === id);
-  if (!asset) return res.status(404).json({ error: "Asset not found" });
-
-  if (asset.tokensIssued + amount > asset.tokenSupply) {
-    return res.status(400).json({ error: "Exceeds supply" });
-  }
-
-  asset.tokensIssued += amount;
-
-  asset.ownership.push({
-    owner,
-    amount,
-    timestamp: new Date().toISOString()
-  });
-
-  const proof = {
-    id: uuidv4(),
-    data: "Tokens issued",
-    metadata: { assetId: id, owner, amount },
-    hash: generateHash(id + owner + amount),
+    hash: generateHash(asset.id + asset.title),
     timestamp: new Date().toISOString()
   };
 
@@ -140,15 +87,34 @@ app.post("/assets/:id/issue", (req, res) => {
 });
 
 // =======================
+// Issue Tokens
+// =======================
+app.post("/assets/:id/issue", (req, res) => {
+  const { id } = req.params;
+  const { owner, amount } = req.body;
+
+  const asset = assets.find(a => a.id === id);
+  if (!asset) return res.status(404).json({ error: "Asset not found" });
+
+  asset.tokensIssued += amount;
+
+  asset.ownership.push({
+    owner,
+    amount,
+    timestamp: new Date().toISOString()
+  });
+
+  res.json(asset);
+});
+
+// =======================
 // Affiliates
 // =======================
-
 app.post("/affiliates/signup", (req, res) => {
   const { name, email } = req.body;
 
-  if (!name || !email) {
+  if (!name || !email)
     return res.status(400).json({ error: "Name and email required" });
-  }
 
   const affiliate = {
     id: uuidv4(),
@@ -164,18 +130,14 @@ app.post("/affiliates/signup", (req, res) => {
 });
 
 app.get("/affiliates", (req, res) => {
-  res.json({
-    count: affiliates.length,
-    affiliates
-  });
+  res.json(affiliates);
 });
 
 // =======================
-// Server
+// START SERVER (IMPORTANT)
 // =======================
-
 const PORT = process.env.PORT || 8080;
 
-app.listen(PORT, () => {
+app.listen(PORT, "0.0.0.0", () => {
   console.log(`ProofDeed backend running on port ${PORT}`);
 });
