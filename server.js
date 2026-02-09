@@ -23,7 +23,6 @@ function generateHash(data) {
   return crypto.createHash("sha256").update(data).digest("hex");
 }
 
-// Friendly timestamp (non-military)
 function timestamp() {
   return new Date().toLocaleString("en-US", {
     month: "short",
@@ -36,8 +35,12 @@ function timestamp() {
 }
 
 // =======================
-// Health Check
+// Health
 // =======================
+
+app.get("/health", (req, res) => {
+  res.status(200).send("OK");
+});
 
 app.get("/", (req, res) => {
   res.json({
@@ -57,9 +60,7 @@ app.get("/proofs", (req, res) => {
 app.post("/proofs", (req, res) => {
   const { data, metadata } = req.body;
 
-  if (!data) {
-    return res.status(400).json({ error: "Data required" });
-  }
+  if (!data) return res.status(400).json({ error: "Data required" });
 
   const proof = {
     id: uuidv4(),
@@ -70,7 +71,6 @@ app.post("/proofs", (req, res) => {
   };
 
   proofs.push(proof);
-
   res.json(proof);
 });
 
@@ -81,9 +81,8 @@ app.post("/proofs", (req, res) => {
 app.post("/assets", (req, res) => {
   const { title, type } = req.body;
 
-  if (!title || !type) {
+  if (!title || !type)
     return res.status(400).json({ error: "Title and type required" });
-  }
 
   const asset = {
     id: uuidv4(),
@@ -95,7 +94,6 @@ app.post("/assets", (req, res) => {
   };
 
   assets.push(asset);
-
   res.json(asset);
 });
 
@@ -110,9 +108,8 @@ app.get("/assets", (req, res) => {
 app.post("/affiliates/signup", (req, res) => {
   const { name, email } = req.body;
 
-  if (!name || !email) {
+  if (!name || !email)
     return res.status(400).json({ error: "Name and email required" });
-  }
 
   const affiliate = {
     id: uuidv4(),
@@ -123,7 +120,6 @@ app.post("/affiliates/signup", (req, res) => {
   };
 
   affiliates.push(affiliate);
-
   res.json(affiliate);
 });
 
@@ -132,7 +128,7 @@ app.get("/affiliates", (req, res) => {
 });
 
 // =======================
-// Start server
+// Start server (LAST)
 // =======================
 
 app.listen(PORT, () => {
