@@ -1,135 +1,136 @@
-const express = require("express");
-const crypto = require("crypto");
-const { v4: uuidv4 } = require("uuid");
+import express from "express";
+import cors from "cors";
+import crypto from "crypto";
+import { v4 as uuidv4 } from "uuid";
 
 const app = express();
+app.use(cors());
 app.use(express.json());
 
 const PORT = process.env.PORT || 8080;
 
-// =======================
-// In-memory MVP storage
-// =======================
+// ======================
+// Utility
+// ======================
 
-const proofs = [];
-const affiliates = [];
-const assets = [];
-
-// =======================
-// Helpers
-// =======================
-
-function generateHash(data) {
-  return crypto.createHash("sha256").update(data).digest("hex");
+function auditLog(type, payload) {
+  console.log(`[AUDIT] ${type}`, payload);
 }
 
-function timestamp() {
-  return new Date().toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "numeric",
-    hour12: true
-  });
+function rateLimitCheck(req) {
+  return false; // placeholder for future logic
 }
 
-// =======================
+// ======================
 // Health
-// =======================
-
-app.get("/health", (req, res) => {
-  res.status(200).send("OK");
-});
+// ======================
 
 app.get("/", (req, res) => {
   res.json({
-    status: "ProofDeed backend running",
-    time: timestamp()
+    status: "ProofDeed Backend Active",
+    timestamp: new Date().toISOString()
   });
 });
 
-// =======================
-// Proofs
-// =======================
+// ======================
+// GOVERNMENT
+// ======================
 
-app.get("/proofs", (req, res) => {
-  res.json({ count: proofs.length, proofs });
+app.post("/api/gov/contact", (req, res) => {
+  if (rateLimitCheck(req)) {
+    return res.status(429).json({ error: "Too many attempts." });
+  }
+
+  const { name, agency, email, message, website } = req.body;
+
+  if (website) return res.status(400).json({ error: "Bot detected." });
+
+  if (!name || !agency || !email) {
+    return res.status(400).json({ error: "Missing required fields." });
+  }
+
+  const leadId = uuidv4();
+
+  auditLog("GOV_CONTACT", { leadId, name, agency, email });
+
+  res.json({
+    success: true,
+    leadId
+  });
 });
 
-app.post("/proofs", (req, res) => {
-  const { data, metadata } = req.body;
+// ======================
+// AUTOMOTIVE
+// ======================
 
-  if (!data) return res.status(400).json({ error: "Data required" });
+app.post("/api/auto/intake", (req, res) => {
+  if (rateLimitCheck(req)) {
+    return res.status(429).json({ error: "Too many attempts." });
+  }
 
-  const proof = {
-    id: uuidv4(),
-    data,
-    metadata: metadata || {},
-    hash: generateHash(data + JSON.stringify(metadata || {})),
-    createdAt: timestamp()
-  };
+  const { vin, buyer, seller, price, state, website } = req.body;
 
-  proofs.push(proof);
-  res.json(proof);
+  if (website) return res.status(400).json({ error: "Bot detected." });
+
+  if (!vin || !buyer || !seller || !price || !state) {
+    return res.status(400).json({ error: "Missing required fields." });
+  }
+
+  const submissionId = uuidv4();
+
+  auditLog("AUTO_INTAKE", { submissionId, vin });
+
+  res.json({
+    success: true,
+    submissionId
+  });
 });
 
-// =======================
-// Assets
-// =======================
+// ======================
+// REAL ESTATE / NOTARY
+// ======================
 
-app.post("/assets", (req, res) => {
-  const { title, type } = req.body;
+app.post("/api/notary/intake", (req, res) => {
+  if (rateLimitCheck(req)) {
+    return res.status(429).json({ error: "Too many attempts." });
+  }
 
-  if (!title || !type)
-    return res.status(400).json({ error: "Title and type required" });
+  const { documentType, partyA, partyB, county, state, website } = req.body;
 
-  const asset = {
-    id: uuidv4(),
-    title,
-    type,
-    status: "draft",
-    createdAt: timestamp(),
-    ownership: []
-  };
+  if (website) return res.status(400).json({ error: "Bot detected." });
 
-  assets.push(asset);
-  res.json(asset);
+  if (!documentType || !partyA || !partyB) {
+    return res.status(400).json({ error: "Missing required fields." });
+  }
+
+  const recordId = uuidv4();
+
+  auditLog("NOTARY_INTAKE", { recordId, documentType });
+
+  res.json({
+    success: true,
+    recordId
+  });
 });
 
-app.get("/assets", (req, res) => {
-  res.json({ count: assets.length, assets });
+// ======================
+// FRAUD CHECK (Government Future)
+// ======================
+
+app.post("/api/gov/fraud-check", (req, res) => {
+  const { recordId } = req.body;
+
+  auditLog("GOV_FRAUD_CHECK", { recordId });
+
+  res.json({
+    riskScore: Math.floor(Math.random() * 100),
+    flagged: false
+  });
 });
 
-// =======================
-// Affiliates
-// =======================
-
-app.post("/affiliates/signup", (req, res) => {
-  const { name, email } = req.body;
-
-  if (!name || !email)
-    return res.status(400).json({ error: "Name and email required" });
-
-  const affiliate = {
-    id: uuidv4(),
-    name,
-    email,
-    referrals: 0,
-    createdAt: timestamp()
-  };
-
-  affiliates.push(affiliate);
-  res.json(affiliate);
-});
-
-app.get("/affiliates", (req, res) => {
-  res.json({ count: affiliates.length, affiliates });
-});
-
-// =======================
-// Start server (LAST)
-// =======================
+// ======================
+// START
+// ======================
 
 app.listen(PORT, () => {
   console.log(`ProofDeed backend running on port ${PORT}`);
