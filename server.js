@@ -9,9 +9,9 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 8080;
 
-/* ======================
-   EMAIL CONFIG
-====================== */
+// ======================
+// Mail Transport
+// ======================
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: Number(process.env.SMTP_PORT),
@@ -22,16 +22,16 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-/* ======================
-   HEALTH
-====================== */
-app.get("/", (req, res) => {
+// ======================
+// Health
+// ======================
+app.get("/", (_, res) => {
   res.json({ status: "ProofDeed Backend Active" });
 });
 
-/* ======================
-   GOVERNMENT CONTACT
-====================== */
+// ======================
+// GOVERNMENT CONTACT
+// ======================
 app.post("/api/gov/contact", async (req, res) => {
   const { name, agency, email, message, website } = req.body;
 
@@ -42,34 +42,27 @@ app.post("/api/gov/contact", async (req, res) => {
 
   const leadId = uuidv4();
 
-  try {
-    await transporter.sendMail({
-      from: `"ProofDeed Website" <${process.env.SMTP_USER}>`,
-      to: "info@proofdeed.com",
-      replyTo: email,
-      subject: `Government Access Request – ${agency}`,
-      text: `
+  await transporter.sendMail({
+    from: `"ProofDeed Contact" <${process.env.SMTP_USER}>`,
+    to: "info@proofdeed.com",
+    subject: "New Government Access Request",
+    text: `
+Lead ID: ${leadId}
 Name: ${name}
 Agency: ${agency}
 Email: ${email}
 
 Message:
 ${message}
+`
+  });
 
-Lead ID: ${leadId}
-      `
-    });
-
-    res.json({ success: true, leadId });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Email failed" });
-  }
+  res.json({ success: true, leadId });
 });
 
-/* ======================
-   START
-====================== */
+// ======================
+// START
+// ======================
 app.listen(PORT, () => {
   console.log(`Backend running on ${PORT}`);
 });
