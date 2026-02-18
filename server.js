@@ -1,68 +1,44 @@
 import express from "express";
 import cors from "cors";
-import nodemailer from "nodemailer";
-import { v4 as uuidv4 } from "uuid";
+import formData from "form-data";
+import Mailgun from "mailgun.js";
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-const PORT = process.env.PORT || 8080;
-
-// ======================
-// Mail Transport
-// ======================
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: Number(process.env.SMTP_PORT),
-  secure: false,
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS
-  }
+const mailgun = new Mailgun(formData);
+const mg = mailgun.client({
+  username: "api",
+  key: process.env.MAILGUN_API_KEY,
+  url: process.env.MAILGUN_BASE_URL
 });
 
-// ======================
-// Health
-// ======================
-app.get("/", (_, res) => {
-  res.json({ status: "ProofDeed Backend Active" });
-});
+app.post("/api/contact", async (req, res) => {
+  const { name, email, message } = req.body;
 
-// ======================
-// GOVERNMENT CONTACT
-// ======================
-app.post("/api/gov/contact", async (req, res) => {
-  const { name, agency, email, message, website } = req.body;
-
-  if (website) return res.status(400).json({ error: "Bot detected" });
-  if (!name || !agency || !email || !message) {
-    return res.status(400).json({ error: "Missing fields" });
-  }
-
-  const leadId = uuidv4();
-
-  await transporter.sendMail({
-    from: `"ProofDeed Contact" <${process.env.SMTP_USER}>`,
-    to: "info@proofdeed.com",
-    subject: "New Government Access Request",
-    text: `
-Lead ID: ${leadId}
+  try {
+    await mg.messages.create(process.env.MAILGUN_DOMAIN, {
+      from: process.env.MAIL_FROM,
+      to: process.env.MAIL_TO,
+      subject: "New ProofDeed Contact Form Submission",
+      text: `
 Name: ${name}
-Agency: ${agency}
 Email: ${email}
 
 Message:
 ${message}
-`
-  });
+      `
+    });
 
-  res.json({ success: true, leadId });
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Mailgun error:", error);
+    res.status(500).json({ success: false, error: "Email failed" });
+  }
 });
 
-// ======================
-// START
-// ======================
+const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
-  console.log(`Backend running on ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
