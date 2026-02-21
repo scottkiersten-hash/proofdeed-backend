@@ -1,12 +1,8 @@
 {
   "name": "proofdeed-backend",
   "version": "1.0.0",
-  "description": "ProofDeed Backend API",
   "type": "module",
   "main": "server.js",
-  "engines": {
-    "node": ">=18"
-  },
   "scripts": {
     "start": "node server.js"
   },
@@ -15,6 +11,7 @@
     "express": "^4.19.2",
     "uuid": "^9.0.1",
     "mailgun.js": "^9.4.1",
-    "form-data": "^4.0.0"
+    "form-data": "^4.0.0",
+    "pg": "^8.11.5"
   }
 }
