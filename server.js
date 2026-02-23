@@ -28,10 +28,6 @@ const mg = mailgun.client({
 |--------------------------------------------------------------------------
 */
 
-app.get("/", (req, res) => {
-  res.send("ProofDeed Backend Running");
-});
-
 app.post("/api/contact", async (req, res) => {
   try {
     const { name, email, message } = req.body;
