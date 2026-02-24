@@ -3,11 +3,23 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import formData from 'form-data';
 import Mailgun from 'mailgun.js';
+import rateLimit from 'express-rate-limit';
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 8080;
+
+/* -------------------- SECURITY -------------------- */
+
+// Basic rate limiting (100 requests per 15 minutes per IP)
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  message: 'Too many requests from this IP, please try again later.',
+});
+
+app.use(limiter);
 
 app.use(cors());
 app.use(express.json());
@@ -26,9 +38,9 @@ app.get('/', (req, res) => {
   res.send('ProofDeed backend running');
 });
 
-/* -------------------- CONTACT HANDLER -------------------- */
+/* -------------------- CONTACT / INQUIRY -------------------- */
 
-async function contactHandler(req, res) {
+app.post('/api/contact', async (req, res) => {
   try {
     const { name, email, message } = req.body;
 
@@ -61,12 +73,7 @@ ${message}
       error: 'Email failed to send',
     });
   }
-}
-
-/* -------------------- ROUTES -------------------- */
-
-app.post('/contact', contactHandler);
-app.post('/api/contact', contactHandler);
+});
 
 /* -------------------- START SERVER -------------------- */
 
