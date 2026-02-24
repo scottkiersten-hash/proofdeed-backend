@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import formData from 'form-data';
 import Mailgun from 'mailgun.js';
 import rateLimit from 'express-rate-limit';
+import helmet from 'helmet';
 
 dotenv.config();
 
@@ -12,11 +13,14 @@ const PORT = process.env.PORT || 8080;
 
 /* -------------------- SECURITY -------------------- */
 
+// Security headers
+app.use(helmet());
+
 // Basic rate limiting (100 requests per 15 minutes per IP)
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
-  message: 'Too many requests from this IP, please try again later.',
+  message: 'Too many requests from this IP, please try again later.'
 });
 
 app.use(limiter);
@@ -29,7 +33,7 @@ app.use(express.json());
 const mailgun = new Mailgun(formData);
 const mg = mailgun.client({
   username: 'api',
-  key: process.env.MAILGUN_API_KEY,
+  key: process.env.MAILGUN_API_KEY
 });
 
 /* -------------------- HEALTH CHECK -------------------- */
@@ -47,7 +51,7 @@ app.post('/api/contact', async (req, res) => {
     if (!name || !email || !message) {
       return res.status(400).json({
         success: false,
-        error: 'Missing required fields',
+        error: 'Missing required fields'
       });
     }
 
@@ -61,7 +65,7 @@ Email: ${email}
 
 Message:
 ${message}
-      `,
+      `
     });
 
     return res.json({ success: true });
@@ -70,7 +74,7 @@ ${message}
     console.error('Mailgun error:', error);
     return res.status(500).json({
       success: false,
-      error: 'Email failed to send',
+      error: 'Email failed to send'
     });
   }
 });
