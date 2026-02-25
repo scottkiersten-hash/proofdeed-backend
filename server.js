@@ -43,9 +43,9 @@ app.get('/', (req, res) => {
   res.send('ProofDeed backend running');
 });
 
-/* -------------------- CONTACT / INQUIRY -------------------- */
+/* -------------------- INQUIRY ENDPOINT -------------------- */
 
-app.post('/api/contact', async (req, res) => {
+app.post('/api/inquiry', async (req, res) => {
   try {
     const { name, email, message } = req.body;
 
