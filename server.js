@@ -45,7 +45,7 @@ app.get('/', (req, res) => {
 
 /* -------------------- INQUIRY ENDPOINT -------------------- */
 
-app.post('/api/inquiry', async (req, res) => {
+app.post('/inquiry', async (req, res) => {
   try {
     const { name, email, message } = req.body;
 
