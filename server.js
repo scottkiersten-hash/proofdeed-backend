@@ -96,7 +96,32 @@ app.post('/api/checkout-intent', async (req, res) => {
   }
 });
 /* -------------------- START SERVER -------------------- */
+/* -------------------- SIGNUP -------------------- */
 
+app.post('/signup', async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        error: 'Email required'
+      });
+    }
+
+    console.log(`New signup attempt: ${email}`);
+
+    return res.json({
+      success: true,
+      message: 'Signup registered'
+    });
+
+  } catch (error) {
+    return res.status(500).json({
+      success: false
+    });
+  }
+});
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
