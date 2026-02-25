@@ -29,23 +29,29 @@ app.use(limiter);
 app.use(cors());
 app.use(express.json());
 
-/* -------------------- DATABASE SETUP -------------------- */
+/* -------------------- DATABASE -------------------- */
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production'
-    ? { rejectUnauthorized: false }
-    : false
+  ssl: {
+    rejectUnauthorized: false
+  }
 });
 
-// Test DB connection on startup
+// Test DB connection at startup
 pool.connect()
-  .then(() => console.log('Database connected successfully'))
-  .catch(err => console.error('Database connection error:', err));
+  .then(client => {
+    console.log("Database connected successfully");
+    client.release();
+  })
+  .catch(err => {
+    console.error("Database connection error:", err);
+  });
 
 /* -------------------- MAILGUN SETUP -------------------- */
 
 const mailgun = new Mailgun(formData);
+
 const mg = mailgun.client({
   username: 'api',
   key: process.env.MAILGUN_API_KEY
@@ -55,35 +61,6 @@ const mg = mailgun.client({
 
 app.get('/', (req, res) => {
   res.send('ProofDeed backend running');
-});
-
-/* -------------------- SIGNUP ENDPOINT -------------------- */
-
-app.post('/signup', async (req, res) => {
-  try {
-    const { email, vertical, plan } = req.body;
-
-    if (!email) {
-      return res.status(400).json({
-        success: false,
-        error: 'Email required'
-      });
-    }
-
-    await pool.query(
-      'INSERT INTO users (email, vertical, plan) VALUES ($1, $2, $3)',
-      [email, vertical || 'document', plan || 'starter']
-    );
-
-    return res.json({ success: true });
-
-  } catch (error) {
-    console.error('Signup error:', error);
-    return res.status(500).json({
-      success: false,
-      error: 'Database error'
-    });
-  }
 });
 
 /* -------------------- INQUIRY ENDPOINT -------------------- */
@@ -100,8 +77,8 @@ app.post('/inquiry', async (req, res) => {
     }
 
     await mg.messages.create(process.env.MAILGUN_DOMAIN, {
-      from: `ProofDeed <mailgun@${process.env.MAILGUN_DOMAIN}>`,
-      to: ['info@proofdeed.com'],
+      from: `ProofDeed <${process.env.MAIL_FROM}>`,
+      to: [process.env.MAIL_TO],
       subject: 'New Inquiry Submission',
       text: `
 Name: ${name}
@@ -120,6 +97,26 @@ ${message}
       success: false,
       error: 'Email failed to send'
     });
+  }
+});
+
+/* -------------------- CHECKOUT INTENT -------------------- */
+
+app.post('/api/checkout-intent', async (req, res) => {
+  try {
+    const { plan, email } = req.body;
+
+    if (!plan || !email) {
+      return res.status(400).json({ success: false });
+    }
+
+    console.log(`Checkout started: ${plan} - ${email}`);
+
+    return res.json({ success: true });
+
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ success: false });
   }
 });
 
