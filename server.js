@@ -5,9 +5,12 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+import Stripe from 'stripe';
 
 const app = express();
 const PORT = process.env.PORT || 8080;
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 app.set('trust proxy', 1);
 
@@ -28,10 +31,6 @@ app.get('/', (req, res) => {
 });
 
 /* -------------------- CHECKOUT INTENT -------------------- */
-
-import Stripe from 'stripe';
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 app.post('/api/checkout-intent', async (req, res) => {
   try {
@@ -66,8 +65,9 @@ app.post('/api/checkout-intent', async (req, res) => {
           quantity: 1
         }
       ],
-      success_url: 'https://proofdeed.com/success',
-cancel_url: 'https://proofdeed.com/pricing'
+      success_url: 'https://proofdeed.com/',
+      cancel_url: 'https://proofdeed.com/pricing'
+    });
 
     return res.json({ url: session.url });
 
