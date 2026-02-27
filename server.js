@@ -65,7 +65,7 @@ app.post('/api/checkout-intent', async (req, res) => {
         }
       ],
       success_url: 'https://proofdeed.com/',
-      cancel_url: 'https://proofdeed.com/pricing'
+     cancel_url: 'https://proofdeed.com/auto'
     });
 
     return res.json({ url: session.url });
