@@ -56,7 +56,7 @@ const pool = new Pool({
   }
 });
 
-pool.connect()
+/*pool.connect()
   .then(client => {
     console.log("✅ Database connected");
     client.release();
@@ -64,7 +64,7 @@ pool.connect()
   .catch(err => {
     console.error("❌ Database connection error:", err);
   });
-
+*/
 /* -------------------- MAILGUN -------------------- */
 
 const mailgun = new Mailgun(formData);
