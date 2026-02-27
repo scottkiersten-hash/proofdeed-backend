@@ -41,10 +41,9 @@ app.post('/api/checkout-intent', async (req, res) => {
     }
 
     const priceMap = {
-      starter: 4900,
-      pro: 9900,
-      enterprise: 19900
-    };
+  starter: 1900,   // $19
+  pro: 3900        // $39
+};
 
     if (!priceMap[plan]) {
       return res.status(400).json({ error: 'Invalid plan' });
