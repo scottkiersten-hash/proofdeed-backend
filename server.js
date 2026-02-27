@@ -34,7 +34,7 @@ app.get('/', (req, res) => {
 
 app.post('/api/checkout-intent', async (req, res) => {
   try {
-    const { plan } = req.body;
+    cancel_url: `https://proofdeed.com/${vertical}`,
 
     if (!plan) {
       return res.status(400).json({ error: 'Missing plan' });
