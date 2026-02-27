@@ -29,6 +29,10 @@ app.get('/', (req, res) => {
 
 /* -------------------- CHECKOUT INTENT -------------------- */
 
+import Stripe from 'stripe';
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
 app.post('/api/checkout-intent', async (req, res) => {
   try {
     const { plan } = req.body;
@@ -37,13 +41,40 @@ app.post('/api/checkout-intent', async (req, res) => {
       return res.status(400).json({ error: 'Missing plan' });
     }
 
-    console.log(`Checkout started: ${plan}`);
+    const priceMap = {
+      starter: 4900,
+      pro: 9900,
+      enterprise: 19900
+    };
 
-    return res.json({ success: true });
+    if (!priceMap[plan]) {
+      return res.status(400).json({ error: 'Invalid plan' });
+    }
+
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      mode: 'payment',
+      line_items: [
+        {
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: `ProofDeed ${plan} Plan`
+            },
+            unit_amount: priceMap[plan]
+          },
+          quantity: 1
+        }
+      ],
+      success_url: 'https://proofdeed.com/success',
+      cancel_url: 'https://proofdeed.com/signup'
+    });
+
+    return res.json({ url: session.url });
 
   } catch (err) {
-    console.error('Checkout error:', err);
-    return res.status(500).json({ error: 'Server error' });
+    console.error('Stripe error:', err);
+    return res.status(500).json({ error: 'Stripe session failed' });
   }
 });
 
