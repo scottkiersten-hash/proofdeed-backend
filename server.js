@@ -8,7 +8,7 @@ import Mailgun from 'mailgun.js';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import pkg from 'pg';
-
+import Stripe from 'stripe';
 const { Pool } = pkg;
 
 /* -------------------- ENV VALIDATION -------------------- */
