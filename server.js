@@ -10,9 +10,17 @@ import Stripe from 'stripe';
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: '2023-10-16',
-});
+/* -------------------- SAFE STRIPE INIT -------------------- */
+
+let stripe = null;
+
+if (!process.env.STRIPE_SECRET_KEY) {
+  console.error("❌ STRIPE_SECRET_KEY is missing");
+} else {
+  stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+    apiVersion: '2023-10-16',
+  });
+}
 
 /* -------------------- SECURITY & MIDDLEWARE -------------------- */
 
@@ -39,6 +47,10 @@ app.get('/', (req, res) => {
 
 app.post('/api/checkout-intent', async (req, res) => {
   try {
+    if (!stripe) {
+      return res.status(500).json({ error: "Stripe not configured" });
+    }
+
     const { plan, vertical } = req.body;
 
     if (!plan || !vertical) {
@@ -46,8 +58,8 @@ app.post('/api/checkout-intent', async (req, res) => {
     }
 
     const priceMap = {
-      starter: 1900, // $19
-      pro: 3900      // $39
+      starter: 1900,
+      pro: 3900
     };
 
     if (!priceMap[plan]) {
