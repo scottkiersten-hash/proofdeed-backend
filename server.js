@@ -18,17 +18,19 @@ if (!process.env.STRIPE_SECRET_KEY) {
   console.warn("⚠️ STRIPE_SECRET_KEY not set");
 }
 
+if (!process.env.FRONTEND_URL) {
+  console.warn("⚠️ FRONTEND_URL not set");
+}
+
 /* ===========================
-   STRIPE SAFE INIT
+   STRIPE INIT
 =========================== */
 
-let stripe = null;
-
-if (process.env.STRIPE_SECRET_KEY) {
-  stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-    apiVersion: '2023-10-16',
-  });
-}
+const stripe = process.env.STRIPE_SECRET_KEY
+  ? new Stripe(process.env.STRIPE_SECRET_KEY, {
+      apiVersion: '2023-10-16',
+    })
+  : null;
 
 /* ===========================
    SECURITY & MIDDLEWARE
@@ -57,7 +59,7 @@ const limiter = rateLimit({
 app.use(limiter);
 
 /* ===========================
-   HEALTH CHECKS
+   HEALTH
 =========================== */
 
 app.get('/', (req, res) => {
@@ -69,47 +71,61 @@ app.get('/health', (req, res) => {
 });
 
 /* ===========================
-   STRIPE CHECKOUT
+   STRIPE SUBSCRIPTION CHECKOUT
 =========================== */
 
-app.post('/api/checkout-intent', async (req, res) => {
+app.post('/api/checkout', async (req, res) => {
   try {
     if (!stripe) {
       return res.status(500).json({ error: 'Stripe not configured' });
     }
 
-    const { plan, vertical } = req.body;
+    const { plan, billing, vertical } = req.body;
 
-    if (!plan || !vertical) {
-      return res.status(400).json({ error: 'Missing plan or vertical' });
+    if (!plan || !billing || !vertical) {
+      return res.status(400).json({
+        error: 'Missing plan, billing, or vertical'
+      });
     }
 
+    /*
+      🔐 IMPORTANT:
+      Replace these with your REAL Stripe price IDs
+      (You already copied them from Stripe dashboard)
+    */
+
     const priceMap = {
-      starter: 1900,
-      pro: 3900
+      starter: {
+        monthly: process.env.PRICE_STARTER_MONTHLY,
+        yearly: process.env.PRICE_STARTER_YEARLY
+      },
+      pro: {
+        monthly: process.env.PRICE_PRO_MONTHLY,
+        yearly: process.env.PRICE_PRO_YEARLY
+      }
     };
 
-    if (!priceMap[plan]) {
-      return res.status(400).json({ error: 'Invalid plan' });
+    if (
+      !priceMap[plan] ||
+      !priceMap[plan][billing]
+    ) {
+      return res.status(400).json({
+        error: 'Invalid plan or billing cycle'
+      });
     }
 
     const session = await stripe.checkout.sessions.create({
-      mode: 'payment',
+      mode: 'subscription',
       payment_method_types: ['card'],
       line_items: [
         {
-          price_data: {
-            currency: 'usd',
-            product_data: {
-              name: `ProofDeed ${plan} Plan`
-            },
-            unit_amount: priceMap[plan]
-          },
+          price: priceMap[plan][billing],
           quantity: 1
         }
       ],
-      success_url: `https://proofdeed.com/`,
-      cancel_url: `https://proofdeed.com/${vertical}`
+      success_url: `https://proofdeed.com/success`,
+      cancel_url: `https://proofdeed.com/${vertical}`,
+      allow_promotion_codes: true
     });
 
     return res.json({ url: session.url });
@@ -132,7 +148,6 @@ app.post('/api/contact', async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    // Basic email validation server-side
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       return res.status(400).json({ error: 'Invalid email address' });
@@ -146,8 +161,6 @@ app.post('/api/contact', async (req, res) => {
       vertical,
       message
     });
-
-    // TODO: integrate Mailgun here later
 
     return res.json({
       success: true,
