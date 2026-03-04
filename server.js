@@ -22,6 +22,14 @@ if (!process.env.FRONTEND_URL) {
   console.warn("⚠️ FRONTEND_URL not set");
 }
 
+if (!process.env.DO_AGENT_ID) {
+  console.warn("⚠️ DO_AGENT_ID not set (AI agent disabled)");
+}
+
+if (!process.env.DO_AGENT_KEY) {
+  console.warn("⚠️ DO_AGENT_KEY not set (AI agent disabled)");
+}
+
 /* ===========================
    STRIPE INIT
 =========================== */
@@ -71,6 +79,70 @@ app.get('/health', (req, res) => {
 });
 
 /* ===========================
+   DIGITALOCEAN AI DOCUMENT ANALYSIS
+=========================== */
+
+async function analyzeDocument(documentText) {
+
+  if (!process.env.DO_AGENT_ID || !process.env.DO_AGENT_KEY) {
+    throw new Error("AI agent not configured");
+  }
+
+  const response = await fetch(
+    `https://api.digitalocean.com/v2/gen-ai/agents/${process.env.DO_AGENT_ID}/responses`,
+    {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${process.env.DO_AGENT_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        input: documentText
+      })
+    }
+  );
+
+  const data = await response.json();
+
+  return data;
+}
+
+/* ===========================
+   DOCUMENT ANALYSIS ENDPOINT
+=========================== */
+
+app.post('/api/analyze-document', async (req, res) => {
+
+  try {
+
+    const { document } = req.body;
+
+    if (!document) {
+      return res.status(400).json({
+        error: "Document text required"
+      });
+    }
+
+    const analysis = await analyzeDocument(document);
+
+    return res.json({
+      success: true,
+      analysis
+    });
+
+  } catch (err) {
+
+    console.error("AI analysis error:", err);
+
+    return res.status(500).json({
+      error: "Document analysis failed"
+    });
+
+  }
+
+});
+
+/* ===========================
    STRIPE SUBSCRIPTION CHECKOUT
 =========================== */
 
@@ -87,12 +159,6 @@ app.post('/api/checkout', async (req, res) => {
         error: 'Missing plan, billing, or vertical'
       });
     }
-
-    /*
-      🔐 IMPORTANT:
-      Replace these with your REAL Stripe price IDs
-      (You already copied them from Stripe dashboard)
-    */
 
     const priceMap = {
       starter: {
