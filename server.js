@@ -32,15 +32,11 @@ INIT CLIENTS
 =========================== */
 
 const stripe = process.env.STRIPE_SECRET_KEY
-? new Stripe(process.env.STRIPE_SECRET_KEY, {
-apiVersion: '2023-10-16'
-})
+? new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2023-10-16' })
 : null;
 
 const openai = process.env.OPENAI_API_KEY
-? new OpenAI({
-apiKey: process.env.OPENAI_API_KEY
-})
+? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 : null;
 
 /* ===========================
@@ -206,7 +202,7 @@ return res.json({
 console.error('Stripe error:', err);
 
 return res.status(500).json({
-  error: err.message || 'Stripe session failed'
+  error: err?.message || 'Stripe session failed'
 });
 ```
 
