@@ -134,7 +134,7 @@ app.post('/api/analyze-document', async (req, res) => {
 
     console.error("AI analysis error:", err);
 
-    return res.status(500).json({
+   return res.status(500).json({ error: err.message });
       error: "Document analysis failed"
     });
 
