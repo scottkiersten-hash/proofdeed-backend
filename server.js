@@ -11,7 +11,7 @@ const app = express();
 const PORT = process.env.PORT || 8080;
 
 /* ===========================
-   ENV VALIDATION
+ENV VALIDATION
 =========================== */
 
 if (!process.env.STRIPE_SECRET_KEY) {
@@ -22,26 +22,16 @@ if (!process.env.FRONTEND_URL) {
   console.warn("⚠️ FRONTEND_URL not set");
 }
 
-if (!process.env.DO_AGENT_ID) {
-  console.warn("⚠️ DO_AGENT_ID not set (AI agent disabled)");
-}
-
-if (!process.env.DO_AGENT_KEY) {
-  console.warn("⚠️ DO_AGENT_KEY not set (AI agent disabled)");
-}
-
 /* ===========================
-   STRIPE INIT
+STRIPE INIT
 =========================== */
 
-const stripe = process.env.STRIPE_SECRET_KEY
-  ? new Stripe(process.env.STRIPE_SECRET_KEY, {
-      apiVersion: '2023-10-16',
-    })
-  : null;
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+  apiVersion: '2023-10-16'
+});
 
 /* ===========================
-   SECURITY & MIDDLEWARE
+SECURITY
 =========================== */
 
 app.set('trust proxy', 1);
@@ -61,13 +51,13 @@ app.use(express.json({ limit: '2mb' }));
 
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: 100
 });
 
 app.use(limiter);
 
 /* ===========================
-   HEALTH
+HEALTH
 =========================== */
 
 app.get('/', (req, res) => {
@@ -79,82 +69,14 @@ app.get('/health', (req, res) => {
 });
 
 /* ===========================
-   DIGITALOCEAN AI DOCUMENT ANALYSIS
-=========================== */
-
-async function analyzeDocument(documentText) {
-
-  if (!process.env.DO_AGENT_ID || !process.env.DO_AGENT_KEY) {
-    throw new Error("AI agent not configured");
-  }
-
-  const response = await fetch(
-    `https://api.digitalocean.com/v2/gen-ai/agents/${process.env.DO_AGENT_ID}/responses`,
-    {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${process.env.DO_AGENT_KEY}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        input: documentText
-      })
-    }
-  );
-
-  const data = await response.json();
-
-  return data;
-}
-
-/* ===========================
-   DOCUMENT ANALYSIS ENDPOINT
-=========================== */
-
-app.post('/api/analyze-document', async (req, res) => {
-
-  try {
-
-    const { document } = req.body;
-
-    if (!document) {
-      return res.status(400).json({
-        error: "Document text required"
-      });
-    }
-
-    const analysis = await analyzeDocument(document);
-
-    return res.json({
-      success: true,
-      analysis
-    });
-
-  } catch (err) {
-
-    console.error("AI analysis error:", err);
-
-    return res.status(500).json({
-      error: err.message || "Document analysis failed"
-    });
-
-  }
-
-});
-
-/* ===========================
-   STRIPE SUBSCRIPTION CHECKOUT
+STRIPE CHECKOUT
 =========================== */
 
 app.post('/api/checkout', async (req, res) => {
 
   try {
 
-    if (!stripe) {
-      return res.status(500).json({ error: 'Stripe not configured' });
-    }
-
-    const { plan, billing, vertical } = req.body;
+    let { plan, billing, vertical } = req.body;
 
     if (!plan || !billing || !vertical) {
       return res.status(400).json({
@@ -162,15 +84,34 @@ app.post('/api/checkout', async (req, res) => {
       });
     }
 
+    /* -------------------------
+    NORMALIZE VALUES
+    --------------------------*/
+
+    if (plan === 'pro') {
+      plan = 'professional';
+    }
+
+    if (billing === 'annual') {
+      billing = 'yearly';
+    }
+
+    /* -------------------------
+    PRICE MAP
+    --------------------------*/
+
     const priceMap = {
+
       starter: {
         monthly: process.env.PRICE_STARTER_MONTHLY,
         yearly: process.env.PRICE_STARTER_YEARLY
       },
-      pro: {
+
+      professional: {
         monthly: process.env.PRICE_PRO_MONTHLY,
         yearly: process.env.PRICE_PRO_YEARLY
       }
+
     };
 
     const priceId = priceMap?.[plan]?.[billing];
@@ -181,21 +122,34 @@ app.post('/api/checkout', async (req, res) => {
       });
     }
 
+    /* -------------------------
+    CREATE STRIPE SESSION
+    --------------------------*/
+
     const session = await stripe.checkout.sessions.create({
+
       mode: 'subscription',
+
       payment_method_types: ['card'],
+
       line_items: [
         {
           price: priceId,
           quantity: 1
         }
       ],
+
       success_url: `https://proofdeed.com/success`,
+
       cancel_url: `https://proofdeed.com/${vertical}`,
+
       allow_promotion_codes: true
+
     });
 
-    return res.json({ url: session.url });
+    return res.json({
+      url: session.url
+    });
 
   } catch (err) {
 
@@ -210,7 +164,7 @@ app.post('/api/checkout', async (req, res) => {
 });
 
 /* ===========================
-   CONTACT FORM
+CONTACT FORM
 =========================== */
 
 app.post('/api/contact', async (req, res) => {
@@ -254,7 +208,7 @@ app.post('/api/contact', async (req, res) => {
 });
 
 /* ===========================
-   GLOBAL ERROR HANDLER
+GLOBAL ERROR HANDLER
 =========================== */
 
 app.use((err, req, res, next) => {
@@ -263,7 +217,7 @@ app.use((err, req, res, next) => {
 });
 
 /* ===========================
-   START SERVER
+START SERVER
 =========================== */
 
 app.listen(PORT, () => {
