@@ -40,12 +40,15 @@ const openai = process.env.OPENAI_API_KEY
   : null;
 
 /* ===========================
-SECURITY
+SECURITY + MIDDLEWARE
 =========================== */
 
 app.set('trust proxy', 1);
 
 app.use(helmet());
+
+app.use(express.json({ limit: '2mb' }));
+app.use(express.urlencoded({ extended: true }));
 
 app.use(cors({
   origin: [
@@ -55,8 +58,6 @@ app.use(cors({
   ].filter(Boolean),
   credentials: true
 }));
-
-app.use(express.json({ limit: '2mb' }));
 
 app.use(rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -98,7 +99,8 @@ app.post('/api/ai-test', async (req, res) => {
     });
 
     return res.json({
-      reply: response.choices?.[0]?.message?.content || ""
+      success: true,
+      reply: response?.choices?.[0]?.message?.content || ""
     });
 
   } catch (err) {
@@ -124,6 +126,12 @@ app.post('/api/checkout', async (req, res) => {
     if (!stripe) {
       return res.status(500).json({
         error: "Stripe not configured"
+      });
+    }
+
+    if (!req.body) {
+      return res.status(400).json({
+        error: "Invalid request body"
       });
     }
 
@@ -187,6 +195,7 @@ app.post('/api/checkout', async (req, res) => {
     });
 
     return res.json({
+      success: true,
       url: session.url
     });
 
@@ -209,6 +218,12 @@ CONTACT FORM
 app.post('/api/contact', async (req, res) => {
 
   try {
+
+    if (!req.body) {
+      return res.status(400).json({
+        error: "Invalid request body"
+      });
+    }
 
     const { name, organization, email, phone, vertical, message } = req.body;
 
