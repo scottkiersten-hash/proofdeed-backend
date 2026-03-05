@@ -134,8 +134,8 @@ app.post('/api/analyze-document', async (req, res) => {
 
     console.error("AI analysis error:", err);
 
-   return res.status(500).json({ error: err.message });
-      error: "Document analysis failed"
+    return res.status(500).json({
+      error: err.message || "Document analysis failed"
     });
 
   }
@@ -147,7 +147,9 @@ app.post('/api/analyze-document', async (req, res) => {
 =========================== */
 
 app.post('/api/checkout', async (req, res) => {
+
   try {
+
     if (!stripe) {
       return res.status(500).json({ error: 'Stripe not configured' });
     }
@@ -171,10 +173,9 @@ app.post('/api/checkout', async (req, res) => {
       }
     };
 
-    if (
-      !priceMap[plan] ||
-      !priceMap[plan][billing]
-    ) {
+    const priceId = priceMap?.[plan]?.[billing];
+
+    if (!priceId) {
       return res.status(400).json({
         error: 'Invalid plan or billing cycle'
       });
@@ -185,7 +186,7 @@ app.post('/api/checkout', async (req, res) => {
       payment_method_types: ['card'],
       line_items: [
         {
-          price: priceMap[plan][billing],
+          price: priceId,
           quantity: 1
         }
       ],
@@ -197,9 +198,15 @@ app.post('/api/checkout', async (req, res) => {
     return res.json({ url: session.url });
 
   } catch (err) {
+
     console.error('Stripe error:', err);
-    return res.status(500).json({ error: 'Stripe session failed' });
+
+    return res.status(500).json({
+      error: err.message || 'Stripe session failed'
+    });
+
   }
+
 });
 
 /* ===========================
@@ -207,7 +214,9 @@ app.post('/api/checkout', async (req, res) => {
 =========================== */
 
 app.post('/api/contact', async (req, res) => {
+
   try {
+
     const { name, organization, email, phone, vertical, message } = req.body;
 
     if (!name || !organization || !email || !message) {
@@ -215,6 +224,7 @@ app.post('/api/contact', async (req, res) => {
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
     if (!emailRegex.test(email)) {
       return res.status(400).json({ error: 'Invalid email address' });
     }
@@ -234,9 +244,13 @@ app.post('/api/contact', async (req, res) => {
     });
 
   } catch (err) {
+
     console.error('Contact error:', err);
+
     return res.status(500).json({ error: 'Contact request failed' });
+
   }
+
 });
 
 /* ===========================
