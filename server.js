@@ -167,7 +167,7 @@ app.post('/api/checkout', async (req, res) => {
         monthly: process.env.PRICE_STARTER_MONTHLY,
         yearly: process.env.PRICE_STARTER_YEARLY
       },
-      professional: {
+      pro: {
         monthly: process.env.PRICE_PRO_MONTHLY,
         yearly: process.env.PRICE_PRO_YEARLY
       }
