@@ -1,23 +1,15 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
-import OpenAI from "openai";
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import Stripe from 'stripe';
+import OpenAI from 'openai';
 
 const app = express();
 const PORT = process.env.PORT || 8080;
-
-/* ===========================
-OPENAI INIT
-=========================== */
-
-const openai = new OpenAI({
-apiKey: process.env.OPENAI_API_KEY
-});
 
 /* ===========================
 ENV VALIDATION
@@ -36,12 +28,20 @@ console.warn("⚠️ OPENAI_API_KEY not set");
 }
 
 /* ===========================
-STRIPE INIT
+INIT CLIENTS
 =========================== */
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+const stripe = process.env.STRIPE_SECRET_KEY
+? new Stripe(process.env.STRIPE_SECRET_KEY, {
 apiVersion: '2023-10-16'
-});
+})
+: null;
+
+const openai = process.env.OPENAI_API_KEY
+? new OpenAI({
+apiKey: process.env.OPENAI_API_KEY
+})
+: null;
 
 /* ===========================
 SECURITY
@@ -62,12 +62,10 @@ credentials: true
 
 app.use(express.json({ limit: '2mb' }));
 
-const limiter = rateLimit({
+app.use(rateLimit({
 windowMs: 15 * 60 * 1000,
 max: 100
-});
-
-app.use(limiter);
+}));
 
 /* ===========================
 HEALTH
@@ -90,6 +88,12 @@ app.post('/api/ai-test', async (req, res) => {
 try {
 
 ```
+if (!openai) {
+  return res.status(500).json({
+    error: "OpenAI not configured"
+  });
+}
+
 const response = await openai.chat.completions.create({
   model: "gpt-4o-mini",
   messages: [
@@ -98,8 +102,8 @@ const response = await openai.chat.completions.create({
   ]
 });
 
-res.json({
-  reply: response.choices[0].message.content
+return res.json({
+  reply: response.choices?.[0]?.message?.content || ""
 });
 ```
 
@@ -108,7 +112,7 @@ res.json({
 ```
 console.error("AI Error:", err);
 
-res.status(500).json({
+return res.status(500).json({
   error: "AI request failed"
 });
 ```
@@ -126,6 +130,12 @@ app.post('/api/checkout', async (req, res) => {
 try {
 
 ```
+if (!stripe) {
+  return res.status(500).json({
+    error: "Stripe not configured"
+  });
+}
+
 let { plan, billing, vertical } = req.body;
 
 if (!plan || !billing || !vertical) {
@@ -134,10 +144,6 @@ if (!plan || !billing || !vertical) {
   });
 }
 
-/* -------------------------
-NORMALIZE VALUES
---------------------------*/
-
 if (plan === 'pro') {
   plan = 'professional';
 }
@@ -145,10 +151,6 @@ if (plan === 'pro') {
 if (billing === 'annual') {
   billing = 'yearly';
 }
-
-/* -------------------------
-PRICE MAP
---------------------------*/
 
 const priceMap = {
 
@@ -172,10 +174,6 @@ if (!priceId) {
   });
 }
 
-/* -------------------------
-CREATE STRIPE SESSION
---------------------------*/
-
 const session = await stripe.checkout.sessions.create({
 
   mode: 'subscription',
@@ -189,7 +187,7 @@ const session = await stripe.checkout.sessions.create({
     }
   ],
 
-  success_url: `https://proofdeed.com/success`,
+  success_url: "https://proofdeed.com/success",
 
   cancel_url: `https://proofdeed.com/${vertical}`,
 
@@ -228,13 +226,17 @@ try {
 const { name, organization, email, phone, vertical, message } = req.body;
 
 if (!name || !organization || !email || !message) {
-  return res.status(400).json({ error: 'Missing required fields' });
+  return res.status(400).json({
+    error: 'Missing required fields'
+  });
 }
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 if (!emailRegex.test(email)) {
-  return res.status(400).json({ error: 'Invalid email address' });
+  return res.status(400).json({
+    error: 'Invalid email address'
+  });
 }
 
 console.log('📩 New Contact Lead:', {
@@ -257,7 +259,9 @@ return res.json({
 ```
 console.error('Contact error:', err);
 
-return res.status(500).json({ error: 'Contact request failed' });
+return res.status(500).json({
+  error: 'Contact request failed'
+});
 ```
 
 }
