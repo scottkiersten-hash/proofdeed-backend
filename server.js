@@ -185,7 +185,7 @@ const session = await stripe.checkout.sessions.create({
 
   success_url: "https://proofdeed.com/success",
 
-  cancel_url: `https://proofdeed.com/${vertical}`,
+  cancel_url: "https://proofdeed.com/" + vertical,
 
   allow_promotion_codes: true
 
@@ -246,7 +246,7 @@ console.log('📩 New Contact Lead:', {
 
 return res.json({
   success: true,
-  leadId: `PD-${Date.now()}`
+  leadId: "PD-" + Date.now()
 });
 ```
 
@@ -278,5 +278,5 @@ START SERVER
 =========================== */
 
 app.listen(PORT, () => {
-console.log(`🚀 Server running on port ${PORT}`);
+console.log("🚀 Server running on port " + PORT);
 });
