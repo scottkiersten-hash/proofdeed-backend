@@ -92,10 +92,12 @@ app.post('/api/analyze-document', async (req, res) => {
 
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
-      messages: [
-        { role: "system", content: "You are a legal document assistant." },
-        { role: "user", content: "Explain what a document hash is." }
-      ]
+     vconst { document } = req.body;
+
+messages: [
+  { role: "system", content: "You extract structured information from legal documents." },
+  { role: "user", content: document }
+]
     });
 
     return res.json({
