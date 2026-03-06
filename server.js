@@ -9,15 +9,18 @@ import Stripe from 'stripe';
 import OpenAI from 'openai';
 import crypto from 'crypto';
 import PDFDocument from 'pdfkit';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 
 const app = express();
 const PORT = process.env.PORT || 8080;
 
 /* ===========================
-TEMP CERTIFICATE STORAGE
+TEMP STORAGE
 =========================== */
 
 const certifications = [];
+const users = [];
 
 /* ===========================
 ENV VALIDATION
@@ -84,6 +87,106 @@ app.get('/api/health', (req, res) => {
 });
 
 /* ===========================
+USER SIGNUP
+=========================== */
+
+app.post('/api/signup', async (req, res) => {
+
+  try {
+
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({
+        error: "Email and password required"
+      });
+    }
+
+    const existingUser = users.find(u => u.email === email);
+
+    if (existingUser) {
+      return res.status(400).json({
+        error: "User already exists"
+      });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const user = {
+      id: Date.now().toString(),
+      email,
+      password: hashedPassword
+    };
+
+    users.push(user);
+
+    const token = jwt.sign(
+      { userId: user.id },
+      process.env.JWT_SECRET || "dev-secret",
+      { expiresIn: "7d" }
+    );
+
+    res.json({ token });
+
+  } catch (err) {
+
+    console.error("Signup error:", err);
+
+    res.status(500).json({
+      error: "Signup failed"
+    });
+
+  }
+
+});
+
+/* ===========================
+USER LOGIN
+=========================== */
+
+app.post('/api/login', async (req, res) => {
+
+  try {
+
+    const { email, password } = req.body;
+
+    const user = users.find(u => u.email === email);
+
+    if (!user) {
+      return res.status(401).json({
+        error: "Invalid credentials"
+      });
+    }
+
+    const validPassword = await bcrypt.compare(password, user.password);
+
+    if (!validPassword) {
+      return res.status(401).json({
+        error: "Invalid credentials"
+      });
+    }
+
+    const token = jwt.sign(
+      { userId: user.id },
+      process.env.JWT_SECRET || "dev-secret",
+      { expiresIn: "7d" }
+    );
+
+    res.json({ token });
+
+  } catch (err) {
+
+    console.error("Login error:", err);
+
+    res.status(500).json({
+      error: "Login failed"
+    });
+
+  }
+
+});
+
+/* ===========================
 CERTIFY DOCUMENT
 =========================== */
 
@@ -101,8 +204,6 @@ app.post('/api/certify-document', async (req, res) => {
       return res.status(400).json({ error: "Document text required" });
     }
 
-    /* HASH */
-
     const hash = crypto
       .createHash('sha256')
       .update(document)
@@ -110,8 +211,6 @@ app.post('/api/certify-document', async (req, res) => {
 
     const timestamp = new Date().toISOString();
     const certification_id = "PD-" + Date.now();
-
-    /* AI EXTRACTION */
 
     const ai = await openai.chat.completions.create({
 
@@ -134,8 +233,6 @@ app.post('/api/certify-document', async (req, res) => {
 
     const extracted = JSON.parse(ai.choices[0].message.content);
 
-    /* STORE CERTIFICATION */
-
     const record = {
       certification_id,
       timestamp,
@@ -144,8 +241,6 @@ app.post('/api/certify-document', async (req, res) => {
     };
 
     certifications.push(record);
-
-    /* RESPONSE */
 
     return res.json({
       success: true,
