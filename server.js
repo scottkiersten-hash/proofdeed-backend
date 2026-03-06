@@ -8,6 +8,7 @@ import rateLimit from 'express-rate-limit';
 import Stripe from 'stripe';
 import OpenAI from 'openai';
 import crypto from 'crypto';
+import PDFDocument from 'pdfkit';
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -183,6 +184,57 @@ app.get('/api/certificate/:id', (req, res) => {
   }
 
   res.json(cert);
+
+});
+
+/* ===========================
+PDF CERTIFICATE
+=========================== */
+
+app.get('/api/certificate/:id/pdf', (req, res) => {
+
+  const cert = certifications.find(
+    c => c.certification_id === req.params.id
+  );
+
+  if (!cert) {
+    return res.status(404).json({
+      error: "Certificate not found"
+    });
+  }
+
+  const doc = new PDFDocument();
+
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader(
+    'Content-Disposition',
+    `attachment; filename="ProofDeed-${cert.certification_id}.pdf"`
+  );
+
+  doc.pipe(res);
+
+  doc.fontSize(24).text("PROOFDEED CERTIFICATE", { align: 'center' });
+
+  doc.moveDown();
+
+  doc.fontSize(14).text(`Certification ID: ${cert.certification_id}`);
+  doc.text(`Timestamp: ${cert.timestamp}`);
+  doc.text(`Hash: ${cert.hash}`);
+
+  doc.moveDown();
+
+  doc.text("Document Data:");
+
+  Object.entries(cert.document_data).forEach(([key, value]) => {
+    doc.text(`${key}: ${value}`);
+  });
+
+  doc.moveDown();
+
+  doc.text("Certified by ProofDeed");
+  doc.text("https://proofdeed.com");
+
+  doc.end();
 
 });
 
