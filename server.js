@@ -80,7 +80,7 @@ app.get('/health', (req, res) => {
 AI TEST ENDPOINT
 =========================== */
 
-app.post('/api/ai-test', async (req, res) => {
+app.get('/api/ai-test', async (req, res) => {
 
   try {
 
