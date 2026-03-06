@@ -90,11 +90,15 @@ app.post('/api/analyze-document', async (req, res) => {
       });
     }
 
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-     const { document } = req.body;
+   const { document } = req.body;
 
-messages: [
+const response = await openai.chat.completions.create({
+  model: "gpt-4o-mini",
+  messages: [
+    { role: "system", content: "You extract structured information from legal documents." },
+    { role: "user", content: document }
+  ]
+});
   { role: "system", content: "You extract structured information from legal documents." },
   { role: "user", content: document }
 ]
