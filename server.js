@@ -92,7 +92,7 @@ app.post('/api/analyze-document', async (req, res) => {
 
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
-     vconst { document } = req.body;
+     const { document } = req.body;
 
 messages: [
   { role: "system", content: "You extract structured information from legal documents." },
