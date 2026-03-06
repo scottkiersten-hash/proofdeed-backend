@@ -77,7 +77,7 @@ app.get('/api/health', (req, res) => {
 });
 
 /* ===========================
-AI TEST ENDPOINT
+DOCUMENT ANALYSIS API
 =========================== */
 
 app.post('/api/analyze-document', async (req, res) => {
@@ -90,18 +90,26 @@ app.post('/api/analyze-document', async (req, res) => {
       });
     }
 
-   const { document } = req.body;
+    const { document } = req.body;
 
-const response = await openai.chat.completions.create({
-  model: "gpt-4o-mini",
-  messages: [
-    { role: "system", content: "You extract structured information from legal documents." },
-    { role: "user", content: document }
-  ]
-});
-  { role: "system", content: "You extract structured information from legal documents." },
-  { role: "user", content: document }
-]
+    if (!document) {
+      return res.status(400).json({
+        error: "Document text required"
+      });
+    }
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: "You extract structured information from legal or government documents."
+        },
+        {
+          role: "user",
+          content: document
+        }
+      ]
     });
 
     return res.json({
