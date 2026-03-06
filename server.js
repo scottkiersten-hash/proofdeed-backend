@@ -78,7 +78,7 @@ app.get('/api/health', (req, res) => {
 });
 
 /* ===========================
-DOCUMENT ANALYSIS API
+DOCUMENT ANALYSIS
 =========================== */
 
 app.post('/api/analyze-document', async (req, res) => {
@@ -86,17 +86,13 @@ app.post('/api/analyze-document', async (req, res) => {
   try {
 
     if (!openai) {
-      return res.status(500).json({
-        error: "OpenAI not configured"
-      });
+      return res.status(500).json({ error: "OpenAI not configured" });
     }
 
     const { document } = req.body;
 
     if (!document) {
-      return res.status(400).json({
-        error: "Document text required"
-      });
+      return res.status(400).json({ error: "Document text required" });
     }
 
     const response = await openai.chat.completions.create({
@@ -106,16 +102,16 @@ app.post('/api/analyze-document', async (req, res) => {
       messages: [
         {
           role: "system",
-          content: `You extract structured data from legal and government documents.
+          content: `Extract structured data from legal or government documents.
 
 Return ONLY valid JSON.
 
-Example format:
+Example:
 
 {
-  "document_type": "vehicle_title",
-  "vin": "string",
-  "owner_name": "string"
+ "document_type":"vehicle_title",
+ "vin":"string",
+ "owner_name":"string"
 }`
         },
         {
@@ -158,9 +154,7 @@ app.post('/api/hash-document', async (req, res) => {
     const { document } = req.body;
 
     if (!document) {
-      return res.status(400).json({
-        error: "Document text required"
-      });
+      return res.status(400).json({ error: "Document text required" });
     }
 
     const hash = crypto
@@ -187,6 +181,86 @@ app.post('/api/hash-document', async (req, res) => {
 });
 
 /* ===========================
+PROOFDEED CERTIFICATION ENGINE
+=========================== */
+
+app.post('/api/certify-document', async (req, res) => {
+
+  try {
+
+    if (!openai) {
+      return res.status(500).json({ error: "OpenAI not configured" });
+    }
+
+    const { document } = req.body;
+
+    if (!document) {
+      return res.status(400).json({ error: "Document text required" });
+    }
+
+    /* CREATE HASH */
+
+    const hash = crypto
+      .createHash('sha256')
+      .update(document)
+      .digest('hex');
+
+    const timestamp = new Date().toISOString();
+
+    const certification_id = "PD-" + Date.now();
+
+    /* AI EXTRACTION */
+
+    const response = await openai.chat.completions.create({
+
+      model: "gpt-4o-mini",
+
+      messages: [
+        {
+          role: "system",
+          content: `Extract structured data from legal or government documents.
+
+Return JSON only.`
+        },
+        {
+          role: "user",
+          content: document
+        }
+      ],
+
+      response_format: { type: "json_object" }
+
+    });
+
+    const extracted = JSON.parse(response.choices[0].message.content);
+
+    return res.json({
+
+      success: true,
+
+      certification_id,
+
+      hash,
+
+      timestamp,
+
+      document_data: extracted
+
+    });
+
+  } catch (err) {
+
+    console.error("Certification error:", err);
+
+    return res.status(500).json({
+      error: "Certification failed"
+    });
+
+  }
+
+});
+
+/* ===========================
 STRIPE CHECKOUT
 =========================== */
 
@@ -195,15 +269,7 @@ app.post('/api/checkout', async (req, res) => {
   try {
 
     if (!stripe) {
-      return res.status(500).json({
-        error: "Stripe not configured"
-      });
-    }
-
-    if (!req.body) {
-      return res.status(400).json({
-        error: "Invalid request body"
-      });
+      return res.status(500).json({ error: "Stripe not configured" });
     }
 
     let { plan, billing, vertical } = req.body;
@@ -214,13 +280,8 @@ app.post('/api/checkout', async (req, res) => {
       });
     }
 
-    if (plan === 'pro') {
-      plan = 'professional';
-    }
-
-    if (billing === 'annual') {
-      billing = 'yearly';
-    }
+    if (plan === 'pro') plan = 'professional';
+    if (billing === 'annual') billing = 'yearly';
 
     const priceMap = {
 
@@ -251,10 +312,7 @@ app.post('/api/checkout', async (req, res) => {
       payment_method_types: ['card'],
 
       line_items: [
-        {
-          price: priceId,
-          quantity: 1
-        }
+        { price: priceId, quantity: 1 }
       ],
 
       success_url: "https://proofdeed.com/success",
@@ -289,12 +347,6 @@ CONTACT FORM
 app.post('/api/contact', async (req, res) => {
 
   try {
-
-    if (!req.body) {
-      return res.status(400).json({
-        error: "Invalid request body"
-      });
-    }
 
     const { name, organization, email, phone, vertical, message } = req.body;
 
