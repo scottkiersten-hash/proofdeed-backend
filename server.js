@@ -1,12 +1,13 @@
 import dotenv from 'dotenv';
 dotenv.config();
-import crypto from 'crypto';
+
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import Stripe from 'stripe';
 import OpenAI from 'openai';
+import crypto from 'crypto';
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -140,6 +141,45 @@ Example format:
 
     return res.status(500).json({
       error: "AI analysis failed"
+    });
+
+  }
+
+});
+
+/* ===========================
+DOCUMENT HASHING
+=========================== */
+
+app.post('/api/hash-document', async (req, res) => {
+
+  try {
+
+    const { document } = req.body;
+
+    if (!document) {
+      return res.status(400).json({
+        error: "Document text required"
+      });
+    }
+
+    const hash = crypto
+      .createHash('sha256')
+      .update(document)
+      .digest('hex');
+
+    return res.json({
+      success: true,
+      hash,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (err) {
+
+    console.error("Hash error:", err);
+
+    return res.status(500).json({
+      error: "Hash generation failed"
     });
 
   }
