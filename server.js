@@ -19,8 +19,8 @@ const PORT = process.env.PORT || 8080;
 TEMP STORAGE
 =========================== */
 
-const certifications = [];
 const users = [];
+const certifications = [];
 
 /* ===========================
 ENV VALIDATION
@@ -36,6 +36,10 @@ if (!process.env.FRONTEND_URL) {
 
 if (!process.env.OPENAI_API_KEY) {
   console.warn("⚠️ OPENAI_API_KEY not set");
+}
+
+if (!process.env.JWT_SECRET) {
+  console.warn("⚠️ JWT_SECRET not set");
 }
 
 /* ===========================
@@ -75,6 +79,33 @@ app.use(rateLimit({
 }));
 
 /* ===========================
+AUTH MIDDLEWARE
+=========================== */
+
+function authenticateToken(req, res, next) {
+
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader) {
+    return res.status(401).json({ error: "Token required" });
+  }
+
+  const token = authHeader.split(" ")[1];
+
+  jwt.verify(token, process.env.JWT_SECRET || "dev_secret", (err, user) => {
+
+    if (err) {
+      return res.status(403).json({ error: "Invalid token" });
+    }
+
+    req.user = user;
+    next();
+
+  });
+
+}
+
+/* ===========================
 HEALTH
 =========================== */
 
@@ -97,44 +128,40 @@ app.post('/api/signup', async (req, res) => {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.status(400).json({
-        error: "Email and password required"
-      });
+      return res.status(400).json({ error: "Email and password required" });
     }
 
-    const existingUser = users.find(u => u.email === email);
+    const existing = users.find(u => u.email === email);
 
-    if (existingUser) {
-      return res.status(400).json({
-        error: "User already exists"
-      });
+    if (existing) {
+      return res.status(400).json({ error: "User already exists" });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashed = await bcrypt.hash(password, 10);
 
     const user = {
-      id: Date.now().toString(),
+      id: crypto.randomUUID(),
       email,
-      password: hashedPassword
+      password: hashed
     };
 
     users.push(user);
 
     const token = jwt.sign(
-      { userId: user.id },
-      process.env.JWT_SECRET || "dev-secret",
+      { id: user.id, email: user.email },
+      process.env.JWT_SECRET || "dev_secret",
       { expiresIn: "7d" }
     );
 
-    res.json({ token });
+    res.json({
+      success: true,
+      token
+    });
 
   } catch (err) {
 
-    console.error("Signup error:", err);
-
-    res.status(500).json({
-      error: "Signup failed"
-    });
+    console.error(err);
+    res.status(500).json({ error: "Signup failed" });
 
   }
 
@@ -153,34 +180,30 @@ app.post('/api/login', async (req, res) => {
     const user = users.find(u => u.email === email);
 
     if (!user) {
-      return res.status(401).json({
-        error: "Invalid credentials"
-      });
+      return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    const validPassword = await bcrypt.compare(password, user.password);
+    const valid = await bcrypt.compare(password, user.password);
 
-    if (!validPassword) {
-      return res.status(401).json({
-        error: "Invalid credentials"
-      });
+    if (!valid) {
+      return res.status(401).json({ error: "Invalid credentials" });
     }
 
     const token = jwt.sign(
-      { userId: user.id },
-      process.env.JWT_SECRET || "dev-secret",
+      { id: user.id, email: user.email },
+      process.env.JWT_SECRET || "dev_secret",
       { expiresIn: "7d" }
     );
 
-    res.json({ token });
+    res.json({
+      success: true,
+      token
+    });
 
   } catch (err) {
 
-    console.error("Login error:", err);
-
-    res.status(500).json({
-      error: "Login failed"
-    });
+    console.error(err);
+    res.status(500).json({ error: "Login failed" });
 
   }
 
@@ -190,7 +213,7 @@ app.post('/api/login', async (req, res) => {
 CERTIFY DOCUMENT
 =========================== */
 
-app.post('/api/certify-document', async (req, res) => {
+app.post('/api/certify-document', authenticateToken, async (req, res) => {
 
   try {
 
@@ -237,6 +260,7 @@ app.post('/api/certify-document', async (req, res) => {
       certification_id,
       timestamp,
       hash,
+      user_id: req.user.id,
       document_data: extracted
     };
 
@@ -259,6 +283,22 @@ app.post('/api/certify-document', async (req, res) => {
     });
 
   }
+
+});
+
+/* ===========================
+USER CERTIFICATIONS (DASHBOARD)
+=========================== */
+
+app.get('/api/my-certifications', authenticateToken, (req, res) => {
+
+  const userCerts = certifications.filter(
+    c => c.user_id === req.user.id
+  );
+
+  res.json({
+    certifications: userCerts
+  });
 
 });
 
