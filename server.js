@@ -99,22 +99,39 @@ app.post('/api/analyze-document', async (req, res) => {
     }
 
     const response = await openai.chat.completions.create({
+
       model: "gpt-4o-mini",
+
       messages: [
         {
           role: "system",
-          content: "You extract structured information from legal or government documents."
+          content: `You extract structured data from legal and government documents.
+
+Return ONLY valid JSON.
+
+Example format:
+
+{
+  "document_type": "vehicle_title",
+  "vin": "string",
+  "owner_name": "string"
+}`
         },
         {
           role: "user",
           content: document
         }
-      ]
+      ],
+
+      response_format: { type: "json_object" }
+
     });
+
+    const result = JSON.parse(response.choices[0].message.content);
 
     return res.json({
       success: true,
-      reply: response?.choices?.[0]?.message?.content || ""
+      data: result
     });
 
   } catch (err) {
@@ -122,7 +139,7 @@ app.post('/api/analyze-document', async (req, res) => {
     console.error("AI Error:", err);
 
     return res.status(500).json({
-      error: "AI request failed"
+      error: "AI analysis failed"
     });
 
   }
