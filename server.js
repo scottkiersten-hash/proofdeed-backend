@@ -72,7 +72,7 @@ app.get('/', (req, res) => {
   res.status(200).send('ProofDeed backend running');
 });
 
-app.get('/health', (req, res) => {
+app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'ok' });
 });
 
