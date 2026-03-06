@@ -13,6 +13,12 @@ const app = express();
 const PORT = process.env.PORT || 8080;
 
 /* ===========================
+TEMP CERTIFICATE STORAGE
+=========================== */
+
+const certifications = [];
+
+/* ===========================
 ENV VALIDATION
 =========================== */
 
@@ -47,7 +53,6 @@ SECURITY + MIDDLEWARE
 app.set('trust proxy', 1);
 
 app.use(helmet());
-
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true }));
 
@@ -74,114 +79,11 @@ app.get('/', (req, res) => {
 });
 
 app.get('/api/health', (req, res) => {
-  res.status(200).json({ status: 'ok' });
+  res.json({ status: 'ok' });
 });
 
 /* ===========================
-DOCUMENT ANALYSIS
-=========================== */
-
-app.post('/api/analyze-document', async (req, res) => {
-
-  try {
-
-    if (!openai) {
-      return res.status(500).json({ error: "OpenAI not configured" });
-    }
-
-    const { document } = req.body;
-
-    if (!document) {
-      return res.status(400).json({ error: "Document text required" });
-    }
-
-    const response = await openai.chat.completions.create({
-
-      model: "gpt-4o-mini",
-
-      messages: [
-        {
-          role: "system",
-          content: `Extract structured data from legal or government documents.
-
-Return ONLY valid JSON.
-
-Example:
-
-{
- "document_type":"vehicle_title",
- "vin":"string",
- "owner_name":"string"
-}`
-        },
-        {
-          role: "user",
-          content: document
-        }
-      ],
-
-      response_format: { type: "json_object" }
-
-    });
-
-    const result = JSON.parse(response.choices[0].message.content);
-
-    return res.json({
-      success: true,
-      data: result
-    });
-
-  } catch (err) {
-
-    console.error("AI Error:", err);
-
-    return res.status(500).json({
-      error: "AI analysis failed"
-    });
-
-  }
-
-});
-
-/* ===========================
-DOCUMENT HASHING
-=========================== */
-
-app.post('/api/hash-document', async (req, res) => {
-
-  try {
-
-    const { document } = req.body;
-
-    if (!document) {
-      return res.status(400).json({ error: "Document text required" });
-    }
-
-    const hash = crypto
-      .createHash('sha256')
-      .update(document)
-      .digest('hex');
-
-    return res.json({
-      success: true,
-      hash,
-      timestamp: new Date().toISOString()
-    });
-
-  } catch (err) {
-
-    console.error("Hash error:", err);
-
-    return res.status(500).json({
-      error: "Hash generation failed"
-    });
-
-  }
-
-});
-
-/* ===========================
-PROOFDEED CERTIFICATION ENGINE
+CERTIFY DOCUMENT
 =========================== */
 
 app.post('/api/certify-document', async (req, res) => {
@@ -198,7 +100,7 @@ app.post('/api/certify-document', async (req, res) => {
       return res.status(400).json({ error: "Document text required" });
     }
 
-    /* CREATE HASH */
+    /* HASH */
 
     const hash = crypto
       .createHash('sha256')
@@ -206,21 +108,18 @@ app.post('/api/certify-document', async (req, res) => {
       .digest('hex');
 
     const timestamp = new Date().toISOString();
-
     const certification_id = "PD-" + Date.now();
 
     /* AI EXTRACTION */
 
-    const response = await openai.chat.completions.create({
+    const ai = await openai.chat.completions.create({
 
       model: "gpt-4o-mini",
 
       messages: [
         {
           role: "system",
-          content: `Extract structured data from legal or government documents.
-
-Return JSON only.`
+          content: "Extract structured data from legal documents and return JSON."
         },
         {
           role: "user",
@@ -232,20 +131,27 @@ Return JSON only.`
 
     });
 
-    const extracted = JSON.parse(response.choices[0].message.content);
+    const extracted = JSON.parse(ai.choices[0].message.content);
+
+    /* STORE CERTIFICATION */
+
+    const record = {
+      certification_id,
+      timestamp,
+      hash,
+      document_data: extracted
+    };
+
+    certifications.push(record);
+
+    /* RESPONSE */
 
     return res.json({
-
       success: true,
-
       certification_id,
-
       hash,
-
       timestamp,
-
       document_data: extracted
-
     });
 
   } catch (err) {
@@ -261,142 +167,23 @@ Return JSON only.`
 });
 
 /* ===========================
-STRIPE CHECKOUT
+VIEW CERTIFICATE
 =========================== */
 
-app.post('/api/checkout', async (req, res) => {
+app.get('/api/certificate/:id', (req, res) => {
 
-  try {
+  const cert = certifications.find(
+    c => c.certification_id === req.params.id
+  );
 
-    if (!stripe) {
-      return res.status(500).json({ error: "Stripe not configured" });
-    }
-
-    let { plan, billing, vertical } = req.body;
-
-    if (!plan || !billing || !vertical) {
-      return res.status(400).json({
-        error: 'Missing plan, billing, or vertical'
-      });
-    }
-
-    if (plan === 'pro') plan = 'professional';
-    if (billing === 'annual') billing = 'yearly';
-
-    const priceMap = {
-
-      starter: {
-        monthly: process.env.PRICE_STARTER_MONTHLY,
-        yearly: process.env.PRICE_STARTER_YEARLY
-      },
-
-      professional: {
-        monthly: process.env.PRICE_PRO_MONTHLY,
-        yearly: process.env.PRICE_PRO_YEARLY
-      }
-
-    };
-
-    const priceId = priceMap?.[plan]?.[billing];
-
-    if (!priceId) {
-      return res.status(400).json({
-        error: 'Invalid plan or billing cycle'
-      });
-    }
-
-    const session = await stripe.checkout.sessions.create({
-
-      mode: 'subscription',
-
-      payment_method_types: ['card'],
-
-      line_items: [
-        { price: priceId, quantity: 1 }
-      ],
-
-      success_url: "https://proofdeed.com/success",
-
-      cancel_url: "https://proofdeed.com/" + vertical,
-
-      allow_promotion_codes: true
-
+  if (!cert) {
+    return res.status(404).json({
+      error: "Certificate not found"
     });
-
-    return res.json({
-      success: true,
-      url: session.url
-    });
-
-  } catch (err) {
-
-    console.error('Stripe error:', err);
-
-    return res.status(500).json({
-      error: err?.message || 'Stripe session failed'
-    });
-
   }
 
-});
+  res.json(cert);
 
-/* ===========================
-CONTACT FORM
-=========================== */
-
-app.post('/api/contact', async (req, res) => {
-
-  try {
-
-    const { name, organization, email, phone, vertical, message } = req.body;
-
-    if (!name || !organization || !email || !message) {
-      return res.status(400).json({
-        error: 'Missing required fields'
-      });
-    }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-    if (!emailRegex.test(email)) {
-      return res.status(400).json({
-        error: 'Invalid email address'
-      });
-    }
-
-    console.log('📩 New Contact Lead:', {
-      name,
-      organization,
-      email,
-      phone,
-      vertical,
-      message
-    });
-
-    return res.json({
-      success: true,
-      leadId: "PD-" + Date.now()
-    });
-
-  } catch (err) {
-
-    console.error('Contact error:', err);
-
-    return res.status(500).json({
-      error: 'Contact request failed'
-    });
-
-  }
-
-});
-
-/* ===========================
-GLOBAL ERROR HANDLER
-=========================== */
-
-app.use((err, req, res, next) => {
-  console.error('Unhandled error:', err);
-  res.status(500).json({ error: 'Internal server error' });
 });
 
 /* ===========================
