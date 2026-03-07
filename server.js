@@ -47,7 +47,7 @@ INIT CLIENTS
 =========================== */
 
 const stripe = process.env.STRIPE_SECRET_KEY
-  ? new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2023-10-16' })
+  ? new Stripe(process.env.STRIPE_SECRET_KEY)
   : null;
 
 const openai = process.env.OPENAI_API_KEY
@@ -115,6 +115,65 @@ app.get('/', (req, res) => {
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
+});
+
+/* ===========================
+STRIPE CHECKOUT SESSION
+=========================== */
+
+app.get('/api/create-checkout-session', async (req, res) => {
+
+  try {
+
+    if (!stripe) {
+      return res.status(500).json({ error: "Stripe not configured" });
+    }
+
+    const { price } = req.query;
+
+    const priceMap = {
+      PRICE_STARTER_MONTHLY: process.env.PRICE_STARTER_MONTHLY,
+      PRICE_STARTER_YEARLY: process.env.PRICE_STARTER_YEARLY,
+      PRICE_PRO_MONTHLY: process.env.PRICE_PRO_MONTHLY,
+      PRICE_PRO_YEARLY: process.env.PRICE_PRO_YEARLY
+    };
+
+    const stripePrice = priceMap[price];
+
+    if (!stripePrice) {
+      return res.status(400).json({ error: "Invalid price id" });
+    }
+
+    const session = await stripe.checkout.sessions.create({
+
+      mode: "subscription",
+
+      line_items: [
+        {
+          price: stripePrice,
+          quantity: 1
+        }
+      ],
+
+      success_url: "https://proofdeed.com/success",
+      cancel_url: "https://proofdeed.com/document",
+
+      billing_address_collection: "auto"
+
+    });
+
+    res.redirect(303, session.url);
+
+  } catch (error) {
+
+    console.error("Stripe session error:", error);
+
+    res.status(500).json({
+      error: "Stripe session creation failed"
+    });
+
+  }
+
 });
 
 /* ===========================
@@ -287,7 +346,7 @@ app.post('/api/certify-document', authenticateToken, async (req, res) => {
 });
 
 /* ===========================
-USER CERTIFICATIONS (DASHBOARD)
+USER CERTIFICATIONS
 =========================== */
 
 app.get('/api/my-certifications', authenticateToken, (req, res) => {
