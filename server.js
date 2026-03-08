@@ -1,4 +1,3 @@
-import OpenAI from "openai";
 import dotenv from 'dotenv';
 dotenv.config();
 
@@ -116,6 +115,45 @@ app.get('/', (req, res) => {
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
+});
+
+/* ===========================
+AI TEST ROUTE
+=========================== */
+
+app.get('/api/ai-test', async (req, res) => {
+
+  try {
+
+    if (!openai) {
+      return res.status(500).json({
+        error: "OpenAI not configured"
+      });
+    }
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: "You are ProofDeed AI." },
+        { role: "user", content: "Say AI is connected." }
+      ]
+    });
+
+    res.json({
+      success: true,
+      reply: response.choices[0].message.content
+    });
+
+  } catch (err) {
+
+    console.error(err);
+
+    res.status(500).json({
+      error: "AI test failed"
+    });
+
+  }
+
 });
 
 /* ===========================
