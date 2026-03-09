@@ -1,18 +1,17 @@
-```javascript
-import dotenv from 'dotenv';
+import dotenv from "dotenv";
 dotenv.config();
 
 import anchorToPolygon from "./polygon.js";
-import express from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
-import Stripe from 'stripe';
-import OpenAI from 'openai';
-import crypto from 'crypto';
-import PDFDocument from 'pdfkit';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
+import express from "express";
+import cors from "cors";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
+import Stripe from "stripe";
+import OpenAI from "openai";
+import crypto from "crypto";
+import PDFDocument from "pdfkit";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -40,23 +39,27 @@ const openai = process.env.OPENAI_API_KEY
 SECURITY + MIDDLEWARE
 =========================== */
 
-app.set('trust proxy', 1);
+app.set("trust proxy", 1);
 
 app.use(helmet());
 
-app.use(cors({
-  origin: [
-    'https://proofdeed.com',
-    'https://www.proofdeed.com',
-    process.env.FRONTEND_URL
-  ].filter(Boolean),
-  credentials: true
-}));
+app.use(
+  cors({
+    origin: [
+      "https://proofdeed.com",
+      "https://www.proofdeed.com",
+      process.env.FRONTEND_URL,
+    ].filter(Boolean),
+    credentials: true,
+  })
+);
 
-app.use(rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100
-}));
+app.use(
+  rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 100,
+  })
+);
 
 /* ===========================
 IMPORTANT
@@ -64,52 +67,50 @@ Stripe webhook must receive RAW body
 =========================== */
 
 app.post(
-  '/api/stripe-webhook',
-  express.raw({ type: 'application/json' }),
+  "/api/stripe-webhook",
+  express.raw({ type: "application/json" }),
   async (req, res) => {
+    if (!stripe) {
+      console.error("Stripe not configured");
+      return res.status(500).send("Stripe not configured");
+    }
 
-    const sig = req.headers['stripe-signature'];
+    const sig = req.headers["stripe-signature"];
 
     let event;
 
     try {
-
       event = stripe.webhooks.constructEvent(
         req.body,
         sig,
         process.env.STRIPE_WEBHOOK_SECRET
       );
-
     } catch (err) {
-
       console.error("Webhook signature error:", err.message);
       return res.status(400).send(`Webhook Error: ${err.message}`);
-
     }
 
-    if (event.type === 'checkout.session.completed') {
+    try {
+      if (event.type === "checkout.session.completed") {
+        const session = event.data.object;
+        console.log("✅ Payment completed:", session.id);
+      }
 
-      const session = event.data.object;
-      console.log("✅ Payment completed:", session.id);
+      if (event.type === "customer.subscription.created") {
+        const subscription = event.data.object;
+        console.log("📦 Subscription created:", subscription.id);
+      }
 
+      if (event.type === "customer.subscription.deleted") {
+        const subscription = event.data.object;
+        console.log("❌ Subscription cancelled:", subscription.id);
+      }
+
+      res.json({ received: true });
+    } catch (err) {
+      console.error("Webhook handler error:", err);
+      res.status(500).send("Webhook processing error");
     }
-
-    if (event.type === 'customer.subscription.created') {
-
-      const subscription = event.data.object;
-      console.log("📦 Subscription created:", subscription.id);
-
-    }
-
-    if (event.type === 'customer.subscription.deleted') {
-
-      const subscription = event.data.object;
-      console.log("❌ Subscription cancelled:", subscription.id);
-
-    }
-
-    res.json({ received: true });
-
   }
 );
 
@@ -117,7 +118,7 @@ app.post(
 NORMAL JSON ROUTES
 =========================== */
 
-app.use('/api', express.json({ limit: '2mb' }));
+app.use("/api", express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 /* ===========================
@@ -125,7 +126,6 @@ AUTH MIDDLEWARE
 =========================== */
 
 function authenticateToken(req, res, next) {
-
   const authHeader = req.headers.authorization;
 
   if (!authHeader) {
@@ -135,128 +135,127 @@ function authenticateToken(req, res, next) {
   const token = authHeader.split(" ")[1];
 
   jwt.verify(token, process.env.JWT_SECRET || "dev_secret", (err, user) => {
-
     if (err) {
       return res.status(403).json({ error: "Invalid token" });
     }
 
     req.user = user;
     next();
-
   });
-
 }
 
 /* ===========================
 HEALTH
 =========================== */
 
-app.get('/', (req, res) => {
-  res.status(200).send('ProofDeed backend running');
+app.get("/", (req, res) => {
+  res.status(200).send("ProofDeed backend running");
 });
 
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok' });
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok" });
 });
 
 /* ===========================
 AI TEST ROUTE
 =========================== */
 
-app.get('/api/ai-test', async (req, res) => {
+app.get("/api/ai-test", async (req, res) => {
+  if (!openai) {
+    return res.status(500).json({ error: "OpenAI not configured" });
+  }
 
   try {
-
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         { role: "system", content: "You are ProofDeed AI." },
-        { role: "user", content: "Say AI is connected." }
-      ]
+        { role: "user", content: "Say AI is connected." },
+      ],
     });
 
     res.json({
       success: true,
-      reply: response.choices[0].message.content
+      reply: response.choices[0].message.content,
     });
-
   } catch (err) {
-
     console.error(err);
 
     res.status(500).json({
-      error: "AI test failed"
+      error: "AI test failed",
     });
-
   }
-
 });
 
 /* ===========================
 STRIPE CHECKOUT SESSION
 =========================== */
 
-app.get('/api/create-checkout-session', async (req, res) => {
+app.get("/api/create-checkout-session", async (req, res) => {
+  if (!stripe) {
+    return res.status(500).json({ error: "Stripe not configured" });
+  }
 
   try {
-
     const { price } = req.query;
 
     const priceMap = {
       PRICE_STARTER_MONTHLY: process.env.PRICE_STARTER_MONTHLY,
       PRICE_STARTER_YEARLY: process.env.PRICE_STARTER_YEARLY,
       PRICE_PRO_MONTHLY: process.env.PRICE_PRO_MONTHLY,
-      PRICE_PRO_YEARLY: process.env.PRICE_PRO_YEARLY
+      PRICE_PRO_YEARLY: process.env.PRICE_PRO_YEARLY,
     };
 
     const stripePrice = priceMap[price];
 
-    const session = await stripe.checkout.sessions.create({
+    if (!stripePrice) {
+      return res.status(400).json({ error: "Invalid price selected" });
+    }
 
+    const session = await stripe.checkout.sessions.create({
       mode: "subscription",
 
       line_items: [
         {
           price: stripePrice,
-          quantity: 1
-        }
+          quantity: 1,
+        },
       ],
 
-      success_url: "https://proofdeed.com/success?session_id={CHECKOUT_SESSION_ID}",
+      success_url:
+        "https://proofdeed.com/success?session_id={CHECKOUT_SESSION_ID}",
       cancel_url: "https://proofdeed.com/document",
 
-      billing_address_collection: "auto"
-
+      billing_address_collection: "auto",
     });
 
     res.redirect(303, session.url);
-
   } catch (error) {
-
     console.error("Stripe session error:", error);
 
     res.status(500).json({
-      error: "Stripe session creation failed"
+      error: "Stripe session creation failed",
     });
-
   }
-
 });
 
 /* ===========================
 CERTIFY DOCUMENT
 =========================== */
 
-app.post('/api/certify-document', authenticateToken, async (req, res) => {
+app.post("/api/certify-document", authenticateToken, async (req, res) => {
+  if (!openai) {
+    return res.status(500).json({ error: "OpenAI not configured" });
+  }
 
   try {
-
     const { document } = req.body;
 
-    const hash = crypto
-      .createHash('sha256')
-      .update(document)
-      .digest('hex');
+    if (!document) {
+      return res.status(400).json({ error: "Document required" });
+    }
+
+    const hash = crypto.createHash("sha256").update(document).digest("hex");
 
     await anchorToPolygon(hash);
 
@@ -264,22 +263,21 @@ app.post('/api/certify-document', authenticateToken, async (req, res) => {
     const certification_id = "PD-" + Date.now();
 
     const ai = await openai.chat.completions.create({
-
       model: "gpt-4o-mini",
 
       messages: [
         {
           role: "system",
-          content: "Extract structured data from legal documents and return JSON."
+          content:
+            "Extract structured data from legal documents and return JSON.",
         },
         {
           role: "user",
-          content: document
-        }
+          content: document,
+        },
       ],
 
-      response_format: { type: "json_object" }
-
+      response_format: { type: "json_object" },
     });
 
     const extracted = JSON.parse(ai.choices[0].message.content);
@@ -289,7 +287,7 @@ app.post('/api/certify-document', authenticateToken, async (req, res) => {
       timestamp,
       hash,
       user_id: req.user.id,
-      document_data: extracted
+      document_data: extracted,
     };
 
     certifications.push(record);
@@ -299,19 +297,15 @@ app.post('/api/certify-document', authenticateToken, async (req, res) => {
       certification_id,
       hash,
       timestamp,
-      document_data: extracted
+      document_data: extracted,
     });
-
   } catch (err) {
-
     console.error("Certification error:", err);
 
     return res.status(500).json({
-      error: "Certification failed"
+      error: "Certification failed",
     });
-
   }
-
 });
 
 /* ===========================
@@ -321,4 +315,3 @@ START SERVER
 app.listen(PORT, () => {
   console.log("🚀 Server running on port " + PORT);
 });
-```
