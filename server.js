@@ -522,6 +522,67 @@ app.get('/api/verify-payment', async (req, res) => {
 
 });
 /* ===========================
+STRIPE WEBHOOK
+=========================== */
+
+app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+
+  const sig = req.headers['stripe-signature'];
+
+  if (!process.env.STRIPE_WEBHOOK_SECRET) {
+    console.warn("⚠️ STRIPE_WEBHOOK_SECRET not set");
+    return res.status(400).send("Webhook secret missing");
+  }
+
+  let event;
+
+  try {
+
+    event = stripe.webhooks.constructEvent(
+      req.body,
+      sig,
+      process.env.STRIPE_WEBHOOK_SECRET
+    );
+
+  } catch (err) {
+
+    console.error("Webhook signature error:", err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+
+  }
+
+  /* ===========================
+  HANDLE EVENTS
+  =========================== */
+
+  if (event.type === 'checkout.session.completed') {
+
+    const session = event.data.object;
+
+    console.log("✅ Payment completed:", session.id);
+
+  }
+
+  if (event.type === 'customer.subscription.created') {
+
+    const subscription = event.data.object;
+
+    console.log("📦 Subscription created:", subscription.id);
+
+  }
+
+  if (event.type === 'customer.subscription.deleted') {
+
+    const subscription = event.data.object;
+
+    console.log("❌ Subscription cancelled:", subscription.id);
+
+  }
+
+  res.json({ received: true });
+
+});
+/* ===========================
 START SERVER
 =========================== */
 
