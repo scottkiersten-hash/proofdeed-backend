@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 dotenv.config();
-
+const anchorToPolygon = require("./polygon");
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
