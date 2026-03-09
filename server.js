@@ -473,7 +473,54 @@ app.get('/api/certificate/:id/pdf', (req, res) => {
   doc.end();
 
 });
+/* ===========================
+VERIFY STRIPE PAYMENT
+=========================== */
 
+app.get('/api/verify-payment', async (req, res) => {
+
+  try {
+
+    if (!stripe) {
+      return res.status(500).json({
+        error: "Stripe not configured"
+      });
+    }
+
+    const { session_id } = req.query;
+
+    if (!session_id) {
+      return res.status(400).json({
+        error: "Missing session_id"
+      });
+    }
+
+    const session = await stripe.checkout.sessions.retrieve(session_id);
+
+    if (session.payment_status !== "paid") {
+      return res.status(400).json({
+        success: false,
+        status: session.payment_status
+      });
+    }
+
+    res.json({
+      success: true,
+      customer: session.customer,
+      subscription: session.subscription
+    });
+
+  } catch (err) {
+
+    console.error("Verify payment error:", err);
+
+    res.status(500).json({
+      error: "Verification failed"
+    });
+
+  }
+
+});
 /* ===========================
 START SERVER
 =========================== */
