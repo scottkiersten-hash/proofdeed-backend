@@ -9,6 +9,11 @@ const wallet = new ethers.Wallet(
 
 export default async function anchorToPolygon(hash) {
 
+  if (!process.env.POLYGON_RPC_URL || !process.env.POLYGON_PRIVATE_KEY) {
+    console.log("Polygon not configured — skipping anchor");
+    return null;
+  }
+
   try {
 
     const tx = await wallet.sendTransaction({
@@ -23,9 +28,11 @@ export default async function anchorToPolygon(hash) {
 
     return tx.hash;
 
-  } catch (err) {
+  } catch (error) {
 
-    console.error("Polygon anchor error:", err);
+    console.error("Polygon anchor failed:", error);
+
+    return null;
 
   }
 
