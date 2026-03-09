@@ -195,7 +195,7 @@ app.get('/api/create-checkout-session', async (req, res) => {
         }
       ],
 
-      success_url: "https://proofdeed.com/success",
+      success_url: "https://proofdeed.com/success?session_id={CHECKOUT_SESSION_ID}",
       cancel_url: "https://proofdeed.com/document",
 
       billing_address_collection: "auto"
