@@ -117,7 +117,7 @@ app.post(
 NORMAL JSON ROUTES
 =========================== */
 
-app.use(express.json({ limit: '2mb' }));
+app.use('/api', express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 /* ===========================
