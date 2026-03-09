@@ -1,4 +1,4 @@
-const { ethers } = require("ethers");
+import { ethers } from "ethers";
 
 const provider = new ethers.JsonRpcProvider(process.env.POLYGON_RPC_URL);
 
@@ -7,7 +7,7 @@ const wallet = new ethers.Wallet(
   provider
 );
 
-async function anchorHashToPolygon(hash) {
+export default async function anchorToPolygon(hash) {
 
   try {
 
@@ -17,18 +17,16 @@ async function anchorHashToPolygon(hash) {
       data: ethers.hexlify(ethers.toUtf8Bytes(hash))
     });
 
-    console.log("Polygon TX:", tx.hash);
+    await tx.wait();
+
+    console.log("Polygon anchor tx:", tx.hash);
 
     return tx.hash;
 
-  } catch (error) {
+  } catch (err) {
 
-    console.error("Polygon anchor error:", error);
-
-    return null;
+    console.error("Polygon anchor error:", err);
 
   }
 
 }
-
-module.exports = { anchorHashToPolygon };
