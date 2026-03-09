@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
 dotenv.config();
-const anchorToPolygon = require("./polygon");
+
+import anchorToPolygon from "./polygon.js";
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -329,6 +330,8 @@ app.post('/api/certify-document', authenticateToken, async (req, res) => {
       .createHash('sha256')
       .update(document)
       .digest('hex');
+
+    await anchorToPolygon(hash);
 
     const timestamp = new Date().toISOString();
     const certification_id = "PD-" + Date.now();
