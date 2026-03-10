@@ -9,19 +9,23 @@ import rateLimit from "express-rate-limit";
 import Stripe from "stripe";
 import OpenAI from "openai";
 import crypto from "crypto";
-import PDFDocument from "pdfkit";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import pkg from "pg";
+
+const { Pool } = pkg;
 
 const app = express();
 const PORT = process.env.PORT || 8080;
 
 /* ===========================
-TEMP STORAGE
+DATABASE
 =========================== */
 
-const users = [];
-const certifications = [];
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
+});
 
 /* ===========================
 INIT CLIENTS
@@ -51,41 +55,6 @@ app.use(rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100
 }));
-
-/* ======================================================
-STRIPE WEBHOOK
-====================================================== */
-
-app.post(
-  "/api/stripe-webhook",
-  express.raw({ type: "*/*" }),
-  (req, res) => {
-
-    const sig = req.headers["stripe-signature"];
-
-    let event;
-
-    try {
-
-      event = stripe.webhooks.constructEvent(
-        req.body,
-        sig,
-        process.env.STRIPE_WEBHOOK_SECRET
-      );
-
-    } catch (err) {
-
-      console.error("Webhook verification failed:", err.message);
-      return res.status(400).send(`Webhook Error: ${err.message}`);
-
-    }
-
-    console.log("Stripe event received:", event.type);
-
-    res.json({ received: true });
-
-  }
-);
 
 /* ===========================
 BODY PARSERS
@@ -141,22 +110,25 @@ app.get("/api/health", (req, res) => {
 VERIFY CERTIFICATE
 =========================== */
 
-app.get("/api/verify/:hash", (req, res) => {
+app.get("/api/verify/:hash", async (req, res) => {
 
-  const cert = certifications.find(
-    c => c.hash === req.params.hash
+  const { rows } = await pool.query(
+    "SELECT * FROM certifications WHERE hash=$1",
+    [req.params.hash]
   );
 
-  if (!cert) {
+  if (!rows.length) {
     return res.status(404).json({ verified: false });
   }
+
+  const cert = rows[0];
 
   res.json({
     verified: true,
     certification_id: cert.certification_id,
     timestamp: cert.timestamp,
     hash: cert.hash,
-    polygon_tx: cert.polygon_tx || null
+    polygon_tx: cert.polygon_tx
   });
 
 });
@@ -165,52 +137,18 @@ app.get("/api/verify/:hash", (req, res) => {
 GET CERTIFICATE
 =========================== */
 
-app.get("/api/certificate/:id", (req, res) => {
+app.get("/api/certificate/:id", async (req, res) => {
 
-  const cert = certifications.find(
-    c => c.certification_id === req.params.id
+  const { rows } = await pool.query(
+    "SELECT * FROM certifications WHERE certification_id=$1",
+    [req.params.id]
   );
 
-  if (!cert) {
-    return res.status(404).json({
-      error: "Certificate not found"
-    });
+  if (!rows.length) {
+    return res.status(404).json({ error: "Certificate not found" });
   }
 
-  res.json(cert);
-
-});
-
-/* ===========================
-AI CONNECTION TEST
-=========================== */
-
-app.get("/api/ai-test", async (req, res) => {
-
-  try {
-
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        { role: "system", content: "You are ProofDeed AI." },
-        { role: "user", content: "Say AI is connected." }
-      ]
-    });
-
-    res.json({
-      success: true,
-      reply: response.choices[0].message.content
-    });
-
-  } catch (err) {
-
-    console.error("AI error:", err);
-
-    res.status(500).json({
-      error: "AI connection failed"
-    });
-
-  }
+  res.json(rows[0]);
 
 });
 
@@ -224,81 +162,52 @@ app.post("/api/certify-document", authenticateToken, async (req, res) => {
 
     const { document } = req.body;
 
-    if (!document) {
-      return res.status(400).json({
-        error: "Document content required"
-      });
-    }
-
-    /* HASH DOCUMENT */
-
     const hash = crypto
       .createHash("sha256")
       .update(document)
       .digest("hex");
 
-    /* POLYGON ANCHOR */
-
-    let polygon_tx = null;
-
-    try {
-
-      polygon_tx = await anchorToPolygon(hash);
-
-    } catch (err) {
-
-      console.error("Polygon anchor failed:", err);
-
-    }
+    const polygon_tx = await anchorToPolygon(hash);
 
     const timestamp = new Date().toISOString();
     const certification_id = "PD-" + Date.now();
 
-    /* AI EXTRACTION */
+    const ai = await openai.chat.completions.create({
 
-    let extracted = {};
+      model: "gpt-4o-mini",
 
-    try {
+      messages: [
+        {
+          role: "system",
+          content: "Extract structured data from legal documents and return JSON."
+        },
+        {
+          role: "user",
+          content: document
+        }
+      ],
 
-      const ai = await openai.chat.completions.create({
+      response_format: { type: "json_object" }
 
-        model: "gpt-4o-mini",
+    });
 
-        messages: [
-          {
-            role: "system",
-            content: "Extract structured data from legal documents and return JSON."
-          },
-          {
-            role: "user",
-            content: document
-          }
-        ],
+    const extracted = JSON.parse(ai.choices[0].message.content);
 
-        response_format: { type: "json_object" }
-
-      });
-
-      extracted = JSON.parse(ai.choices[0].message.content);
-
-    } catch (err) {
-
-      console.error("AI extraction failed:", err);
-
-    }
-
-    const record = {
-
-      certification_id,
-      timestamp,
-      hash,
-      polygon_tx,
-      user_id: req.user.id,
-      document_data: extracted
-
-    };
-
-    certifications.push(record);
+    await pool.query(
+      `
+      INSERT INTO certifications
+      (certification_id, timestamp, hash, polygon_tx, user_id, document_data)
+      VALUES ($1,$2,$3,$4,$5,$6)
+      `,
+      [
+        certification_id,
+        timestamp,
+        hash,
+        polygon_tx,
+        req.user.id,
+        extracted
+      ]
+    );
 
     res.json({
       certification_id,
@@ -310,7 +219,7 @@ app.post("/api/certify-document", authenticateToken, async (req, res) => {
 
   } catch (err) {
 
-    console.error("Certification failed:", err);
+    console.error(err);
 
     res.status(500).json({
       error: "Certification failed"
@@ -326,41 +235,39 @@ TEST CERTIFICATE
 
 app.get("/api/test-cert", async (req, res) => {
 
-  try {
+  const document = "ProofDeed Test Document";
 
-    const document = "ProofDeed Test Document";
+  const hash = crypto
+    .createHash("sha256")
+    .update(document)
+    .digest("hex");
 
-    const hash = crypto
-      .createHash("sha256")
-      .update(document)
-      .digest("hex");
+  const polygon_tx = await anchorToPolygon(hash);
 
-    const polygon_tx = await anchorToPolygon(hash);
+  const timestamp = new Date().toISOString();
+  const certification_id = "PD-" + Date.now();
 
-    const timestamp = new Date().toISOString();
-    const certification_id = "PD-" + Date.now();
-
-    const record = {
+  await pool.query(
+    `
+    INSERT INTO certifications
+    (certification_id, timestamp, hash, polygon_tx, document_data)
+    VALUES ($1,$2,$3,$4,$5)
+    `,
+    [
       certification_id,
       timestamp,
       hash,
       polygon_tx,
-      document_data: { test: true }
-    };
+      { test: true }
+    ]
+  );
 
-    certifications.push(record);
-
-    res.json(record);
-
-  } catch (err) {
-
-    console.error("Test cert error:", err);
-
-    res.status(500).json({
-      error: "Test certification failed"
-    });
-
-  }
+  res.json({
+    certification_id,
+    timestamp,
+    hash,
+    polygon_tx
+  });
 
 });
 
@@ -373,7 +280,6 @@ app.listen(PORT, () => {
   console.log("================================");
   console.log("ProofDeed backend running");
   console.log("Port:", PORT);
-  console.log("Environment:", process.env.NODE_ENV || "development");
   console.log("================================");
 
 });
