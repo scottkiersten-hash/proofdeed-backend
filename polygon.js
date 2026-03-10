@@ -1,36 +1,36 @@
 import { ethers } from "ethers";
 
-const provider = new ethers.JsonRpcProvider(process.env.POLYGON_RPC_URL);
-
-const wallet = new ethers.Wallet(
-  process.env.POLYGON_PRIVATE_KEY,
-  provider
-);
-
 export default async function anchorToPolygon(hash) {
-
-  if (!process.env.POLYGON_RPC_URL || !process.env.POLYGON_PRIVATE_KEY) {
-    console.log("Polygon not configured — skipping anchor");
-    return null;
-  }
 
   try {
 
+    if (!process.env.POLYGON_RPC_URL || !process.env.POLYGON_PRIVATE_KEY) {
+      console.log("Polygon not configured");
+      return null;
+    }
+
+    const provider = new ethers.JsonRpcProvider(process.env.POLYGON_RPC_URL);
+
+    const wallet = new ethers.Wallet(
+      process.env.POLYGON_PRIVATE_KEY,
+      provider
+    );
+
     const tx = await wallet.sendTransaction({
       to: wallet.address,
-      value: 0,
+      value: 0n,
       data: ethers.hexlify(ethers.toUtf8Bytes(hash))
     });
 
-    await tx.wait();
+    console.log("Polygon TX sent:", tx.hash);
 
-    console.log("Polygon anchor tx:", tx.hash);
+    await tx.wait();
 
     return tx.hash;
 
-  } catch (error) {
+  } catch (err) {
 
-    console.error("Polygon anchor failed:", error);
+    console.error("Polygon anchor failed:", err);
 
     return null;
 
