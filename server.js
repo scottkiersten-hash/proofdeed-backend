@@ -304,7 +304,6 @@ app.post("/api/certify-document", authenticateToken, async (req, res) => {
 
     const extracted = JSON.parse(ai.choices[0].message.content);
 
-  const polygon_tx = await anchorToPolygon(hash);
 
 const record = {
   certification_id,
