@@ -212,7 +212,11 @@ app.post("/api/certify-document", authenticateToken, async (req, res) => {
       .update(document)
       .digest("hex");
 
-    const polygon_tx = await anchorToPolygon(hash);
+    /* MERKLE QUEUE INSTEAD OF DIRECT POLYGON ANCHOR */
+
+    queueHash(hash);
+
+    const polygon_tx = null;
 
     const timestamp = new Date().toISOString();
     const certification_id = "PD-" + Date.now();
@@ -352,6 +356,41 @@ async function startServer() {
       console.log("================================");
 
     });
+
+    /* MERKLE BATCH PROCESSOR */
+
+    setInterval(async () => {
+
+      try {
+
+        const batch = await processBatch();
+
+        if (!batch) return;
+
+        const { polygon_tx, hashes } = batch;
+
+        for (const hash of hashes) {
+
+          await pool.query(
+            `
+            UPDATE certifications
+            SET polygon_tx=$1
+            WHERE hash=$2
+            `,
+            [polygon_tx, hash]
+          );
+
+        }
+
+        console.log("Batch anchored:", hashes.length);
+
+      } catch (err) {
+
+        console.error("Batch anchor failed", err);
+
+      }
+
+    }, 60000);
 
   } catch (err) {
 
