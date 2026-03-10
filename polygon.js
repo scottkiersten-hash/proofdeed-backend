@@ -1,9 +1,7 @@
 import { ethers } from "ethers";
 
 export default async function anchorToPolygon(hash) {
-
   try {
-
     if (!process.env.POLYGON_RPC_URL || !process.env.POLYGON_PRIVATE_KEY) {
       console.log("Polygon not configured");
       return null;
@@ -16,7 +14,7 @@ export default async function anchorToPolygon(hash) {
       provider
     );
 
-    console.log("Using wallet:", wallet.address);
+    console.log("Server wallet address:", wallet.address);
 
     const tx = await wallet.sendTransaction({
       to: wallet.address,
@@ -24,21 +22,16 @@ export default async function anchorToPolygon(hash) {
       data: ethers.hexlify(ethers.toUtf8Bytes(hash))
     });
 
-    console.log("Transaction submitted:", tx.hash);
+    console.log("TX submitted:", tx.hash);
 
-    const receipt = await tx.wait();
+    await tx.wait();
 
-    console.log("Transaction confirmed:", receipt.hash);
+    console.log("TX confirmed:", tx.hash);
 
     return tx.hash;
 
   } catch (err) {
-
-    console.error("Polygon anchor failed:");
-    console.error(err);
-
+    console.error("Polygon anchor failed:", err);
     return null;
-
   }
-
 }
