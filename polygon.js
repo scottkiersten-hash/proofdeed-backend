@@ -5,8 +5,7 @@ export default async function anchorToPolygon(hash) {
   try {
 
     const rpc =
-      process.env.POLYGON_RPC_URL ||
-      process.env.POLYGON_RPC;
+     const RPC = "https://polygon-rpc.com";
 
     const key = process.env.POLYGON_PRIVATE_KEY;
 
