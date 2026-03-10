@@ -76,13 +76,12 @@ app.get("/api/test-cert", async (req, res) => {
     console.log("Starting test certification...");
 
     const testDocument = "ProofDeed test document " + Date.now();
+    console.log("Test document:", testDocument);
 
     const hash = crypto.createHash("sha256").update(testDocument).digest("hex");
-
     console.log("Generated hash:", hash);
 
     const polygonTx = await anchorToPolygon(hash);
-
     console.log("Polygon TX:", polygonTx);
 
     const certificationId = "PD-" + Date.now();
@@ -115,7 +114,7 @@ app.get("/api/test-cert", async (req, res) => {
 
     res.status(500).json({
       success: false,
-      error: error.message
+      error: error.message || "Unknown error"
     });
   }
 });
