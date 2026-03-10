@@ -155,7 +155,7 @@ app.get("/api/health", (req, res) => {
 });
 
 /* ===========================
-VERIFY CERTIFICATE (NEW)
+VERIFY CERTIFICATE
 =========================== */
 
 app.get("/api/verify/:hash", (req, res) => {
@@ -174,7 +174,8 @@ app.get("/api/verify/:hash", (req, res) => {
     verified: true,
     certification_id: cert.certification_id,
     timestamp: cert.timestamp,
-    hash: cert.hash
+    hash: cert.hash,
+    polygon_tx: cert.polygon_tx
   });
 
 });
@@ -278,7 +279,7 @@ app.post("/api/certify-document", authenticateToken, async (req, res) => {
       .update(document)
       .digest("hex");
 
-    await anchorToPolygon(hash);
+    const polygon_tx = await anchorToPolygon(hash);
 
     const timestamp = new Date().toISOString();
     const certification_id = "PD-" + Date.now();
@@ -304,15 +305,14 @@ app.post("/api/certify-document", authenticateToken, async (req, res) => {
 
     const extracted = JSON.parse(ai.choices[0].message.content);
 
-
-const record = {
-  certification_id,
-  timestamp,
-  hash,
-  polygon_tx,
-  user_id: req.user.id,
-  document_data: extracted
-};
+    const record = {
+      certification_id,
+      timestamp,
+      hash,
+      polygon_tx,
+      user_id: req.user.id,
+      document_data: extracted
+    };
 
     certifications.push(record);
 
@@ -320,6 +320,7 @@ const record = {
       success: true,
       certification_id,
       hash,
+      polygon_tx,
       timestamp,
       document_data: extracted
     });
