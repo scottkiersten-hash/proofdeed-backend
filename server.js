@@ -1,6 +1,6 @@
 import dotenv from "dotenv";
 dotenv.config();
-
+import { queueHash, processBatch } from "./merkleAnchor.js";
 import anchorToPolygon from "./polygon.js";
 import express from "express";
 import cors from "cors";
