@@ -158,7 +158,7 @@ app.get("/api/verify/:hash", (req, res) => {
 });
 
 /* ===========================
-GET CERTIFICATE (NEW)
+GET CERTIFICATE
 =========================== */
 
 app.get("/api/certificate/:id", (req, res) => {
@@ -267,6 +267,38 @@ app.post("/api/certify-document", authenticateToken, async (req, res) => {
     });
 
   }
+
+});
+
+/* ===========================
+TEST CERTIFICATE
+=========================== */
+
+app.get("/api/test-cert", async (req, res) => {
+
+  const document = "ProofDeed Test Document";
+
+  const hash = crypto
+    .createHash("sha256")
+    .update(document)
+    .digest("hex");
+
+  const polygon_tx = await anchorToPolygon(hash);
+
+  const timestamp = new Date().toISOString();
+  const certification_id = "PD-" + Date.now();
+
+  const record = {
+    certification_id,
+    timestamp,
+    hash,
+    polygon_tx,
+    document_data: { test: true }
+  };
+
+  certifications.push(record);
+
+  res.json(record);
 
 });
 
