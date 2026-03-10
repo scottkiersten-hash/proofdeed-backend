@@ -85,7 +85,6 @@ app.post(
     if (event.type === "checkout.session.completed") {
 
       const session = event.data.object;
-
       console.log("Payment completed:", session.id);
 
     }
@@ -93,7 +92,6 @@ app.post(
     if (event.type === "invoice.payment_succeeded") {
 
       const invoice = event.data.object;
-
       console.log("Invoice paid:", invoice.id);
 
     }
@@ -101,7 +99,6 @@ app.post(
     if (event.type === "customer.subscription.deleted") {
 
       const sub = event.data.object;
-
       console.log("Subscription cancelled:", sub.id);
 
     }
@@ -155,6 +152,31 @@ app.get("/", (req, res) => {
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
+});
+
+/* ===========================
+VERIFY CERTIFICATE (NEW)
+=========================== */
+
+app.get("/api/verify/:hash", (req, res) => {
+
+  const cert = certifications.find(
+    c => c.hash === req.params.hash
+  );
+
+  if (!cert) {
+    return res.status(404).json({
+      verified: false
+    });
+  }
+
+  res.json({
+    verified: true,
+    certification_id: cert.certification_id,
+    timestamp: cert.timestamp,
+    hash: cert.hash
+  });
+
 });
 
 /* ===========================
