@@ -8,19 +8,20 @@
     "start": "node server.js"
   },
   "engines": {
-    "node": ">=18"
+    "node": "20.x"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
+    "ethers": "^6.13.4",
     "express": "^4.19.2",
-    "helmet": "^7.0.0",
+    "express-rate-limit": "^7.3.0",
+    "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
     "openai": "^4.52.0",
-    "pdfkit": "^0.14.0",
+    "pdfkit": "^0.15.0",
     "pg": "^8.11.5",
-    "rate-limit": "^1.4.0",
-    "stripe": "^14.23.0"
+    "stripe": "^14.25.0"
   }
 }
