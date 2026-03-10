@@ -1,4 +1,4 @@
-import dotenv from "dotenv";
+ import dotenv from "dotenv";
 dotenv.config();
 
 import express from "express";
@@ -74,7 +74,6 @@ AUTH
 =========================== */
 
 function authenticateToken(req, res, next) {
-
   const authHeader = req.headers.authorization;
 
   if (!authHeader) {
@@ -91,17 +90,14 @@ function authenticateToken(req, res, next) {
     token,
     process.env.JWT_SECRET,
     (err, user) => {
-
       if (err) {
         return res.status(403).json({ error: "Invalid token" });
       }
 
       req.user = user;
       next();
-
     }
   );
-
 }
 
 /* ===========================
@@ -113,25 +109,19 @@ app.get("/", (req, res) => {
 });
 
 app.get("/api/health", async (req, res) => {
-
   try {
-
     await pool.query("SELECT 1");
 
     res.json({
       status: "ok",
       database: "connected"
     });
-
   } catch (err) {
-
     res.status(500).json({
       status: "error",
       database: "disconnected"
     });
-
   }
-
 });
 
 /* ===========================
@@ -139,9 +129,7 @@ VERIFY CERTIFICATE
 =========================== */
 
 app.get("/api/verify/:hash", async (req, res) => {
-
   try {
-
     const { rows } = await pool.query(
       "SELECT * FROM certifications WHERE hash=$1",
       [req.params.hash]
@@ -160,15 +148,10 @@ app.get("/api/verify/:hash", async (req, res) => {
       hash: cert.hash,
       polygon_tx: cert.polygon_tx
     });
-
   } catch (err) {
-
     console.error(err);
-
     res.status(500).json({ error: "Verification failed" });
-
   }
-
 });
 
 /* ===========================
@@ -176,9 +159,7 @@ GET CERTIFICATE
 =========================== */
 
 app.get("/api/certificate/:id", async (req, res) => {
-
   try {
-
     const { rows } = await pool.query(
       "SELECT * FROM certifications WHERE certification_id=$1",
       [req.params.id]
@@ -189,15 +170,10 @@ app.get("/api/certificate/:id", async (req, res) => {
     }
 
     res.json(rows[0]);
-
   } catch (err) {
-
     console.error(err);
-
     res.status(500).json({ error: "Database error" });
-
   }
-
 });
 
 /* ===========================
@@ -205,17 +181,14 @@ CERTIFY DOCUMENT
 =========================== */
 
 app.post("/api/certify-document", authenticateToken, async (req, res) => {
-
   try {
-
     const { document } = req.body;
 
     if (!document) {
       return res.status(400).json({ error: "Document required" });
     }
 
-    /* Prevent extremely large documents */
-
+    // Prevent extremely large documents
     if (document.length > 200000) {
       return res.status(400).json({ error: "Document too large" });
     }
@@ -225,40 +198,31 @@ app.post("/api/certify-document", authenticateToken, async (req, res) => {
       .update(document)
       .digest("hex");
 
-    /* Prevent duplicate certifications */
-
+    // Prevent duplicate certifications
     const existing = await pool.query(
       "SELECT certification_id FROM certifications WHERE hash=$1",
       [hash]
     );
 
     if (existing.rows.length) {
-
       return res.json({
         duplicate: true,
         certification_id: existing.rows[0].certification_id
       });
-
     }
 
     const polygon_tx = await anchorToPolygon(hash);
-
     const timestamp = new Date().toISOString();
 
-    /* Safer ID generation */
-
+    // Safer ID generation
     const certification_id = "PD-" + crypto.randomUUID();
 
-    /* AI extraction (non-critical) */
-
+    // AI extraction (non-critical)
     let extracted = {};
 
     try {
-
       const ai = await openai.chat.completions.create({
-
         model: "gpt-4o-mini",
-
         messages: [
           {
             role: "system",
@@ -269,9 +233,7 @@ app.post("/api/certify-document", authenticateToken, async (req, res) => {
             content: document
           }
         ],
-
         response_format: { type: "json_object" }
-
       });
 
       try {
@@ -279,13 +241,9 @@ app.post("/api/certify-document", authenticateToken, async (req, res) => {
       } catch {
         extracted = { raw: ai.choices[0].message.content };
       }
-
     } catch (err) {
-
       console.error("AI extraction failed");
-
       extracted = { ai_error: true };
-
     }
 
     await pool.query(
@@ -311,17 +269,12 @@ app.post("/api/certify-document", authenticateToken, async (req, res) => {
       polygon_tx,
       document_data: extracted
     });
-
   } catch (err) {
-
     console.error(err);
-
     res.status(500).json({
       error: "Certification failed"
     });
-
   }
-
 });
 
 /* ===========================
@@ -329,15 +282,9 @@ TEST CERTIFICATE
 =========================== */
 
 app.get("/api/test-cert", async (req, res) => {
-
   try {
-
     const document = "ProofDeed Test Document";
-
-    const hash = crypto
-      .createHash("sha256")
-      .update(document)
-      .digest("hex");
+    const hash = crypto.createHash("sha256").update(document).digest("hex");
 
     const polygon_tx = await anchorToPolygon(hash);
 
@@ -365,17 +312,14 @@ app.get("/api/test-cert", async (req, res) => {
       hash,
       polygon_tx
     });
-
   } catch (err) {
-
-    console.error(err);
-
+    console.error("Test cert failed:", err); // Log the detailed error here
     res.status(500).json({
-      error: "Test certification failed"
+      error: "Test certification failed",
+      details: err.message, // Provide the error message in the response
+      stack: err.stack       // Optionally include the stack trace for deeper insights
     });
-
   }
-
 });
 
 /* ===========================
@@ -383,29 +327,20 @@ START SERVER
 =========================== */
 
 async function startServer() {
-
   try {
-
     await pool.query("SELECT 1");
 
     app.listen(PORT, () => {
-
       console.log("================================");
       console.log("ProofDeed backend running");
       console.log("Port:", PORT);
       console.log("================================");
-
     });
-
   } catch (err) {
-
     console.error("Database connection failed");
     console.error(err);
-
     process.exit(1);
-
   }
-
 }
 
 startServer();
