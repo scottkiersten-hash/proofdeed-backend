@@ -80,7 +80,7 @@ app.post(
 
     }
 
-    console.log("Stripe event:", event.type);
+    console.log("Stripe event received:", event.type);
 
     res.json({ received: true });
 
@@ -91,7 +91,7 @@ app.post(
 BODY PARSERS
 =========================== */
 
-app.use(express.json({ limit: "2mb" }));
+app.use(express.json({ limit: "4mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 /* ===========================
@@ -108,16 +108,20 @@ function authenticateToken(req, res, next) {
 
   const token = authHeader.split(" ")[1];
 
-  jwt.verify(token, process.env.JWT_SECRET || "dev_secret", (err, user) => {
+  jwt.verify(
+    token,
+    process.env.JWT_SECRET || "dev_secret",
+    (err, user) => {
 
-    if (err) {
-      return res.status(403).json({ error: "Invalid token" });
+      if (err) {
+        return res.status(403).json({ error: "Invalid token" });
+      }
+
+      req.user = user;
+      next();
+
     }
-
-    req.user = user;
-    next();
-
-  });
+  );
 
 }
 
@@ -178,23 +182,35 @@ app.get("/api/certificate/:id", (req, res) => {
 });
 
 /* ===========================
-AI TEST
+AI CONNECTION TEST
 =========================== */
 
 app.get("/api/ai-test", async (req, res) => {
 
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
-    messages: [
-      { role: "system", content: "You are ProofDeed AI." },
-      { role: "user", content: "Say AI is connected." }
-    ]
-  });
+  try {
 
-  res.json({
-    success: true,
-    reply: response.choices[0].message.content
-  });
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: "You are ProofDeed AI." },
+        { role: "user", content: "Say AI is connected." }
+      ]
+    });
+
+    res.json({
+      success: true,
+      reply: response.choices[0].message.content
+    });
+
+  } catch (err) {
+
+    console.error("AI error:", err);
+
+    res.status(500).json({
+      error: "AI connection failed"
+    });
+
+  }
 
 });
 
@@ -208,44 +224,78 @@ app.post("/api/certify-document", authenticateToken, async (req, res) => {
 
     const { document } = req.body;
 
+    if (!document) {
+      return res.status(400).json({
+        error: "Document content required"
+      });
+    }
+
+    /* HASH DOCUMENT */
+
     const hash = crypto
       .createHash("sha256")
       .update(document)
       .digest("hex");
 
-    const polygon_tx = await anchorToPolygon(hash);
+    /* POLYGON ANCHOR */
+
+    let polygon_tx = null;
+
+    try {
+
+      polygon_tx = await anchorToPolygon(hash);
+
+    } catch (err) {
+
+      console.error("Polygon anchor failed:", err);
+
+    }
 
     const timestamp = new Date().toISOString();
     const certification_id = "PD-" + Date.now();
 
-    const ai = await openai.chat.completions.create({
+    /* AI EXTRACTION */
 
-      model: "gpt-4o-mini",
+    let extracted = {};
 
-      messages: [
-        {
-          role: "system",
-          content: "Extract structured data from legal documents and return JSON."
-        },
-        {
-          role: "user",
-          content: document
-        }
-      ],
+    try {
 
-      response_format: { type: "json_object" }
+      const ai = await openai.chat.completions.create({
 
-    });
+        model: "gpt-4o-mini",
 
-    const extracted = JSON.parse(ai.choices[0].message.content);
+        messages: [
+          {
+            role: "system",
+            content: "Extract structured data from legal documents and return JSON."
+          },
+          {
+            role: "user",
+            content: document
+          }
+        ],
+
+        response_format: { type: "json_object" }
+
+      });
+
+      extracted = JSON.parse(ai.choices[0].message.content);
+
+    } catch (err) {
+
+      console.error("AI extraction failed:", err);
+
+    }
 
     const record = {
+
       certification_id,
       timestamp,
       hash,
       polygon_tx,
       user_id: req.user.id,
       document_data: extracted
+
     };
 
     certifications.push(record);
@@ -260,7 +310,7 @@ app.post("/api/certify-document", authenticateToken, async (req, res) => {
 
   } catch (err) {
 
-    console.error(err);
+    console.error("Certification failed:", err);
 
     res.status(500).json({
       error: "Certification failed"
@@ -276,29 +326,41 @@ TEST CERTIFICATE
 
 app.get("/api/test-cert", async (req, res) => {
 
-  const document = "ProofDeed Test Document";
+  try {
 
-  const hash = crypto
-    .createHash("sha256")
-    .update(document)
-    .digest("hex");
+    const document = "ProofDeed Test Document";
 
-  const polygon_tx = await anchorToPolygon(hash);
+    const hash = crypto
+      .createHash("sha256")
+      .update(document)
+      .digest("hex");
 
-  const timestamp = new Date().toISOString();
-  const certification_id = "PD-" + Date.now();
+    const polygon_tx = await anchorToPolygon(hash);
 
-  const record = {
-    certification_id,
-    timestamp,
-    hash,
-    polygon_tx,
-    document_data: { test: true }
-  };
+    const timestamp = new Date().toISOString();
+    const certification_id = "PD-" + Date.now();
 
-  certifications.push(record);
+    const record = {
+      certification_id,
+      timestamp,
+      hash,
+      polygon_tx,
+      document_data: { test: true }
+    };
 
-  res.json(record);
+    certifications.push(record);
+
+    res.json(record);
+
+  } catch (err) {
+
+    console.error("Test cert error:", err);
+
+    res.status(500).json({
+      error: "Test certification failed"
+    });
+
+  }
 
 });
 
@@ -307,5 +369,11 @@ START SERVER
 =========================== */
 
 app.listen(PORT, () => {
-  console.log("Server running on port " + PORT);
+
+  console.log("================================");
+  console.log("ProofDeed backend running");
+  console.log("Port:", PORT);
+  console.log("Environment:", process.env.NODE_ENV || "development");
+  console.log("================================");
+
 });
