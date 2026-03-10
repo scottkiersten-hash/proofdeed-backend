@@ -304,13 +304,16 @@ app.post("/api/certify-document", authenticateToken, async (req, res) => {
 
     const extracted = JSON.parse(ai.choices[0].message.content);
 
-    const record = {
-      certification_id,
-      timestamp,
-      hash,
-      user_id: req.user.id,
-      document_data: extracted
-    };
+  const polygon_tx = await anchorToPolygon(hash);
+
+const record = {
+  certification_id,
+  timestamp,
+  hash,
+  polygon_tx,
+  user_id: req.user.id,
+  document_data: extracted
+};
 
     certifications.push(record);
 
