@@ -7,8 +7,9 @@
   "scripts": {
     "start": "node server.js"
   },
-  "engines": {
-    "node": ">=20"
+ "engines": {
+  "node": ">=20 <21"
+}
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
