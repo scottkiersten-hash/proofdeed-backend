@@ -16,21 +16,26 @@ export default async function anchorToPolygon(hash) {
       provider
     );
 
+    console.log("Using wallet:", wallet.address);
+
     const tx = await wallet.sendTransaction({
       to: wallet.address,
       value: 0n,
       data: ethers.hexlify(ethers.toUtf8Bytes(hash))
     });
 
-    console.log("Polygon TX sent:", tx.hash);
+    console.log("Transaction submitted:", tx.hash);
 
-    await tx.wait();
+    const receipt = await tx.wait();
+
+    console.log("Transaction confirmed:", receipt.hash);
 
     return tx.hash;
 
   } catch (err) {
 
-    console.error("Polygon anchor failed:", err);
+    console.error("Polygon anchor failed:");
+    console.error(err);
 
     return null;
 
