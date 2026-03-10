@@ -87,55 +87,50 @@ app.post(
   }
 );
 
-/* ======================================================
+/* ===========================
 BODY PARSERS
-====================================================== */
+=========================== */
 
 app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: true }));
+
+/* ===========================
+AUTH
+=========================== */
+
+function authenticateToken(req, res, next) {
+
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader) {
+    return res.status(401).json({ error: "Token required" });
+  }
+
+  const token = authHeader.split(" ")[1];
+
+  jwt.verify(token, process.env.JWT_SECRET || "dev_secret", (err, user) => {
+
+    if (err) {
+      return res.status(403).json({ error: "Invalid token" });
+    }
+
+    req.user = user;
+    next();
+
+  });
+
+}
 
 /* ===========================
 HEALTH
 =========================== */
 
 app.get("/", (req, res) => {
-  res.status(200).send("ProofDeed backend running");
+  res.send("ProofDeed backend running");
 });
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
-});
-
-/* ===========================
-POLYGON TEST ROUTE (NEW)
-=========================== */
-
-app.get("/api/test-cert", async (req, res) => {
-
-  const document = "Test ProofDeed Document";
-
-  const hash = crypto
-    .createHash("sha256")
-    .update(document)
-    .digest("hex");
-
-  const polygon_tx = await anchorToPolygon(hash);
-
-  const timestamp = new Date().toISOString();
-  const certification_id = "PD-" + Date.now();
-
-  const record = {
-    certification_id,
-    timestamp,
-    hash,
-    polygon_tx,
-    document_data: { test: true }
-  };
-
-  certifications.push(record);
-
-  res.json(record);
-
 });
 
 /* ===========================
@@ -149,9 +144,7 @@ app.get("/api/verify/:hash", (req, res) => {
   );
 
   if (!cert) {
-    return res.status(404).json({
-      verified: false
-    });
+    return res.status(404).json({ verified: false });
   }
 
   res.json({
@@ -159,8 +152,121 @@ app.get("/api/verify/:hash", (req, res) => {
     certification_id: cert.certification_id,
     timestamp: cert.timestamp,
     hash: cert.hash,
-    polygon_tx: cert.polygon_tx
+    polygon_tx: cert.polygon_tx || null
   });
+
+});
+
+/* ===========================
+GET CERTIFICATE (NEW)
+=========================== */
+
+app.get("/api/certificate/:id", (req, res) => {
+
+  const cert = certifications.find(
+    c => c.certification_id === req.params.id
+  );
+
+  if (!cert) {
+    return res.status(404).json({
+      error: "Certificate not found"
+    });
+  }
+
+  res.json(cert);
+
+});
+
+/* ===========================
+AI TEST
+=========================== */
+
+app.get("/api/ai-test", async (req, res) => {
+
+  const response = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [
+      { role: "system", content: "You are ProofDeed AI." },
+      { role: "user", content: "Say AI is connected." }
+    ]
+  });
+
+  res.json({
+    success: true,
+    reply: response.choices[0].message.content
+  });
+
+});
+
+/* ===========================
+CERTIFY DOCUMENT
+=========================== */
+
+app.post("/api/certify-document", authenticateToken, async (req, res) => {
+
+  try {
+
+    const { document } = req.body;
+
+    const hash = crypto
+      .createHash("sha256")
+      .update(document)
+      .digest("hex");
+
+    const polygon_tx = await anchorToPolygon(hash);
+
+    const timestamp = new Date().toISOString();
+    const certification_id = "PD-" + Date.now();
+
+    const ai = await openai.chat.completions.create({
+
+      model: "gpt-4o-mini",
+
+      messages: [
+        {
+          role: "system",
+          content: "Extract structured data from legal documents and return JSON."
+        },
+        {
+          role: "user",
+          content: document
+        }
+      ],
+
+      response_format: { type: "json_object" }
+
+    });
+
+    const extracted = JSON.parse(ai.choices[0].message.content);
+
+    const record = {
+      certification_id,
+      timestamp,
+      hash,
+      polygon_tx,
+      user_id: req.user.id,
+      document_data: extracted
+    };
+
+    certifications.push(record);
+
+    res.json({
+      certification_id,
+      timestamp,
+      hash,
+      polygon_tx,
+      document_data: extracted
+    });
+
+  } catch (err) {
+
+    console.error(err);
+
+    res.status(500).json({
+      error: "Certification failed"
+    });
+
+  }
 
 });
 
@@ -169,5 +275,5 @@ START SERVER
 =========================== */
 
 app.listen(PORT, () => {
-  console.log("🚀 Server running on port " + PORT);
+  console.log("Server running on port " + PORT);
 });
