@@ -1,63 +1,45 @@
 import { ethers } from "ethers";
 
-const rpc =
-  process.env.POLYGON_RPC_URL ||
-  "https://polygon.llamarpc.com";
-
-const key = process.env.POLYGON_PRIVATE_KEY;
-
-let buffer = [];
-let processing = false;
-
 export default async function anchorToPolygon(hash) {
+  try {
+    const rpc = process.env.POLYGON_RPC_ENDPOINT;
+    const key = process.env.POLYGON_PRIVATE_KEY;
 
-  buffer.push(hash);
-
-  if (processing) {
-    return null;
-  }
-
-  processing = true;
-
-  setTimeout(async () => {
-
-    try {
-
-      if (!rpc || !key) {
-        console.log("Polygon not configured");
-        return;
-      }
-
-      const provider = new ethers.JsonRpcProvider(rpc);
-      const wallet = new ethers.Wallet(key, provider);
-
-      console.log("Anchoring batch:", buffer.length);
-
-      const combined = buffer.join("|");
-
-      const tx = await wallet.sendTransaction({
-        to: wallet.address,
-        value: 0n,
-        data: ethers.hexlify(ethers.toUtf8Bytes(combined)),
-        gasLimit: 60000n
-      });
-
-      console.log("Polygon TX:", tx.hash);
-
-      await tx.wait();
-
-      buffer = [];
-      processing = false;
-
-    } catch (err) {
-
-      console.error("Batch anchor error:", err);
-      processing = false;
-
+    if (!rpc || !key) {
+      console.log("Polygon not configured");
+      return null;
     }
 
-  }, 30000);
+    const provider = new ethers.JsonRpcProvider(rpc, {
+      chainId: Number(process.env.POLYGON_CHAIN_ID || 137),
+      name: "polygon"
+    });
 
-  return null;
+    const wallet = new ethers.Wallet(key, provider);
 
+    console.log("RPC:", rpc);
+    console.log("Wallet:", wallet.address);
+
+    const balance = await provider.getBalance(wallet.address);
+    console.log("Wallet balance:", ethers.formatEther(balance));
+
+    const tx = await wallet.sendTransaction({
+      to: wallet.address,
+      value: 0n,
+      data: ethers.hexlify(ethers.toUtf8Bytes(hash))
+    });
+
+    console.log("TX submitted:", tx.hash);
+
+    const receipt = await tx.wait();
+    console.log("TX confirmed:", receipt.hash);
+
+    return tx.hash;
+
+  } catch (err) {
+    console.error("POLYGON ERROR START");
+    console.error(err);
+    console.error("POLYGON ERROR END");
+    return null;
+  }
 }
