@@ -1,7 +1,6 @@
 import dotenv from "dotenv";
 dotenv.config();
-import { queueHash, processBatch } from "./merkleAnchor.js";
-import anchorToPolygon from "./polygon.js";
+
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -12,6 +11,8 @@ import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import pkg from "pg";
+
+import anchorToPolygon from "./polygon.js";
 
 const { Pool } = pkg;
 
@@ -78,7 +79,11 @@ function authenticateToken(req, res, next) {
     return res.status(401).json({ error: "Token required" });
   }
 
-  const token = authHeader.split(" ")[1];
+  const token = authHeader?.split(" ")[1];
+
+  if (!token) {
+    return res.status(401).json({ error: "Token required" });
+  }
 
   jwt.verify(
     token,
@@ -207,45 +212,78 @@ app.post("/api/certify-document", authenticateToken, async (req, res) => {
       return res.status(400).json({ error: "Document required" });
     }
 
+    /* Prevent extremely large documents */
+
+    if (document.length > 200000) {
+      return res.status(400).json({ error: "Document too large" });
+    }
+
     const hash = crypto
       .createHash("sha256")
       .update(document)
       .digest("hex");
 
-    /* MERKLE QUEUE INSTEAD OF DIRECT POLYGON ANCHOR */
+    /* Prevent duplicate certifications */
 
-    queueHash(hash);
+    const existing = await pool.query(
+      "SELECT certification_id FROM certifications WHERE hash=$1",
+      [hash]
+    );
 
-    const polygon_tx = null;
+    if (existing.rows.length) {
+
+      return res.json({
+        duplicate: true,
+        certification_id: existing.rows[0].certification_id
+      });
+
+    }
+
+    const polygon_tx = await anchorToPolygon(hash);
 
     const timestamp = new Date().toISOString();
-    const certification_id = "PD-" + Date.now();
 
-    const ai = await openai.chat.completions.create({
+    /* Safer ID generation */
 
-      model: "gpt-4o-mini",
+    const certification_id = "PD-" + crypto.randomUUID();
 
-      messages: [
-        {
-          role: "system",
-          content: "Extract structured data from legal documents and return JSON."
-        },
-        {
-          role: "user",
-          content: document
-        }
-      ],
-
-      response_format: { type: "json_object" }
-
-    });
+    /* AI extraction (non-critical) */
 
     let extracted = {};
 
     try {
-      extracted = JSON.parse(ai.choices[0].message.content);
-    } catch {
-      extracted = { raw: ai.choices[0].message.content };
+
+      const ai = await openai.chat.completions.create({
+
+        model: "gpt-4o-mini",
+
+        messages: [
+          {
+            role: "system",
+            content: "Extract structured data from legal documents and return JSON."
+          },
+          {
+            role: "user",
+            content: document
+          }
+        ],
+
+        response_format: { type: "json_object" }
+
+      });
+
+      try {
+        extracted = JSON.parse(ai.choices[0].message.content);
+      } catch {
+        extracted = { raw: ai.choices[0].message.content };
+      }
+
+    } catch (err) {
+
+      console.error("AI extraction failed");
+
+      extracted = { ai_error: true };
+
     }
 
     await pool.query(
@@ -302,7 +340,7 @@ app.get("/api/test-cert", async (req, res) => {
     const polygon_tx = await anchorToPolygon(hash);
 
     const timestamp = new Date().toISOString();
-    const certification_id = "PD-" + Date.now();
+    const certification_id = "PD-" + crypto.randomUUID();
 
     await pool.query(
       `
@@ -356,41 +394,6 @@ async function startServer() {
       console.log("================================");
 
     });
-
-    /* MERKLE BATCH PROCESSOR */
-
-    setInterval(async () => {
-
-      try {
-
-        const batch = await processBatch();
-
-        if (!batch) return;
-
-        const { polygon_tx, hashes } = batch;
-
-        for (const hash of hashes) {
-
-          await pool.query(
-            `
-            UPDATE certifications
-            SET polygon_tx=$1
-            WHERE hash=$2
-            `,
-            [polygon_tx, hash]
-          );
-
-        }
-
-        console.log("Batch anchored:", hashes.length);
-
-      } catch (err) {
-
-        console.error("Batch anchor failed", err);
-
-      }
-
-    }, 60000);
 
   } catch (err) {
 
