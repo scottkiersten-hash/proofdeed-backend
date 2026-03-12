@@ -129,12 +129,33 @@ function authenticateToken(req, res, next) {
 
 /* ---------------- Health ---------------- */
 
-app.get("/api/health", async (req, res) => {
+app.get("/api/fix-db", async (req, res) => {
   try {
-    const result = await pool.query("SELECT NOW()");
-    res.json({ status: "ok", database: result.rows[0] });
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS certifications (
+        id SERIAL PRIMARY KEY,
+        certification_id TEXT,
+        hash TEXT,
+        polygon_tx TEXT,
+        user_id INTEGER,
+        document_data JSONB,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+
+    res.json({
+      success: true,
+      message: "certifications table repaired"
+    });
+
   } catch (err) {
-    res.status(500).json({ error: err.message });
+
+    res.status(500).json({
+      success: false,
+      error: err.message
+    });
+
   }
 });
 
