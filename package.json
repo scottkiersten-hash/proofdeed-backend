@@ -19,6 +19,8 @@
     "express-rate-limit": "^7.3.0",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
+    "keccak256": "^1.0.6",
+    "merkletreejs": "^0.6.0",
     "openai": "^4.52.0",
     "pdfkit": "^0.15.0",
     "pg": "^8.11.5",
