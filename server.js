@@ -226,7 +226,21 @@ app.get("/api/verify/:certId", async (req, res) => {
 
 });
 /* ---------------- Start Server ---------------- */
+app.get("/api/registry", async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT id, document_hash, created_at
+      FROM certifications
+      ORDER BY created_at DESC
+      LIMIT 50
+    `);
 
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Registry error:", error);
+    res.status(500).json({ error: "Registry failed" });
+  }
+});
 app.listen(port, () => {
   console.log(`ProofDeed backend running on port ${port}`);
 });
