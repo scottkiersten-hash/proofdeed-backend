@@ -130,14 +130,12 @@ function authenticateToken(req, res, next) {
 
 /* ---------------- Health ---------------- */
 
-app.get("/api/health", async (req, res) => {
-  try {
-    const result = await pool.query("SELECT NOW()");
-    res.json({ status: "ok", database: result.rows[0] });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+const result = await pool.query(`
+  SELECT certification_id, hash, created_at
+  FROM certifications
+  ORDER BY created_at DESC
+  LIMIT 50
+`);
 
 /* ---------------- Test Certification ---------------- */
 
