@@ -179,6 +179,51 @@ app.get("/api/test-cert", async (req, res) => {
   }
 });
 
+/* ---------------- Verify Certification ---------------- */
+
+app.get("/api/verify/:certId", async (req, res) => {
+
+  try {
+
+    const certId = req.params.certId;
+
+    const result = await pool.query(
+      `SELECT certification_id, hash, polygon_tx, document_data, created_at
+       FROM certifications
+       WHERE certification_id = $1`,
+      [certId]
+    );
+
+    if (result.rows.length === 0) {
+
+      return res.json({
+        valid: false,
+        message: "Certification not found"
+      });
+
+    }
+
+    const cert = result.rows[0];
+
+    res.json({
+      valid: true,
+      certification_id: cert.certification_id,
+      hash: cert.hash,
+      polygon_transaction: cert.polygon_tx,
+      created_at: cert.created_at,
+      document_data: cert.document_data
+    });
+
+  } catch (error) {
+
+    res.status(500).json({
+      valid: false,
+      error: error.message
+    });
+
+  }
+
+});
 /* ---------------- Start Server ---------------- */
 
 app.listen(port, () => {
