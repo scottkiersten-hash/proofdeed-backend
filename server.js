@@ -138,40 +138,6 @@ app.get("/api/health", async (req, res) => {
   }
 });
 
-/* ---------------- DATABASE REPAIR ---------------- */
-
-app.get("/api/fix-db", async (req, res) => {
-  try {
-
-    await pool.query(`DROP TABLE IF EXISTS certifications`);
-
-    await pool.query(`
-      CREATE TABLE certifications (
-        id SERIAL PRIMARY KEY,
-        certification_id TEXT,
-        hash TEXT,
-        polygon_tx TEXT,
-        user_id INTEGER,
-        document_data JSONB,
-        created_at TIMESTAMP DEFAULT NOW()
-      );
-    `);
-
-    res.json({
-      success: true,
-      message: "certifications table rebuilt"
-    });
-
-  } catch (err) {
-
-    res.status(500).json({
-      success: false,
-      error: err.message
-    });
-
-  }
-});
-
 /* ---------------- Test Certification ---------------- */
 
 app.get("/api/test-cert", async (req, res) => {
