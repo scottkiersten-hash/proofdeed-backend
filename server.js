@@ -15,7 +15,7 @@ dotenv.config();
 const { Pool } = pkg;
 
 const app = express();
-app.set('trust proxy', 1);
+app.set("trust proxy", 1);
 const port = process.env.PORT || 3000;
 
 /* ---------------- Stripe ---------------- */
@@ -37,10 +37,10 @@ app.post(
         sig,
         process.env.STRIPE_WEBHOOK_SECRET
       );
-   catch (error) {
-  console.error("Registry error:", error);
-  res.status(500).json({ error: error.message });
-}
+    } catch (error) {
+      console.error("Stripe webhook error:", error);
+      return res.status(400).send(`Webhook Error: ${error.message}`);
+    }
 
     console.log("Stripe event received:", event.type);
 
@@ -130,12 +130,20 @@ function authenticateToken(req, res, next) {
 
 /* ---------------- Health ---------------- */
 
-const result = await pool.query(`
-  SELECT certification_id, hash, created_at
-  FROM certifications
-  ORDER BY created_at DESC
-  LIMIT 50
-`);
+app.get("/api/health", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT NOW()");
+    res.json({
+      status: "ok",
+      database: result.rows[0]
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: "error",
+      error: error.message
+    });
+  }
+});
 
 /* ---------------- Test Certification ---------------- */
 
@@ -181,9 +189,7 @@ app.get("/api/test-cert", async (req, res) => {
 /* ---------------- Verify Certification ---------------- */
 
 app.get("/api/verify/:certId", async (req, res) => {
-
   try {
-
     const certId = req.params.certId;
 
     const result = await pool.query(
@@ -194,12 +200,10 @@ app.get("/api/verify/:certId", async (req, res) => {
     );
 
     if (result.rows.length === 0) {
-
       return res.json({
         valid: false,
         message: "Certification not found"
       });
-
     }
 
     const cert = result.rows[0];
@@ -212,22 +216,20 @@ app.get("/api/verify/:certId", async (req, res) => {
       created_at: cert.created_at,
       document_data: cert.document_data
     });
-
   } catch (error) {
-
     res.status(500).json({
       valid: false,
       error: error.message
     });
-
   }
-
 });
-/* ---------------- Start Server ---------------- */
+
+/* ---------------- Public Registry ---------------- */
+
 app.get("/api/registry", async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT id, document_hash, created_at
+      SELECT certification_id, hash, created_at
       FROM certifications
       ORDER BY created_at DESC
       LIMIT 50
@@ -239,6 +241,9 @@ app.get("/api/registry", async (req, res) => {
     res.status(500).json({ error: "Registry failed" });
   }
 });
+
+/* ---------------- Debug Tables ---------------- */
+
 app.get("/api/debug/tables", async (req, res) => {
   try {
     const result = await pool.query(
@@ -249,6 +254,9 @@ app.get("/api/debug/tables", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+/* ---------------- Start Server ---------------- */
+
 app.listen(port, () => {
   console.log(`ProofDeed backend running on port ${port}`);
 });
