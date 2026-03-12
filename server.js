@@ -241,6 +241,16 @@ app.get("/api/registry", async (req, res) => {
     res.status(500).json({ error: "Registry failed" });
   }
 });
+app.get("/api/debug/tables", async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT table_name FROM information_schema.tables WHERE table_schema='public'"
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 app.listen(port, () => {
   console.log(`ProofDeed backend running on port ${port}`);
 });
