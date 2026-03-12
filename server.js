@@ -138,6 +138,31 @@ app.get("/api/health", async (req, res) => {
   }
 });
 
+/* ---------------- DATABASE FIX ENDPOINT ---------------- */
+
+app.get("/api/fix-db", async (req, res) => {
+  try {
+
+    await pool.query(`
+      ALTER TABLE certifications
+      ADD COLUMN IF NOT EXISTS certification_id TEXT;
+    `);
+
+    res.json({
+      success: true,
+      message: "certification_id column created"
+    });
+
+  } catch (err) {
+
+    res.status(500).json({
+      success: false,
+      error: err.message
+    });
+
+  }
+});
+
 /* ---------------- Test Certification ---------------- */
 
 app.get("/api/test-cert", async (req, res) => {
