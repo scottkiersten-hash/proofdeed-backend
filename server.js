@@ -37,10 +37,10 @@ app.post(
         sig,
         process.env.STRIPE_WEBHOOK_SECRET
       );
-    } catch (err) {
-      console.log("Webhook signature failed:", err.message);
-      return res.status(400).send(`Webhook Error: ${err.message}`);
-    }
+   catch (error) {
+  console.error("Registry error:", error);
+  res.status(500).json({ error: error.message });
+}
 
     console.log("Stripe event received:", event.type);
 
