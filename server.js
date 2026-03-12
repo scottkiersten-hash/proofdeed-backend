@@ -133,20 +133,38 @@ app.get("/api/fix-db", async (req, res) => {
   try {
 
     await pool.query(`
-      CREATE TABLE IF NOT EXISTS certifications (
-        id SERIAL PRIMARY KEY,
-        certification_id TEXT,
-        hash TEXT,
-        polygon_tx TEXT,
-        user_id INTEGER,
-        document_data JSONB,
-        created_at TIMESTAMP DEFAULT NOW()
-      );
+      ALTER TABLE certifications
+      ADD COLUMN IF NOT EXISTS certification_id TEXT;
+    `);
+
+    await pool.query(`
+      ALTER TABLE certifications
+      ADD COLUMN IF NOT EXISTS hash TEXT;
+    `);
+
+    await pool.query(`
+      ALTER TABLE certifications
+      ADD COLUMN IF NOT EXISTS polygon_tx TEXT;
+    `);
+
+    await pool.query(`
+      ALTER TABLE certifications
+      ADD COLUMN IF NOT EXISTS user_id INTEGER;
+    `);
+
+    await pool.query(`
+      ALTER TABLE certifications
+      ADD COLUMN IF NOT EXISTS document_data JSONB;
+    `);
+
+    await pool.query(`
+      ALTER TABLE certifications
+      ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW();
     `);
 
     res.json({
       success: true,
-      message: "certifications table repaired"
+      message: "certifications table fully repaired"
     });
 
   } catch (err) {
