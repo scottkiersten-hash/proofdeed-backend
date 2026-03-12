@@ -129,67 +129,37 @@ function authenticateToken(req, res, next) {
 
 /* ---------------- Health ---------------- */
 
-app.get("/api/fix-db", async (req, res) => {
+app.get("/api/health", async (req, res) => {
   try {
-
-    await pool.query(`
-      ALTER TABLE certifications
-      ADD COLUMN IF NOT EXISTS certification_id TEXT;
-    `);
-
-    await pool.query(`
-      ALTER TABLE certifications
-      ADD COLUMN IF NOT EXISTS hash TEXT;
-    `);
-
-    await pool.query(`
-      ALTER TABLE certifications
-      ADD COLUMN IF NOT EXISTS polygon_tx TEXT;
-    `);
-
-    await pool.query(`
-      ALTER TABLE certifications
-      ADD COLUMN IF NOT EXISTS user_id INTEGER;
-    `);
-
-    await pool.query(`
-      ALTER TABLE certifications
-      ADD COLUMN IF NOT EXISTS document_data JSONB;
-    `);
-
-    await pool.query(`
-      ALTER TABLE certifications
-      ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW();
-    `);
-
-    res.json({
-      success: true,
-      message: "certifications table fully repaired"
-    });
-
+    const result = await pool.query("SELECT NOW()");
+    res.json({ status: "ok", database: result.rows[0] });
   } catch (err) {
-
-    res.status(500).json({
-      success: false,
-      error: err.message
-    });
-
+    res.status(500).json({ error: err.message });
   }
 });
 
-/* ---------------- DATABASE FIX ENDPOINT ---------------- */
+/* ---------------- DATABASE REPAIR ---------------- */
 
 app.get("/api/fix-db", async (req, res) => {
   try {
 
+    await pool.query(`DROP TABLE IF EXISTS certifications`);
+
     await pool.query(`
-      ALTER TABLE certifications
-      ADD COLUMN IF NOT EXISTS certification_id TEXT;
+      CREATE TABLE certifications (
+        id SERIAL PRIMARY KEY,
+        certification_id TEXT,
+        hash TEXT,
+        polygon_tx TEXT,
+        user_id INTEGER,
+        document_data JSONB,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
     `);
 
     res.json({
       success: true,
-      message: "certification_id column created"
+      message: "certifications table rebuilt"
     });
 
   } catch (err) {
