@@ -31,23 +31,29 @@ const pool = new Pool({
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 /* Stripe webhook MUST be before express.json() */
+
 app.post(
   "/api/stripe-webhook",
   express.raw({ type: "application/json" }),
   async (req, res) => {
+
     const sig = req.headers["stripe-signature"];
 
     let event;
 
     try {
+
       event = stripe.webhooks.constructEvent(
         req.body,
         sig,
         process.env.STRIPE_WEBHOOK_SECRET
       );
+
     } catch (err) {
+
       console.log("Webhook signature failed:", err.message);
       return res.status(400).send(`Webhook Error: ${err.message}`);
+
     }
 
     console.log("Stripe event received:", event.type);
@@ -62,7 +68,6 @@ app.post(
         const customerId = session.customer;
 
         if (!email) {
-          console.log("No email in session");
           return res.json({ received: true });
         }
 
@@ -80,15 +85,19 @@ app.post(
           );
 
           console.log("New user created:", email);
+
         }
 
       }
 
     } catch (error) {
+
       console.log("Webhook DB error:", error);
+
     }
 
     res.status(200).json({ received: true });
+
   }
 );
 
@@ -111,6 +120,48 @@ const limiter = rateLimit({
 });
 
 app.use(limiter);
+
+/* ---------------- Checkout Session ---------------- */
+
+app.post("/api/create-checkout-session", async (req, res) => {
+
+  try {
+
+    const { priceId } = req.body;
+
+    const session = await stripe.checkout.sessions.create({
+
+      mode: "subscription",
+
+      line_items: [
+        {
+          price: priceId,
+          quantity: 1
+        }
+      ],
+
+      customer_creation: "always",
+
+      success_url: `${process.env.FRONTEND_URL}/certify`,
+      cancel_url: `${process.env.FRONTEND_URL}/pricing`,
+
+      allow_promotion_codes: true
+
+    });
+
+    res.json({ url: session.url });
+
+  } catch (error) {
+
+    console.log("Stripe checkout error:", error);
+
+    res.status(500).json({
+      error: "Checkout session failed"
+    });
+
+  }
+
+});
 
 /* ---------------- OpenAI ---------------- */
 
@@ -138,6 +189,7 @@ function authenticateToken(req, res, next) {
     next();
 
   });
+
 }
 
 /* ---------------- Health ---------------- */
@@ -248,7 +300,7 @@ app.post("/api/certify-document", authenticateToken, async (req, res) => {
 
       extractedData = aiResponse.choices[0].message.content;
 
-    } catch (aiError) {
+    } catch {
 
       console.log("AI extraction skipped");
 
@@ -300,9 +352,7 @@ app.get("/api/verify/:hash", async (req, res) => {
     );
 
     if (result.rows.length === 0) {
-
       return res.json({ verified: false });
-
     }
 
     res.json({
@@ -332,11 +382,7 @@ app.get("/api/certificate/:id", async (req, res) => {
     );
 
     if (result.rows.length === 0) {
-
-      return res.status(404).json({
-        error: "Certificate not found"
-      });
-
+      return res.status(404).json({ error: "Certificate not found" });
     }
 
     res.json(result.rows[0]);
