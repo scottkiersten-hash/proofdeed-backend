@@ -13,6 +13,8 @@ dotenv.config();
 const { Pool } = pkg;
 
 const app = express();
+app.set("trust proxy", 1);
+
 const PORT = process.env.PORT || 8080;
 
 /* ---------------- Database ---------------- */
@@ -43,7 +45,6 @@ app.use(
   cors({
     origin(origin, callback) {
 
-      // allow non-browser calls
       if (!origin) {
         return callback(null, true);
       }
