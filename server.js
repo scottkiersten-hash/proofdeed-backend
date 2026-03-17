@@ -14,7 +14,9 @@ const { Pool } = pkg;
 
 const app = express();
 app.set("trust proxy", 1);
-
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok' });
+});
 const PORT = process.env.PORT || 8080;
 
 /* ---------------- Database ---------------- */
