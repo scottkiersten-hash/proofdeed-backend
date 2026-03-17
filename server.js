@@ -14,9 +14,12 @@ const { Pool } = pkg;
 
 const app = express();
 app.set("trust proxy", 1);
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'ok' });
+
+/* ---------------- REQUIRED FOR DIGITALOCEAN ---------------- */
+app.get("/health", (req, res) => {
+  res.status(200).json({ status: "ok" });
 });
+
 const PORT = process.env.PORT || 8080;
 
 /* ---------------- Database ---------------- */
@@ -97,21 +100,7 @@ function authenticateToken(req, res, next) {
   });
 }
 
-/* ---------------- Root ---------------- */
-
-app.get("/", (req, res) => {
-
-  res.status(200).json({
-    service: "proofdeed-backend",
-    status: "ok",
-    message: "Backend is running",
-    frontend_url: process.env.FRONTEND_URL || "https://proofdeed.com",
-    health_endpoint: "/api/health"
-  });
-
-});
-
-/* ---------------- Health ---------------- */
+/* ---------------- Health (API) ---------------- */
 
 app.get("/api/health", async (req, res) => {
 
