@@ -100,7 +100,7 @@ app.get("/api/test-cert", async (req, res) => {
 });
 
 /* ---------------- CREATE PROOF ---------------- */
-app.post("/api/create-proof", async (req, res) => {
+app.post("/create-proof", async (req, res) => {
   try {
     const { documentHash } = req.body;
 console.log("BODY:", JSON.stringify(req.body));
