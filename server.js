@@ -178,4 +178,84 @@ app.post("/api/contact", async (req, res) => {
       [name, company || null, email, notes || null, request_type || "contact"]
     );
 
-    console.log(`N
+    console.log(`New ${request_type || "contact"} submission from: ${email}`);
+
+    res.json({ success: true });
+
+  } catch (error) {
+    console.error("Contact form error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/* ---------------- STRIPE CHECKOUT ---------------- */
+app.post("/api/create-checkout-session", async (req, res) => {
+  try {
+    const { plan } = req.body;
+
+    const priceMap = {
+      "starter-monthly": process.env.PRICE_STARTER_MONTHLY,
+      "starter-annual":  process.env.PRICE_STARTER_YEARLY,
+      "pro-monthly":     process.env.PRICE_PRO_MONTHLY,
+      "pro-annual":      process.env.PRICE_PRO_YEARLY,
+    };
+
+    const priceId = priceMap[plan];
+    if (!priceId) return res.status(400).json({ error: `Invalid plan: ${plan}` });
+
+    const session = await stripe.checkout.sessions.create({
+      mode: "subscription",
+      payment_method_types: ["card"],
+      line_items: [{ price: priceId, quantity: 1 }],
+      success_url: "https://proofdeed.com/success",
+      cancel_url:  "https://proofdeed.com/cancel",
+    });
+
+    res.json({ url: session.url });
+
+  } catch (err) {
+    console.error("Stripe error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ---------------- STRIPE WEBHOOK ---------------- */
+app.post("/api/stripe-webhook", express.raw({ type: "application/json" }), async (req, res) => {
+  const sig = req.headers["stripe-signature"];
+  let event;
+
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+  } catch (err) {
+    console.error("Webhook signature failed:", err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  if (event.type === "checkout.session.completed") {
+    const session = event.data.object;
+    const email = session.customer_details?.email;
+    const customerId = session.customer;
+    const subscriptionId = session.subscription;
+
+    console.log("New subscriber:", email);
+
+    try {
+      await pool.query(
+        `INSERT INTO users (email, stripe_customer_id, subscription_id, created_at)
+         VALUES ($1, $2, $3, NOW())
+         ON CONFLICT (email) DO UPDATE
+         SET stripe_customer_id = $2, subscription_id = $3`,
+        [email, customerId, subscriptionId]
+      );
+    } catch (dbErr) {
+      console.error("User creation failed:", dbErr.message);
+    }
+  }
+
+  res.json({ received: true });
+});
+
+/* ---------------- Start Server ---------------- */
+app.listen(PORT, () => {
+  console.log(`ProofDeed backend running on port ${PORT}`);
+});
