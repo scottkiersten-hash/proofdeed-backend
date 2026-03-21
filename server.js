@@ -56,7 +56,10 @@ app.use(
   })
 );
 
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  crossOriginOpenerPolicy: { policy: "unsafe-none" }
+}));
 
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -136,7 +139,6 @@ app.post("/create-proof", async (req, res) => {
     const proofId = "PD-" + Date.now();
     const timestamp = new Date().toISOString();
 
-    // Anchor hash to Polygon blockchain
     let polygon_tx = null;
     try {
       polygon_tx = await anchorToPolygon(documentHash);
@@ -144,7 +146,6 @@ app.post("/create-proof", async (req, res) => {
       console.error("Blockchain anchoring failed (non-fatal):", blockchainErr.message);
     }
 
-    // Store in database
     await pool.query(
       `INSERT INTO certifications (certification_id, hash, polygon_tx, created_at)
        VALUES ($1, $2, $3, NOW())
