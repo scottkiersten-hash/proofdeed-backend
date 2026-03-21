@@ -16,6 +16,27 @@ const { Pool } = pkg;
 const app = express();
 app.set("trust proxy", 1);
 
+/* ---------------- CORS ---------------- */
+const configuredOrigins = [
+  process.env.FRONTEND_URL,
+  process.env.FRONTEND_URL_ALT,
+  "https://proofdeed.com",
+  "https://www.proofdeed.com"
+].filter(Boolean).map((origin) => origin.trim());
+
+const allowedOrigins = [...new Set(configuredOrigins)];
+
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error(`CORS blocked for origin: ${origin}`));
+  },
+  credentials: true
+}));
+
+app.options("*", cors());
+
 /* ---------------- REQUIRED FOR DIGITALOCEAN ---------------- */
 app.get("/health", (req, res) => {
   res.status(200).json({ status: "ok" });
@@ -31,34 +52,6 @@ const pool = new Pool({
 
 /* ---------------- Middleware ---------------- */
 app.use(express.json({ limit: "5mb" }));
-app.use((req, res, next) => {
-  res.setHeader("Access-Control-Allow-Origin", "https://proofdeed.com");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  res.setHeader("Access-Control-Allow-Credentials", "true");
-  if (req.method === "OPTIONS") {
-    return res.sendStatus(200);
-  }
-  next();
-});
-const configuredOrigins = [
-  process.env.FRONTEND_URL,
-  process.env.FRONTEND_URL_ALT,
-  "https://proofdeed.com",
-  "https://www.proofdeed.com"
-].filter(Boolean).map((origin) => origin.trim());
-
-const allowedOrigins = [...new Set(configuredOrigins)];
-
-app.options("*", cors());
-app.use(cors({
-  origin(origin, callback) {
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) return callback(null, true);
-    return callback(new Error(`CORS blocked for origin: ${origin}`));
-  },
-  credentials: true
-}));
 
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" },
