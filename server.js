@@ -26,9 +26,7 @@ const PORT = process.env.PORT || 8080;
 /* ---------------- Database ---------------- */
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false
-  }
+  ssl: { rejectUnauthorized: false }
 });
 
 /* ---------------- Middleware ---------------- */
@@ -39,39 +37,29 @@ const configuredOrigins = [
   process.env.FRONTEND_URL_ALT,
   "https://proofdeed.com",
   "https://www.proofdeed.com"
-]
-  .filter(Boolean)
-  .map((origin) => origin.trim());
+].filter(Boolean).map((origin) => origin.trim());
 
 const allowedOrigins = [...new Set(configuredOrigins)];
 
-app.use(
-  cors({
-    origin(origin, callback) {
-      if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin)) return callback(null, true);
-      return callback(new Error(`CORS blocked for origin: ${origin}`));
-    },
-    credentials: true
-  })
-);
+app.options("*", cors());
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error(`CORS blocked for origin: ${origin}`));
+  },
+  credentials: true
+}));
 
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" },
   crossOriginOpenerPolicy: { policy: "unsafe-none" }
 }));
 
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100
-});
-
-app.use(limiter);
+app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }));
 
 /* ---------------- OpenAI ---------------- */
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 /* ---------------- Stripe ---------------- */
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
@@ -80,9 +68,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 function authenticateToken(req, res, next) {
   const authHeader = req.headers["authorization"];
   if (!authHeader) return res.sendStatus(401);
-
   const token = authHeader.split(" ")[1];
-
   jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
     if (err) return res.sendStatus(403);
     req.user = user;
@@ -94,15 +80,9 @@ function authenticateToken(req, res, next) {
 app.get("/api/health", async (req, res) => {
   try {
     const result = await pool.query("SELECT NOW()");
-    res.json({
-      status: "ok",
-      database: result.rows[0]
-    });
+    res.json({ status: "ok", database: result.rows[0] });
   } catch (error) {
-    res.status(500).json({
-      status: "error",
-      error: error.message
-    });
+    res.status(500).json({ status: "error", error: error.message });
   }
 });
 
@@ -110,20 +90,10 @@ app.get("/api/health", async (req, res) => {
 app.get("/api/test-cert", async (req, res) => {
   try {
     const testDocument = "ProofDeed test document " + Date.now();
-
-    const hash = crypto
-      .createHash("sha256")
-      .update(testDocument)
-      .digest("hex");
-
-    res.json({
-      document: testDocument,
-      hash
-    });
+    const hash = crypto.createHash("sha256").update(testDocument).digest("hex");
+    res.json({ document: testDocument, hash });
   } catch (error) {
-    res.status(500).json({
-      error: error.message
-    });
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -177,8 +147,7 @@ app.get("/api/verify/:certId", async (req, res) => {
 
     const result = await pool.query(
       `SELECT certification_id, hash, polygon_tx, created_at, document_data
-       FROM certifications
-       WHERE certification_id = $1`,
+       FROM certifications WHERE certification_id = $1`,
       [certId]
     );
 
@@ -186,14 +155,36 @@ app.get("/api/verify/:certId", async (req, res) => {
       return res.status(404).json({ success: false, error: "Certificate not found." });
     }
 
-    res.json({
-      success: true,
-      certification: result.rows[0]
-    });
+    res.json({ success: true, certification: result.rows[0] });
 
   } catch (error) {
     console.error("Verify error:", error);
     res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/* ---------------- CONTACT / AFFILIATE FORM ---------------- */
+app.post("/api/contact", async (req, res) => {
+  try {
+    const { name, company, email, notes, request_type } = req.body;
+
+    if (!email || !name) {
+      return res.status(400).json({ error: "Name and email are required." });
+    }
+
+    await pool.query(
+      `INSERT INTO contact_submissions (name, company, email, notes, request_type, created_at)
+       VALUES ($1, $2, $3, $4, $5, NOW())`,
+      [name, company || null, email, notes || null, request_type || "contact"]
+    );
+
+    console.log(`New ${request_type || "contact"} submission from: ${email}`);
+
+    res.json({ success: true });
+
+  } catch (error) {
+    console.error("Contact form error:", error);
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -210,10 +201,7 @@ app.post("/api/create-checkout-session", async (req, res) => {
     };
 
     const priceId = priceMap[plan];
-
-    if (!priceId) {
-      return res.status(400).json({ error: `Invalid plan: ${plan}` });
-    }
+    if (!priceId) return res.status(400).json({ error: `Invalid plan: ${plan}` });
 
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
@@ -269,5 +257,4 @@ app.post("/api/stripe-webhook", express.raw({ type: "application/json" }), async
 
 /* ---------------- Start Server ---------------- */
 app.listen(PORT, () => {
-  console.log(`ProofDeed backend running on port ${PORT}`);
-});
+  console.log(`ProofDeed backend running on port ${PORT}`
