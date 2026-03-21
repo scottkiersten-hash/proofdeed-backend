@@ -31,7 +31,16 @@ const pool = new Pool({
 
 /* ---------------- Middleware ---------------- */
 app.use(express.json({ limit: "5mb" }));
-
+app.use((req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", "https://proofdeed.com");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(200);
+  }
+  next();
+});
 const configuredOrigins = [
   process.env.FRONTEND_URL,
   process.env.FRONTEND_URL_ALT,
