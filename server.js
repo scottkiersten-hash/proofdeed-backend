@@ -1,3 +1,11 @@
+"setup-db": "node setup-db.js"
+```
+
+Push to GitHub, then in DigitalOcean **App Platform → your backend app → Console** (there's a console there, separate from the database console) run:
+```
+node setup-db.js
+
+
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
