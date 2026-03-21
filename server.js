@@ -8,11 +8,11 @@ import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import OpenAI from "openai";
 import Stripe from "stripe";
+import { anchorToPolygon } from "./polygon.js";
 
 dotenv.config();
 
 const { Pool } = pkg;
-
 const app = express();
 app.set("trust proxy", 1);
 
@@ -24,7 +24,6 @@ app.get("/health", (req, res) => {
 const PORT = process.env.PORT || 8080;
 
 /* ---------------- Database ---------------- */
-
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: {
@@ -33,7 +32,6 @@ const pool = new Pool({
 });
 
 /* ---------------- Middleware ---------------- */
-
 app.use(express.json({ limit: "5mb" }));
 
 const configuredOrigins = [
@@ -68,17 +66,14 @@ const limiter = rateLimit({
 app.use(limiter);
 
 /* ---------------- OpenAI ---------------- */
-
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
 
 /* ---------------- Stripe ---------------- */
-
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 /* ---------------- Auth ---------------- */
-
 function authenticateToken(req, res, next) {
   const authHeader = req.headers["authorization"];
   if (!authHeader) return res.sendStatus(401);
@@ -93,7 +88,6 @@ function authenticateToken(req, res, next) {
 }
 
 /* ---------------- Health (API) ---------------- */
-
 app.get("/api/health", async (req, res) => {
   try {
     const result = await pool.query("SELECT NOW()");
@@ -110,7 +104,6 @@ app.get("/api/health", async (req, res) => {
 });
 
 /* ---------------- Test Certification ---------------- */
-
 app.get("/api/test-cert", async (req, res) => {
   try {
     const testDocument = "ProofDeed test document " + Date.now();
@@ -131,17 +124,88 @@ app.get("/api/test-cert", async (req, res) => {
   }
 });
 
-/* ---------------- STRIPE CHECKOUT ---------------- */
+/* ---------------- CREATE PROOF ---------------- */
+app.post("/create-proof", async (req, res) => {
+  try {
+    const { documentHash } = req.body;
 
+    if (!documentHash || typeof documentHash !== "string" || documentHash.length !== 64) {
+      return res.status(400).json({ error: "Invalid document hash. Must be a 64-character SHA-256 hex string." });
+    }
+
+    const proofId = "PD-" + Date.now();
+    const timestamp = new Date().toISOString();
+
+    // Anchor hash to Polygon blockchain
+    let polygon_tx = null;
+    try {
+      polygon_tx = await anchorToPolygon(documentHash);
+    } catch (blockchainErr) {
+      console.error("Blockchain anchoring failed (non-fatal):", blockchainErr.message);
+    }
+
+    // Store in database
+    await pool.query(
+      `INSERT INTO certifications (certification_id, hash, polygon_tx, created_at)
+       VALUES ($1, $2, $3, NOW())
+       ON CONFLICT (certification_id) DO NOTHING`,
+      [proofId, documentHash, polygon_tx]
+    );
+
+    res.json({
+      proofId,
+      timestamp,
+      polygon_tx,
+      verificationText: "Your document fingerprint has been permanently recorded on the Polygon blockchain."
+    });
+
+  } catch (error) {
+    console.error("Create proof error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/* ---------------- VERIFY CERTIFICATE ---------------- */
+app.get("/api/verify/:certId", async (req, res) => {
+  try {
+    const { certId } = req.params;
+
+    if (!certId) {
+      return res.status(400).json({ success: false, error: "Certificate ID required." });
+    }
+
+    const result = await pool.query(
+      `SELECT certification_id, hash, polygon_tx, created_at, document_data
+       FROM certifications
+       WHERE certification_id = $1`,
+      [certId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: "Certificate not found." });
+    }
+
+    res.json({
+      success: true,
+      certification: result.rows[0]
+    });
+
+  } catch (error) {
+    console.error("Verify error:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/* ---------------- STRIPE CHECKOUT ---------------- */
 app.post("/api/create-checkout-session", async (req, res) => {
   try {
     const { plan } = req.body;
 
     const priceMap = {
       "starter-monthly": process.env.PRICE_STARTER_MONTHLY,
-      "starter-annual": process.env.PRICE_STARTER_YEARLY,
-      "pro-monthly": process.env.PRICE_PRO_MONTHLY,
-      "pro-annual": process.env.PRICE_PRO_YEARLY,
+      "starter-annual":  process.env.PRICE_STARTER_YEARLY,
+      "pro-monthly":     process.env.PRICE_PRO_MONTHLY,
+      "pro-annual":      process.env.PRICE_PRO_YEARLY,
     };
 
     const priceId = priceMap[plan];
@@ -153,14 +217,9 @@ app.post("/api/create-checkout-session", async (req, res) => {
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       payment_method_types: ["card"],
-      line_items: [
-        {
-          price: priceId,
-          quantity: 1,
-        },
-      ],
+      line_items: [{ price: priceId, quantity: 1 }],
       success_url: "https://proofdeed.com/success",
-      cancel_url: "https://proofdeed.com/cancel",
+      cancel_url:  "https://proofdeed.com/cancel",
     });
 
     res.json({ url: session.url });
@@ -171,8 +230,43 @@ app.post("/api/create-checkout-session", async (req, res) => {
   }
 });
 
-/* ---------------- Start Server ---------------- */
+/* ---------------- STRIPE WEBHOOK ---------------- */
+app.post("/api/stripe-webhook", express.raw({ type: "application/json" }), async (req, res) => {
+  const sig = req.headers["stripe-signature"];
+  let event;
 
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+  } catch (err) {
+    console.error("Webhook signature failed:", err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  if (event.type === "checkout.session.completed") {
+    const session = event.data.object;
+    const email = session.customer_details?.email;
+    const customerId = session.customer;
+    const subscriptionId = session.subscription;
+
+    console.log("New subscriber:", email);
+
+    try {
+      await pool.query(
+        `INSERT INTO users (email, stripe_customer_id, subscription_id, created_at)
+         VALUES ($1, $2, $3, NOW())
+         ON CONFLICT (email) DO UPDATE
+         SET stripe_customer_id = $2, subscription_id = $3`,
+        [email, customerId, subscriptionId]
+      );
+    } catch (dbErr) {
+      console.error("User creation failed:", dbErr.message);
+    }
+  }
+
+  res.json({ received: true });
+});
+
+/* ---------------- Start Server ---------------- */
 app.listen(PORT, () => {
   console.log(`ProofDeed backend running on port ${PORT}`);
 });
