@@ -21,7 +21,8 @@ const configuredOrigins = [
   process.env.FRONTEND_URL,
   process.env.FRONTEND_URL_ALT,
   "https://proofdeed.com",
-  "https://www.proofdeed.com"
+  "https://www.proofdeed.com",
+  "https://api.proofdeed.com"
 ].filter(Boolean).map((origin) => origin.trim());
 
 const allowedOrigins = [...new Set(configuredOrigins)];
@@ -103,8 +104,8 @@ app.get("/api/test-cert", async (req, res) => {
 app.post("/create-proof", async (req, res) => {
   try {
     const { documentHash } = req.body;
-console.log("BODY:", JSON.stringify(req.body));
-console.log("HASH:", documentHash, "LEN:", documentHash?.length);
+    console.log("BODY:", JSON.stringify(req.body));
+    console.log("HASH:", documentHash, "LEN:", documentHash?.length);
 
     if (!documentHash || typeof documentHash !== "string" || documentHash.length !== 64) {
       return res.status(400).json({ error: "Invalid document hash. Must be a 64-character SHA-256 hex string." });
