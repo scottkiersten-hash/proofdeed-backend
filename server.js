@@ -21,7 +21,8 @@ const configuredOrigins = [
   process.env.FRONTEND_URL,
   process.env.FRONTEND_URL_ALT,
   "https://proofdeed.com",
-  "https://www.proofdeed.com",
+  "https://api.proofdeed.com",
+  "https://urchin-app-e33ih.ondigitalocean.app"
   "https://api.proofdeed.com"
 ].filter(Boolean).map((origin) => origin.trim());
 
