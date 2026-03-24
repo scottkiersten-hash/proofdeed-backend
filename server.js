@@ -17,26 +17,8 @@ const app = express();
 app.set("trust proxy", 1);
 
 /* ---------------- CORS ---------------- */
-const configuredOrigins = [
-  process.env.FRONTEND_URL,
-  process.env.FRONTEND_URL_ALT,
-  "https://proofdeed.com",
-  "https://www.proofdeed.com",
-  "https://api.proofdeed.com"
-].filter(Boolean).map((origin) => origin.trim());
-
-const allowedOrigins = [...new Set(configuredOrigins)];
-
-app.use(cors({
-  origin(origin, callback) {
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) return callback(null, true);
-    return callback(new Error(`CORS blocked for origin: ${origin}`));
-  },
-  credentials: true
-}));
-
-app.options("*", cors());
+app.options("*", cors({ origin: true, credentials: true }));
+app.use(cors({ origin: true, credentials: true }));
 
 /* ---------------- REQUIRED FOR DIGITALOCEAN ---------------- */
 app.get("/health", (req, res) => {
