@@ -178,7 +178,7 @@ app.get("/api/verify/:certId", async (req, res) => {
 });
 
 /* ---------------- CONTACT / AFFILIATE FORM ---------------- */
-app.post("/api/contact", async (req, res) => {
+app.post(["/contact", "/api/contact"], async (req, res) => {
   try {
     const { name, company, email, notes, request_type, subject, proofId, documentHash, timestamp } = req.body;
 
