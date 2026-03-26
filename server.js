@@ -180,7 +180,7 @@ app.get("/api/verify/:certId", async (req, res) => {
 /* ---------------- CONTACT / AFFILIATE FORM ---------------- */
 app.post("/api/contact", async (req, res) => {
   try {
-    const { name, company, email, notes, request_type } = req.body;
+    const { name, company, email, notes, request_type, subject, proofId, documentHash, timestamp } = req.body;
 
     if (!email || !name) {
       return res.status(400).json({ error: "Name and email are required." });
@@ -192,8 +192,37 @@ app.post("/api/contact", async (req, res) => {
       [name, company || null, email, notes || null, request_type || "contact"]
     );
 
-    console.log(`New ${request_type || "contact"} submission from: ${email}`);
+    const mailgunDomain = process.env.MAILGUN_DOMAIN;
+    const mailgunApiKey = process.env.MAILGUN_API_KEY;
 
+    if (mailgunDomain && mailgunApiKey) {
+      const isProofEmail = !!proofId;
+      const emailSubject = subject || (isProofEmail ? "Your ProofDeed Certificate" : "ProofDeed Contact Confirmation");
+      const emailBody = isProofEmail
+        ? `Thank you for using ProofDeed.\n\nYour document has been permanently recorded on the Polygon blockchain.\n\nProof ID: ${proofId}\nDocument Hash: ${documentHash}\nTimestamp: ${timestamp}\n\nVerify your document at:\nhttps://proofdeed.com/verify\n\nProofDeed\nhttps://proofdeed.com`
+        : `Thank you for contacting ProofDeed.\n\nWe received your message and will be in touch shortly.\n\nName: ${name}\nEmail: ${email}\nNotes: ${notes || "N/A"}\n\nProofDeed\nhttps://proofdeed.com`;
+
+      try {
+        await fetch(`https://api.mailgun.net/v3/${mailgunDomain}/messages`, {
+          method: "POST",
+          headers: {
+            "Authorization": "Basic " + Buffer.from(`api:${mailgunApiKey}`).toString("base64"),
+            "Content-Type": "application/x-www-form-urlencoded"
+          },
+          body: new URLSearchParams({
+            from: process.env.MAIL_FROM || `ProofDeed <mailgun@${mailgunDomain}>`,
+            to: email,
+            subject: emailSubject,
+            text: emailBody
+          })
+        });
+        console.log(`Email sent to ${email}`);
+      } catch (mailErr) {
+        console.error("Mailgun error (non-fatal):", mailErr.message);
+      }
+    }
+
+    console.log(`New ${request_type || "contact"} submission from: ${email}`);
     res.json({ success: true });
 
   } catch (error) {
