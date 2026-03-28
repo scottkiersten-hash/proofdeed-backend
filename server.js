@@ -234,7 +234,7 @@ app.post(["/contact", "/api/contact"], async (req, res) => {
 /* ---------------- STRIPE CHECKOUT ---------------- */
 app.post(["/create-checkout-session", "/api/create-checkout-session"], async (req, res) => {
   try {
-    const { plan } = req.body;
+    const { plan, success_url, cancel_url } = req.body;
 
     const priceMap = {
       "starter-monthly": process.env.PRICE_STARTER_MONTHLY,
