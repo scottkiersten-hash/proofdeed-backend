@@ -168,28 +168,28 @@ app.post(["/auth/magic-link", "/api/auth/magic-link"], async (req, res) => {
       [email, token, expiresAt]
     );
 
-    const magicLink = `https://proofdeed.com/auth/verify?token=${token}`;
+    const magicLink = "https://proofdeed.com/auth/verify?token=" + token;
 
     const mailgunDomain = process.env.MAILGUN_DOMAIN;
     const mailgunApiKey = process.env.MAILGUN_API_KEY;
 
     if (mailgunDomain && mailgunApiKey) {
-      await fetch(`https://api.mailgun.net/v3/${mailgunDomain}/messages`, {
+      await fetch("https://api.mailgun.net/v3/" + mailgunDomain + "/messages", {
         method: "POST",
         headers: {
-          "Authorization": "Basic " + Buffer.from(`api:${mailgunApiKey}`).toString("base64"),
+          "Authorization": "Basic " + Buffer.from("api:" + mailgunApiKey).toString("base64"),
           "Content-Type": "application/x-www-form-urlencoded"
         },
         body: new URLSearchParams({
-          from: process.env.MAIL_FROM || `ProofDeed <mailgun@${mailgunDomain}>`,
+          from: process.env.MAIL_FROM || "ProofDeed <mailgun@" + mailgunDomain + ">",
           to: email,
           subject: "Your ProofDeed Sign-In Link",
-          text: `Click the link below to sign in to ProofDeed.\n\nThis link expires in 15 minutes.\n\n${magicLink}\n\nIf you did not request this, please ignore this email.\n\nProofDeed\nhttps://proofdeed.com`
+          text: "Click the link below to sign in to ProofDeed.\n\nThis link expires in 15 minutes.\n\n" + magicLink + "\n\nIf you did not request this, please ignore this email.\n\nProofDeed\nhttps://proofdeed.com"
         })
       });
     }
 
-    console.log(`Magic link sent to ${email}`);
+    console.log("Magic link sent to " + email);
     res.json({ success: true });
 
   } catch (error) {
@@ -318,17 +318,17 @@ app.post("/api/enterprise/generate-key", async (req, res) => {
     const mailgunApiKey = process.env.MAILGUN_API_KEY;
 
     if (mailgunDomain && mailgunApiKey) {
-      await fetch(`https://api.mailgun.net/v3/${mailgunDomain}/messages`, {
+      await fetch("https://api.mailgun.net/v3/" + mailgunDomain + "/messages", {
         method: "POST",
         headers: {
-          "Authorization": "Basic " + Buffer.from(`api:${mailgunApiKey}`).toString("base64"),
+          "Authorization": "Basic " + Buffer.from("api:" + mailgunApiKey).toString("base64"),
           "Content-Type": "application/x-www-form-urlencoded"
         },
         body: new URLSearchParams({
-          from: process.env.MAIL_FROM || `ProofDeed <mailgun@${mailgunDomain}>`,
+          from: process.env.MAIL_FROM || "ProofDeed <mailgun@" + mailgunDomain + ">",
           to: email,
           subject: "Your ProofDeed Enterprise API Key",
-          text: `Welcome to ProofDeed Enterprise.\n\nYour API Key: ${apiKey}\n\nMonthly Limit: ${monthly_limit || 1000} certifications\n\nAPI Documentation: https://proofdeed.com/api-docs\n\nExample usage:\ncurl -X POST https://proofdeed.com/api/v1/certify \\\n  -H "X-API-Key: ${apiKey}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"documentHash":"your_sha256_hash"}'\n\nProofDeed\nhttps://proofdeed.com`
+          text: "Welcome to ProofDeed Enterprise.\n\nYour API Key: " + apiKey + "\n\nMonthly Limit: " + (monthly_limit || 1000) + " certifications\n\nAPI Documentation: https://proofdeed.com/api-docs\n\nProofDeed\nhttps://proofdeed.com"
         })
       });
     }
@@ -342,9 +342,9 @@ app.post("/api/enterprise/generate-key", async (req, res) => {
 });
 
 /* ---------------- ENTERPRISE - SINGLE CERTIFY ---------------- */
-app.post(["/api/v1/certify"], authenticateApiKey, async (req, res) => {
+app.post("/api/v1/certify", authenticateApiKey, async (req, res) => {
   try {
-    const { documentHash, metadata } = req.body;
+    const { documentHash } = req.body;
 
     if (!documentHash || typeof documentHash !== "string" || documentHash.length !== 64) {
       return res.status(400).json({ error: "Invalid document hash. Must be a 64-character SHA-256 hex string." });
@@ -372,18 +372,6 @@ app.post(["/api/v1/certify"], authenticateApiKey, async (req, res) => {
       [req.apiKey.api_key]
     );
 
-    try {
-      await stripe.billing.meterEvents.create({
-        event_name: "certification_created",
-        payload: {
-          stripe_customer_id: req.apiKey.stripe_customer_id || "unknown",
-          value: "1"
-        }
-      });
-    } catch (stripeErr) {
-      console.error("Stripe meter event failed (non-fatal):", stripeErr.message);
-    }
-
     if (req.apiKey.webhook_url) {
       try {
         await fetch(req.apiKey.webhook_url, {
@@ -405,7 +393,7 @@ app.post(["/api/v1/certify"], authenticateApiKey, async (req, res) => {
 });
 
 /* ---------------- ENTERPRISE - BATCH CERTIFY ---------------- */
-app.post(["/api/v1/batch"], authenticateApiKey, async (req, res) => {
+app.post("/api/v1/batch", authenticateApiKey, async (req, res) => {
   try {
     const { documents } = req.body;
 
@@ -419,7 +407,7 @@ app.post(["/api/v1/batch"], authenticateApiKey, async (req, res) => {
 
     const remaining = req.apiKey.monthly_limit - req.apiKey.used_this_month;
     if (documents.length > remaining) {
-      return res.status(429).json({ error: `Batch size exceeds remaining limit. Remaining: ${remaining}` });
+      return res.status(429).json({ error: "Batch size exceeds remaining limit. Remaining: " + remaining });
     }
 
     const results = [];
@@ -456,18 +444,6 @@ app.post(["/api/v1/batch"], authenticateApiKey, async (req, res) => {
       "UPDATE api_keys SET used_this_month = used_this_month + $1 WHERE api_key = $2",
       [results.filter(r => !r.error).length, req.apiKey.api_key]
     );
-
-    try {
-      await stripe.billing.meterEvents.create({
-        event_name: "certification_created",
-        payload: {
-          stripe_customer_id: req.apiKey.stripe_customer_id || "unknown",
-          value: String(results.filter(r => !r.error).length)
-        }
-      });
-    } catch (stripeErr) {
-      console.error("Stripe meter event failed (non-fatal):", stripeErr.message);
-    }
 
     res.json({
       success: true,
@@ -574,30 +550,30 @@ app.post(["/contact", "/api/contact"], async (req, res) => {
       const isProofEmail = !!proofId;
       const emailSubject = subject || (isProofEmail ? "Your ProofDeed Certificate" : "ProofDeed Contact Confirmation");
       const emailBody = isProofEmail
-        ? `Thank you for using ProofDeed.\n\nYour document has been permanently recorded on the Polygon blockchain.\n\nProof ID: ${proofId}\nDocument Hash: ${documentHash}\nTimestamp: ${timestamp}\n\nVerify your document at:\nhttps://proofdeed.com/verify\n\nProofDeed\nhttps://proofdeed.com`
-        : `New contact submission from ProofDeed.\n\nName: ${name}\nEmail: ${email}\nOrganization: ${resolvedCompany || "N/A"}\nPhone: ${phone || "N/A"}\nMessage: ${resolvedNotes || "N/A"}\n\nProofDeed\nhttps://proofdeed.com`;
+        ? "Thank you for using ProofDeed.\n\nYour document has been permanently recorded on the Polygon blockchain.\n\nProof ID: " + proofId + "\nDocument Hash: " + documentHash + "\nTimestamp: " + timestamp + "\n\nVerify your document at:\nhttps://proofdeed.com/verify\n\nProofDeed\nhttps://proofdeed.com"
+        : "New contact submission from ProofDeed.\n\nName: " + name + "\nEmail: " + email + "\nOrganization: " + (resolvedCompany || "N/A") + "\nPhone: " + (phone || "N/A") + "\nMessage: " + (resolvedNotes || "N/A") + "\n\nProofDeed\nhttps://proofdeed.com";
 
       try {
-        await fetch(`https://api.mailgun.net/v3/${mailgunDomain}/messages`, {
+        await fetch("https://api.mailgun.net/v3/" + mailgunDomain + "/messages", {
           method: "POST",
           headers: {
-            "Authorization": "Basic " + Buffer.from(`api:${mailgunApiKey}`).toString("base64"),
+            "Authorization": "Basic " + Buffer.from("api:" + mailgunApiKey).toString("base64"),
             "Content-Type": "application/x-www-form-urlencoded"
           },
           body: new URLSearchParams({
-            from: process.env.MAIL_FROM || `ProofDeed <mailgun@${mailgunDomain}>`,
+            from: process.env.MAIL_FROM || "ProofDeed <mailgun@" + mailgunDomain + ">",
             to: process.env.MAIL_TO || email,
             subject: emailSubject,
             text: emailBody
           })
         });
-        console.log(`Email sent to ${email}`);
+        console.log("Email sent to " + email);
       } catch (mailErr) {
         console.error("Mailgun error (non-fatal):", mailErr.message);
       }
     }
 
-    console.log(`New ${request_type || "contact"} submission from: ${email}`);
+    console.log("New " + (request_type || "contact") + " submission from: " + email);
     res.json({ success: true });
 
   } catch (error) {
@@ -609,7 +585,7 @@ app.post(["/contact", "/api/contact"], async (req, res) => {
 /* ---------------- STRIPE CHECKOUT ---------------- */
 app.post(["/create-checkout-session", "/api/create-checkout-session"], async (req, res) => {
   try {
-    const { plan, success_url, cancel_url } = req.body;
+    const { plan, success_url, cancel_url, referral } = req.body;
 
     const priceMap = {
       "starter-monthly": process.env.PRICE_STARTER_MONTHLY,
@@ -619,7 +595,7 @@ app.post(["/create-checkout-session", "/api/create-checkout-session"], async (re
     };
 
     const priceId = priceMap[plan];
-    if (!priceId) return res.status(400).json({ error: `Invalid plan: ${plan}` });
+    if (!priceId) return res.status(400).json({ error: "Invalid plan: " + plan });
 
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
@@ -627,6 +603,7 @@ app.post(["/create-checkout-session", "/api/create-checkout-session"], async (re
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: success_url || "https://proofdeed.com/success",
       cancel_url: cancel_url || "https://proofdeed.com",
+      client_reference_id: referral || null
     });
 
     res.json({ url: session.url });
@@ -646,7 +623,7 @@ app.post(["/stripe-webhook", "/api/stripe-webhook"], express.raw({ type: "applic
     event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
   } catch (err) {
     console.error("Webhook signature failed:", err.message);
-    return res.status(400).send(`Webhook Error: ${err.message}`);
+    return res.status(400).send("Webhook Error: " + err.message);
   }
 
   if (event.type === "checkout.session.completed") {
@@ -654,17 +631,31 @@ app.post(["/stripe-webhook", "/api/stripe-webhook"], express.raw({ type: "applic
     const email = session.customer_details?.email;
     const customerId = session.customer;
     const subscriptionId = session.subscription;
+    const referral = session.client_reference_id;
 
     console.log("New subscriber:", email);
 
     try {
       await pool.query(
-        `INSERT INTO users (email, stripe_customer_id, subscription_id, created_at)
-         VALUES ($1, $2, $3, NOW())
+        `INSERT INTO users (email, stripe_customer_id, subscription_id, referred_by, created_at)
+         VALUES ($1, $2, $3, $4, NOW())
          ON CONFLICT (email) DO UPDATE
          SET stripe_customer_id = $2, subscription_id = $3`,
-        [email, customerId, subscriptionId]
+        [email, customerId, subscriptionId, referral || null]
       );
+
+      if (referral) {
+        try {
+          await pool.query(
+            `UPDATE users SET revenue_generated = COALESCE(revenue_generated, 0) + 1 WHERE referral_code = $1`,
+            [referral]
+          );
+          console.log("Referral credited:", referral);
+        } catch (err) {
+          console.error("Referral update failed:", err.message);
+        }
+      }
+
     } catch (dbErr) {
       console.error("User creation failed:", dbErr.message);
     }
@@ -675,5 +666,5 @@ app.post(["/stripe-webhook", "/api/stripe-webhook"], express.raw({ type: "applic
 
 /* ---------------- Start Server ---------------- */
 app.listen(PORT, () => {
-  console.log(`ProofDeed backend running on port ${PORT}`);
+  console.log("ProofDeed backend running on port " + PORT);
 });
