@@ -36,14 +36,14 @@ app.use(cors({
     return callback(new Error(`CORS blocked for origin: ${origin}`));
   },
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-API-Key"],
   credentials: true
 }));
 
 app.options("*", cors({
   origin: allowedOrigins,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-API-Key"],
   credentials: true
 }));
 
@@ -86,6 +86,40 @@ function authenticateToken(req, res, next) {
     req.user = user;
     next();
   });
+}
+
+/* ---------------- API Key Auth ---------------- */
+async function authenticateApiKey(req, res, next) {
+  const apiKey = req.headers["x-api-key"];
+  if (!apiKey) {
+    return res.status(401).json({ error: "API key required. Include X-API-Key header." });
+  }
+
+  try {
+    const result = await pool.query(
+      "SELECT * FROM api_keys WHERE api_key = $1 AND active = TRUE",
+      [apiKey]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(401).json({ error: "Invalid or inactive API key." });
+    }
+
+    const keyData = result.rows[0];
+
+    if (keyData.used_this_month >= keyData.monthly_limit) {
+      return res.status(429).json({
+        error: "Monthly limit reached.",
+        used: keyData.used_this_month,
+        limit: keyData.monthly_limit
+      });
+    }
+
+    req.apiKey = keyData;
+    next();
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 }
 
 /* ---------------- Health (API) ---------------- */
@@ -247,6 +281,203 @@ app.get(["/user/certifications", "/api/user/certifications"], authenticateToken,
 
   } catch (error) {
     console.error("User certifications error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/* ---------------- ENTERPRISE - GENERATE API KEY ---------------- */
+app.post("/api/enterprise/generate-key", async (req, res) => {
+  try {
+    const adminSecret = req.headers["x-admin-secret"];
+    if (adminSecret !== process.env.ADMIN_SECRET) {
+      return res.status(401).json({ error: "Unauthorized." });
+    }
+
+    const { email, monthly_limit, stripe_customer_id, stripe_subscription_id } = req.body;
+    if (!email) return res.status(400).json({ error: "Email required." });
+
+    const apiKey = "pd_live_" + crypto.randomBytes(32).toString("hex");
+
+    await pool.query(
+      `INSERT INTO api_keys (email, api_key, plan, monthly_limit, used_this_month, active, created_at)
+       VALUES ($1, $2, 'enterprise', $3, 0, TRUE, NOW())
+       ON CONFLICT (email) DO UPDATE SET api_key = $2, monthly_limit = $3, active = TRUE`,
+      [email, apiKey, monthly_limit || 1000]
+    );
+
+    if (stripe_customer_id && stripe_subscription_id) {
+      await pool.query(
+        `INSERT INTO users (email, stripe_customer_id, subscription_id, created_at)
+         VALUES ($1, $2, $3, NOW())
+         ON CONFLICT (email) DO UPDATE SET stripe_customer_id = $2, subscription_id = $3`,
+        [email, stripe_customer_id, stripe_subscription_id]
+      );
+    }
+
+    const mailgunDomain = process.env.MAILGUN_DOMAIN;
+    const mailgunApiKey = process.env.MAILGUN_API_KEY;
+
+    if (mailgunDomain && mailgunApiKey) {
+      await fetch(`https://api.mailgun.net/v3/${mailgunDomain}/messages`, {
+        method: "POST",
+        headers: {
+          "Authorization": "Basic " + Buffer.from(`api:${mailgunApiKey}`).toString("base64"),
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: new URLSearchParams({
+          from: process.env.MAIL_FROM || `ProofDeed <mailgun@${mailgunDomain}>`,
+          to: email,
+          subject: "Your ProofDeed Enterprise API Key",
+          text: `Welcome to ProofDeed Enterprise.\n\nYour API Key: ${apiKey}\n\nMonthly Limit: ${monthly_limit || 1000} certifications\n\nAPI Documentation: https://proofdeed.com/api-docs\n\nExample usage:\ncurl -X POST https://proofdeed.com/api/v1/certify \\\n  -H "X-API-Key: ${apiKey}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"documentHash":"your_sha256_hash"}'\n\nProofDeed\nhttps://proofdeed.com`
+        })
+      });
+    }
+
+    res.json({ success: true, apiKey, email, monthly_limit: monthly_limit || 1000 });
+
+  } catch (error) {
+    console.error("Generate API key error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/* ---------------- ENTERPRISE - SINGLE CERTIFY ---------------- */
+app.post(["/api/v1/certify"], authenticateApiKey, async (req, res) => {
+  try {
+    const { documentHash, metadata } = req.body;
+
+    if (!documentHash || typeof documentHash !== "string" || documentHash.length !== 64) {
+      return res.status(400).json({ error: "Invalid document hash. Must be a 64-character SHA-256 hex string." });
+    }
+
+    const proofId = "PD-" + Date.now();
+    const timestamp = new Date().toISOString();
+
+    let polygon_tx = null;
+    try {
+      polygon_tx = await anchorToPolygon(documentHash);
+    } catch (blockchainErr) {
+      console.error("Blockchain anchoring failed (non-fatal):", blockchainErr.message);
+    }
+
+    await pool.query(
+      `INSERT INTO certifications (certification_id, hash, polygon_tx, created_at)
+       VALUES ($1, $2, $3, NOW())
+       ON CONFLICT (certification_id) DO NOTHING`,
+      [proofId, documentHash, polygon_tx]
+    );
+
+    await pool.query(
+      "UPDATE api_keys SET used_this_month = used_this_month + 1 WHERE api_key = $1",
+      [req.apiKey.api_key]
+    );
+
+    try {
+      await stripe.billing.meterEvents.create({
+        event_name: "certification_created",
+        payload: {
+          stripe_customer_id: req.apiKey.stripe_customer_id || "unknown",
+          value: "1"
+        }
+      });
+    } catch (stripeErr) {
+      console.error("Stripe meter event failed (non-fatal):", stripeErr.message);
+    }
+
+    if (req.apiKey.webhook_url) {
+      try {
+        await fetch(req.apiKey.webhook_url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ proofId, documentHash, timestamp, polygon_tx, event: "certification.created" })
+        });
+      } catch (webhookErr) {
+        console.error("Webhook delivery failed (non-fatal):", webhookErr.message);
+      }
+    }
+
+    res.json({ proofId, timestamp, polygon_tx, hash: documentHash, used: req.apiKey.used_this_month + 1, limit: req.apiKey.monthly_limit });
+
+  } catch (error) {
+    console.error("Enterprise certify error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/* ---------------- ENTERPRISE - BATCH CERTIFY ---------------- */
+app.post(["/api/v1/batch"], authenticateApiKey, async (req, res) => {
+  try {
+    const { documents } = req.body;
+
+    if (!Array.isArray(documents) || documents.length === 0) {
+      return res.status(400).json({ error: "documents array required." });
+    }
+
+    if (documents.length > 100) {
+      return res.status(400).json({ error: "Maximum 100 documents per batch." });
+    }
+
+    const remaining = req.apiKey.monthly_limit - req.apiKey.used_this_month;
+    if (documents.length > remaining) {
+      return res.status(429).json({ error: `Batch size exceeds remaining limit. Remaining: ${remaining}` });
+    }
+
+    const results = [];
+
+    for (const doc of documents) {
+      const { documentHash, id } = doc;
+
+      if (!documentHash || typeof documentHash !== "string" || documentHash.length !== 64) {
+        results.push({ id, error: "Invalid hash", documentHash });
+        continue;
+      }
+
+      const proofId = "PD-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5);
+      const timestamp = new Date().toISOString();
+
+      let polygon_tx = null;
+      try {
+        polygon_tx = await anchorToPolygon(documentHash);
+      } catch (err) {
+        console.error("Blockchain failed for doc:", documentHash);
+      }
+
+      await pool.query(
+        `INSERT INTO certifications (certification_id, hash, polygon_tx, created_at)
+         VALUES ($1, $2, $3, NOW())
+         ON CONFLICT (certification_id) DO NOTHING`,
+        [proofId, documentHash, polygon_tx]
+      );
+
+      results.push({ id, proofId, documentHash, timestamp, polygon_tx });
+    }
+
+    await pool.query(
+      "UPDATE api_keys SET used_this_month = used_this_month + $1 WHERE api_key = $2",
+      [results.filter(r => !r.error).length, req.apiKey.api_key]
+    );
+
+    try {
+      await stripe.billing.meterEvents.create({
+        event_name: "certification_created",
+        payload: {
+          stripe_customer_id: req.apiKey.stripe_customer_id || "unknown",
+          value: String(results.filter(r => !r.error).length)
+        }
+      });
+    } catch (stripeErr) {
+      console.error("Stripe meter event failed (non-fatal):", stripeErr.message);
+    }
+
+    res.json({
+      success: true,
+      processed: results.filter(r => !r.error).length,
+      failed: results.filter(r => r.error).length,
+      results
+    });
+
+  } catch (error) {
+    console.error("Batch certify error:", error);
     res.status(500).json({ error: error.message });
   }
 });
