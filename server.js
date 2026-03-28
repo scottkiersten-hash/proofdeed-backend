@@ -329,7 +329,9 @@ app.get("/api/verify/:certId", async (req, res) => {
 /* ---------------- CONTACT / AFFILIATE FORM ---------------- */
 app.post(["/contact", "/api/contact"], async (req, res) => {
   try {
-    const { name, company, email, notes, request_type, subject, proofId, documentHash, timestamp } = req.body;
+  const { name, company, organization, email, notes, message, phone, request_type, subject, proofId, documentHash, timestamp } = req.body;
+const resolvedCompany = company || organization || null;
+const resolvedNotes = notes || message || null;
 
     if (!email || !name) {
       return res.status(400).json({ error: "Name and email are required." });
