@@ -250,8 +250,8 @@ app.post(["/create-checkout-session", "/api/create-checkout-session"], async (re
       mode: "subscription",
       payment_method_types: ["card"],
       line_items: [{ price: priceId, quantity: 1 }],
-      success_url: "https://proofdeed.com/success",
-     cancel_url: "https://proofdeed.com",
+      success_url: success_url || "https://proofdeed.com/success",
+      cancel_url: cancel_url || "https://proofdeed.com",
     });
 
     res.json({ url: session.url });
