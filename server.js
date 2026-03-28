@@ -338,7 +338,7 @@ const resolvedNotes = notes || message || null;
     }
 
     await pool.query(
-      `INSERT INTO contact_submissions (name, company, email, notes, request_type, created_at)
+     [name, resolvedCompany, email, resolvedNotes, request_type || "contact"]
        VALUES ($1, $2, $3, $4, $5, NOW())`,
       [name, company || null, email, notes || null, request_type || "contact"]
     );
