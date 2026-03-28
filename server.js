@@ -110,7 +110,7 @@ app.get("/api/test-cert", async (req, res) => {
 });
 
 /* ---------------- CREATE PROOF ---------------- */
-app.post("/create-proof", async (req, res) => {
+app.post(["/create-proof", "/api/create-proof"], async (req, res) => {
   try {
     const { documentHash } = req.body;
     console.log("BODY:", JSON.stringify(req.body));
@@ -232,7 +232,7 @@ app.post(["/contact", "/api/contact"], async (req, res) => {
 });
 
 /* ---------------- STRIPE CHECKOUT ---------------- */
-app.post("/api/create-checkout-session", async (req, res) => {
+app.post(["/create-checkout-session", "/api/create-checkout-session"], async (req, res) => {
   try {
     const { plan } = req.body;
 
@@ -263,7 +263,7 @@ app.post("/api/create-checkout-session", async (req, res) => {
 });
 
 /* ---------------- STRIPE WEBHOOK ---------------- */
-app.post("/api/stripe-webhook", express.raw({ type: "application/json" }), async (req, res) => {
+app.post(["/stripe-webhook", "/api/stripe-webhook"], express.raw({ type: "application/json" }), async (req, res) => {
   const sig = req.headers["stripe-signature"];
   let event;
 
