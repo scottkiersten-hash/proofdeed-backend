@@ -524,7 +524,7 @@ app.post(["/create-proof", "/api/create-proof"], async (req, res) => {
 });
 
 /* ---------------- VERIFY CERTIFICATE ---------------- */
-app.get("/api/verify/:certId", async (req, res) => {
+app.get(["/verify/:certId", "/api/verify/:certId"], async (req, res) => {
   try {
     const { certId } = req.params;
 
