@@ -109,6 +109,155 @@ app.get("/api/test-cert", async (req, res) => {
   }
 });
 
+/* ---------------- MAGIC LINK - SEND ---------------- */
+app.post(["/auth/magic-link", "/api/auth/magic-link"], async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email || !email.includes("@")) {
+      return res.status(400).json({ error: "Valid email required." });
+    }
+
+    const userCheck = await pool.query(
+      "SELECT * FROM users WHERE email = $1",
+      [email]
+    );
+
+    if (userCheck.rows.length === 0) {
+      return res.status(404).json({ error: "No account found for this email. Please purchase a plan first." });
+    }
+
+    const token = crypto.randomBytes(32).toString("hex");
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+
+    await pool.query(
+      "INSERT INTO magic_links (email, token, expires_at) VALUES ($1, $2, $3)",
+      [email, token, expiresAt]
+    );
+
+    const magicLink = `https://proofdeed.com/auth/verify?token=${token}`;
+
+    const mailgunDomain = process.env.MAILGUN_DOMAIN;
+    const mailgunApiKey = process.env.MAILGUN_API_KEY;
+
+    if (mailgunDomain && mailgunApiKey) {
+      await fetch(`https://api.mailgun.net/v3/${mailgunDomain}/messages`, {
+        method: "POST",
+        headers: {
+          "Authorization": "Basic " + Buffer.from(`api:${mailgunApiKey}`).toString("base64"),
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: new URLSearchParams({
+          from: process.env.MAIL_FROM || `ProofDeed <mailgun@${mailgunDomain}>`,
+          to: email,
+          subject: "Your ProofDeed Sign-In Link",
+          text: `Click the link below to sign in to ProofDeed.\n\nThis link expires in 15 minutes.\n\n${magicLink}\n\nIf you did not request this, please ignore this email.\n\nProofDeed\nhttps://proofdeed.com`
+        })
+      });
+    }
+
+    console.log(`Magic link sent to ${email}`);
+    res.json({ success: true });
+
+  } catch (error) {
+    console.error("Magic link error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/* ---------------- MAGIC LINK - VERIFY ---------------- */
+app.get(["/auth/verify", "/api/auth/verify"], async (req, res) => {
+  try {
+    const { token } = req.query;
+    if (!token) return res.status(400).json({ error: "Token required." });
+
+    const result = await pool.query(
+      "SELECT * FROM magic_links WHERE token = $1 AND used = FALSE AND expires_at > NOW()",
+      [token]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(401).json({ error: "Link expired or already used. Please request a new one." });
+    }
+
+    const link = result.rows[0];
+    const email = link.email;
+
+    await pool.query("UPDATE magic_links SET used = TRUE WHERE id = $1", [link.id]);
+
+    const userResult = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
+    const user = userResult.rows[0];
+
+    const planLimits = {
+      "starter-monthly": 25,
+      "starter-annual": 25,
+      "pro-monthly": 70,
+      "pro-annual": 70,
+    };
+
+    const certCount = await pool.query(
+      "SELECT COUNT(*) FROM certifications WHERE user_id = $1 AND created_at > date_trunc('month', NOW())",
+      [user?.id || 0]
+    );
+
+    const used = parseInt(certCount.rows[0].count) || 0;
+    const plan = user?.subscription_id ? "pro" : "starter";
+    const certLimit = planLimits[`${plan}-monthly`] || 25;
+
+    const jwtToken = jwt.sign(
+      { email, userId: user?.id, plan },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    res.json({
+      jwt: jwtToken,
+      email,
+      plan,
+      certifications_used: used,
+      certifications_limit: certLimit
+    });
+
+  } catch (error) {
+    console.error("Verify error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/* ---------------- USER CERTIFICATIONS ---------------- */
+app.get(["/user/certifications", "/api/user/certifications"], authenticateToken, async (req, res) => {
+  try {
+    const { email } = req.user;
+
+    const userResult = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
+    const user = userResult.rows[0];
+
+    const certs = await pool.query(
+      "SELECT certification_id, hash, polygon_tx, created_at FROM certifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50",
+      [user?.id || 0]
+    );
+
+    const certCount = await pool.query(
+      "SELECT COUNT(*) FROM certifications WHERE user_id = $1 AND created_at > date_trunc('month', NOW())",
+      [user?.id || 0]
+    );
+
+    const used = parseInt(certCount.rows[0].count) || 0;
+    const plan = user?.subscription_id ? "pro" : "starter";
+    const limit = plan === "pro" ? 70 : 25;
+
+    res.json({
+      certifications: certs.rows,
+      used,
+      limit,
+      plan
+    });
+
+  } catch (error) {
+    console.error("User certifications error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 /* ---------------- CREATE PROOF ---------------- */
 app.post(["/create-proof", "/api/create-proof"], async (req, res) => {
   try {
