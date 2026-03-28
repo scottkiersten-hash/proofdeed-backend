@@ -187,13 +187,6 @@ app.get(["/auth/verify", "/api/auth/verify"], async (req, res) => {
     const userResult = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
     const user = userResult.rows[0];
 
-    const planLimits = {
-      "starter-monthly": 25,
-      "starter-annual": 25,
-      "pro-monthly": 70,
-      "pro-annual": 70,
-    };
-
     const certCount = await pool.query(
       "SELECT COUNT(*) FROM certifications WHERE user_id = $1 AND created_at > date_trunc('month', NOW())",
       [user?.id || 0]
@@ -201,7 +194,7 @@ app.get(["/auth/verify", "/api/auth/verify"], async (req, res) => {
 
     const used = parseInt(certCount.rows[0].count) || 0;
     const plan = user?.subscription_id ? "pro" : "starter";
-    const certLimit = planLimits[`${plan}-monthly`] || 25;
+    const certLimit = plan === "pro" ? 70 : 25;
 
     const jwtToken = jwt.sign(
       { email, userId: user?.id, plan },
@@ -329,18 +322,18 @@ app.get("/api/verify/:certId", async (req, res) => {
 /* ---------------- CONTACT / AFFILIATE FORM ---------------- */
 app.post(["/contact", "/api/contact"], async (req, res) => {
   try {
-  const { name, company, organization, email, notes, message, phone, request_type, subject, proofId, documentHash, timestamp } = req.body;
-const resolvedCompany = company || organization || null;
-const resolvedNotes = notes || message || null;
+    const { name, company, organization, email, notes, message, phone, request_type, subject, proofId, documentHash, timestamp } = req.body;
+    const resolvedCompany = company || organization || null;
+    const resolvedNotes = notes || message || null;
 
     if (!email || !name) {
       return res.status(400).json({ error: "Name and email are required." });
     }
 
     await pool.query(
-     [name, resolvedCompany, email, resolvedNotes, request_type || "contact"]
+      `INSERT INTO contact_submissions (name, company, email, notes, request_type, created_at)
        VALUES ($1, $2, $3, $4, $5, NOW())`,
-      [name, company || null, email, notes || null, request_type || "contact"]
+      [name, resolvedCompany, email, resolvedNotes, request_type || "contact"]
     );
 
     const mailgunDomain = process.env.MAILGUN_DOMAIN;
@@ -351,7 +344,7 @@ const resolvedNotes = notes || message || null;
       const emailSubject = subject || (isProofEmail ? "Your ProofDeed Certificate" : "ProofDeed Contact Confirmation");
       const emailBody = isProofEmail
         ? `Thank you for using ProofDeed.\n\nYour document has been permanently recorded on the Polygon blockchain.\n\nProof ID: ${proofId}\nDocument Hash: ${documentHash}\nTimestamp: ${timestamp}\n\nVerify your document at:\nhttps://proofdeed.com/verify\n\nProofDeed\nhttps://proofdeed.com`
-        : `Thank you for contacting ProofDeed.\n\nWe received your message and will be in touch shortly.\n\nName: ${name}\nEmail: ${email}\nNotes: ${notes || "N/A"}\n\nProofDeed\nhttps://proofdeed.com`;
+        : `New contact submission from ProofDeed.\n\nName: ${name}\nEmail: ${email}\nOrganization: ${resolvedCompany || "N/A"}\nPhone: ${phone || "N/A"}\nMessage: ${resolvedNotes || "N/A"}\n\nProofDeed\nhttps://proofdeed.com`;
 
       try {
         await fetch(`https://api.mailgun.net/v3/${mailgunDomain}/messages`, {
@@ -362,7 +355,7 @@ const resolvedNotes = notes || message || null;
           },
           body: new URLSearchParams({
             from: process.env.MAIL_FROM || `ProofDeed <mailgun@${mailgunDomain}>`,
-            to: email,
+            to: process.env.MAIL_TO || email,
             subject: emailSubject,
             text: emailBody
           })
