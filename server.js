@@ -472,6 +472,21 @@ app.post(["/create-proof", "/api/create-proof"], async (req, res) => {
     const proofId = "PD-" + Date.now();
     const timestamp = new Date().toISOString();
 
+    let userId = null;
+    const authHeader = req.headers["authorization"];
+    if (authHeader) {
+      try {
+        const token = authHeader.split(" ")[1];
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const userResult = await pool.query("SELECT id FROM users WHERE email = $1", [decoded.email]);
+        if (userResult.rows.length > 0) {
+          userId = userResult.rows[0].id;
+        }
+      } catch (err) {
+        console.log("No valid JWT — anonymous certification");
+      }
+    }
+
     let polygon_tx = null;
     try {
       polygon_tx = await anchorToPolygon(documentHash);
@@ -480,10 +495,10 @@ app.post(["/create-proof", "/api/create-proof"], async (req, res) => {
     }
 
     await pool.query(
-      `INSERT INTO certifications (certification_id, hash, polygon_tx, created_at)
-       VALUES ($1, $2, $3, NOW())
+      `INSERT INTO certifications (certification_id, hash, polygon_tx, user_id, created_at)
+       VALUES ($1, $2, $3, $4, NOW())
        ON CONFLICT (certification_id) DO NOTHING`,
-      [proofId, documentHash, polygon_tx]
+      [proofId, documentHash, polygon_tx, userId]
     );
 
     res.json({
