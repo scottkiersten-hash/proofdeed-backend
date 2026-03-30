@@ -564,23 +564,31 @@ app.post(["/contact", "/api/contact"], async (req, res) => {
     if (mailgunDomain && mailgunApiKey) {
       const isProofEmail = !!proofId;
       const emailSubject = subject || (isProofEmail ? "Your ProofDeed Certificate" : "ProofDeed Contact Confirmation");
-      const emailBody = isProofEmail
-        ? "Thank you for using ProofDeed.\n\nYour document has been permanently recorded on the Polygon blockchain.\n\nProof ID: " + proofId + "\nDocument Hash: " + documentHash + "\nTimestamp: " + timestamp + "\n\nVerify your document at:\nhttps://proofdeed.com/verify\n\nProofDeed\nhttps://proofdeed.com"
-        : "New contact submission from ProofDeed.\n\nName: " + name + "\nEmail: " + email + "\nOrganization: " + (resolvedCompany || "N/A") + "\nPhone: " + (phone || "N/A") + "\nMessage: " + (resolvedNotes || "N/A") + "\n\nProofDeed\nhttps://proofdeed.com";
+
+      const htmlProofEmail = "<!DOCTYPE html><html><body style='margin:0;padding:0;background:#f0f0ee;font-family:Georgia,serif;'><div style='max-width:600px;margin:40px auto;background:#ffffff;border:1px solid #ddd;border-radius:4px;overflow:hidden;'><div style='height:4px;background:linear-gradient(90deg,#1a3a8e,#4080d0,#1a3a8e);'></div><div style='padding:40px;'><h1 style='font-size:22px;font-weight:700;color:#111;margin:0 0 8px;'>Document Certified</h1><p style='font-size:14px;color:#666;margin:0 0 32px;'>Your document has been permanently recorded on the Polygon blockchain.</p><div style='background:#f8f8f6;border:1px solid #e5e5e5;border-radius:4px;padding:24px;margin-bottom:24px;'><p style='font-size:11px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:0.1em;margin:0 0 6px;'>Proof ID</p><p style='font-size:18px;font-family:monospace;color:#1a3a8e;font-weight:700;margin:0 0 20px;'>" + proofId + "</p><p style='font-size:11px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:0.1em;margin:0 0 6px;'>Document Hash</p><p style='font-size:11px;font-family:monospace;color:#333;word-break:break-all;margin:0 0 20px;'>" + documentHash + "</p><p style='font-size:11px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:0.1em;margin:0 0 6px;'>Timestamp</p><p style='font-size:13px;color:#333;margin:0;'>" + timestamp + "</p></div><a href='https://proofdeed.com/verify' style='display:inline-block;background:#0f172a;color:#ffffff;text-decoration:none;padding:14px 28px;border-radius:6px;font-family:sans-serif;font-size:14px;font-weight:600;margin-bottom:24px;'>Verify Certificate</a><hr style='border:none;border-top:1px solid #e5e5e5;margin:24px 0;'><p style='font-size:12px;color:#999;font-family:sans-serif;margin:0;'>ProofDeed &mdash; Blockchain Document Certification</p><p style='font-size:12px;color:#999;font-family:sans-serif;margin:4px 0 0;'><a href='https://proofdeed.com' style='color:#1a3a8e;'>proofdeed.com</a></p></div><div style='height:4px;background:linear-gradient(90deg,#1a3a8e,#4080d0,#1a3a8e);'></div></div></body></html>";
+
+      const textContactEmail = "New contact submission from ProofDeed.\n\nName: " + name + "\nEmail: " + email + "\nOrganization: " + (resolvedCompany || "N/A") + "\nPhone: " + (phone || "N/A") + "\nMessage: " + (resolvedNotes || "N/A") + "\n\nProofDeed\nhttps://proofdeed.com";
 
       try {
+        const mailParams = {
+          from: process.env.MAIL_FROM || "ProofDeed <mailgun@" + mailgunDomain + ">",
+          to: process.env.MAIL_TO || email,
+          subject: emailSubject,
+        };
+
+        if (isProofEmail) {
+          mailParams.html = htmlProofEmail;
+        } else {
+          mailParams.text = textContactEmail;
+        }
+
         await fetch("https://api.mailgun.net/v3/" + mailgunDomain + "/messages", {
           method: "POST",
           headers: {
             "Authorization": "Basic " + Buffer.from("api:" + mailgunApiKey).toString("base64"),
             "Content-Type": "application/x-www-form-urlencoded"
           },
-          body: new URLSearchParams({
-            from: process.env.MAIL_FROM || "ProofDeed <mailgun@" + mailgunDomain + ">",
-            to: process.env.MAIL_TO || email,
-            subject: emailSubject,
-            text: emailBody
-          })
+          body: new URLSearchParams(mailParams)
         });
         console.log("Email sent to " + email);
       } catch (mailErr) {
