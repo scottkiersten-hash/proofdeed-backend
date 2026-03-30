@@ -703,6 +703,20 @@ app.get(["/admin/stats", "/api/admin/stats"], async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+/* ---------------- MONTHLY USAGE RESET ---------------- */
+async function resetMonthlyUsage() {
+  try {
+    const now = new Date();
+    if (now.getDate() === 1 && now.getHours() === 0) {
+      await pool.query('UPDATE api_keys SET used_this_month = 0');
+      console.log('Monthly API key usage reset completed.');
+    }
+  } catch (err) {
+    console.error('Monthly reset error:', err.message);
+  }
+}
+
+setInterval(resetMonthlyUsage, 60 * 60 * 1000);
 /* ---------------- Start Server ---------------- */
 app.listen(PORT, () => {
   console.log("ProofDeed backend running on port " + PORT);
