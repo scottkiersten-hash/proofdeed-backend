@@ -663,7 +663,46 @@ app.post(["/stripe-webhook", "/api/stripe-webhook"], express.raw({ type: "applic
 
   res.json({ received: true });
 });
+/* ---------------- ADMIN DASHBOARD ---------------- */
+app.get(["/admin/stats", "/api/admin/stats"], async (req, res) => {
+  try {
+    const adminSecret = req.headers["x-admin-secret"];
+    if (adminSecret !== process.env.ADMIN_SECRET) {
+      return res.status(401).json({ error: "Unauthorized." });
+    }
 
+    const users = await pool.query(
+      `SELECT email, stripe_customer_id, subscription_id, referral_code, 
+       referred_by, revenue_generated, created_at 
+       FROM users ORDER BY created_at DESC`
+    );
+
+    const certs = await pool.query(
+      `SELECT COUNT(*) as total FROM certifications`
+    );
+
+    const contacts = await pool.query(
+      `SELECT name, email, company, notes, request_type, created_at 
+       FROM contact_submissions ORDER BY created_at DESC LIMIT 50`
+    );
+
+    const apiKeys = await pool.query(
+      `SELECT email, plan, monthly_limit, used_this_month, active, created_at 
+       FROM api_keys ORDER BY created_at DESC`
+    );
+
+    res.json({
+      users: users.rows,
+      totalCertifications: parseInt(certs.rows[0].total),
+      contacts: contacts.rows,
+      apiKeys: apiKeys.rows
+    });
+
+  } catch (error) {
+    console.error("Admin stats error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
 /* ---------------- Start Server ---------------- */
 app.listen(PORT, () => {
   console.log("ProofDeed backend running on port " + PORT);
