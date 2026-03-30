@@ -717,6 +717,31 @@ async function resetMonthlyUsage() {
 }
 
 setInterval(resetMonthlyUsage, 60 * 60 * 1000);
+
+/* ---------------- STRIPE CUSTOMER PORTAL ---------------- */
+app.post(["/billing/portal", "/api/billing/portal"], authenticateToken, async (req, res) => {
+  try {
+    const { email } = req.user;
+
+    const userResult = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
+    const user = userResult.rows[0];
+
+    if (!user || !user.stripe_customer_id) {
+      return res.status(404).json({ error: "No billing account found." });
+    }
+
+    const session = await stripe.billingPortal.sessions.create({
+      customer: user.stripe_customer_id,
+      return_url: "https://proofdeed.com/dashboard",
+    });
+
+    res.json({ url: session.url });
+
+  } catch (err) {
+    console.error("Portal error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
 /* ---------------- Start Server ---------------- */
 app.listen(PORT, () => {
   console.log("ProofDeed backend running on port " + PORT);
