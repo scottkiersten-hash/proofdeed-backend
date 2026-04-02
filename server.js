@@ -122,6 +122,20 @@ async function authenticateApiKey(req, res, next) {
   }
 }
 
+/* ---------------- Report Usage to Stripe ---------------- */
+async function reportUsageToStripe(subscriptionItemId, quantity) {
+  try {
+    await stripe.subscriptionItems.createUsageRecord(subscriptionItemId, {
+      quantity,
+      timestamp: Math.floor(Date.now() / 1000),
+      action: "increment"
+    });
+    console.log("Stripe usage reported:", quantity, "for", subscriptionItemId);
+  } catch (err) {
+    console.error("Stripe usage report failed (non-fatal):", err.message);
+  }
+}
+
 /* ---------------- Health (API) ---------------- */
 app.get("/api/health", async (req, res) => {
   try {
@@ -151,10 +165,7 @@ app.post(["/auth/magic-link", "/api/auth/magic-link"], async (req, res) => {
       return res.status(400).json({ error: "Valid email required." });
     }
 
-    const userCheck = await pool.query(
-      "SELECT * FROM users WHERE email = $1",
-      [email]
-    );
+    const userCheck = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
 
     if (userCheck.rows.length === 0) {
       return res.status(404).json({ error: "No account found for this email. Please purchase a plan first." });
@@ -169,7 +180,6 @@ app.post(["/auth/magic-link", "/api/auth/magic-link"], async (req, res) => {
     );
 
     const magicLink = "https://proofdeed.com/auth/verify?token=" + token;
-
     const mailgunDomain = process.env.MAILGUN_DOMAIN;
     const mailgunApiKey = process.env.MAILGUN_API_KEY;
 
@@ -272,12 +282,7 @@ app.get(["/user/certifications", "/api/user/certifications"], authenticateToken,
     const plan = user?.subscription_id ? "pro" : "starter";
     const limit = plan === "pro" ? 70 : 25;
 
-    res.json({
-      certifications: certs.rows,
-      used,
-      limit,
-      plan
-    });
+    res.json({ certifications: certs.rows, used, limit, plan });
 
   } catch (error) {
     console.error("User certifications error:", error);
@@ -293,27 +298,60 @@ app.post("/api/enterprise/generate-key", async (req, res) => {
       return res.status(401).json({ error: "Unauthorized." });
     }
 
-    const { email, monthly_limit, stripe_customer_id, stripe_subscription_id } = req.body;
+    const { email, monthly_limit } = req.body;
     if (!email) return res.status(400).json({ error: "Email required." });
 
     const apiKey = "pd_live_" + crypto.randomBytes(32).toString("hex");
 
-    await pool.query(
-      `INSERT INTO api_keys (email, api_key, plan, monthly_limit, used_this_month, active, created_at)
-       VALUES ($1, $2, 'enterprise', $3, 0, TRUE, NOW())
-       ON CONFLICT (email) DO UPDATE SET api_key = $2, monthly_limit = $3, active = TRUE`,
-      [email, apiKey, monthly_limit || 1000]
-    );
+    // Create or get Stripe customer
+    let stripeCustomerId = null;
+    let stripeSubscriptionId = null;
+    let stripeSubscriptionItemId = null;
 
-    if (stripe_customer_id && stripe_subscription_id) {
-      await pool.query(
-        `INSERT INTO users (email, stripe_customer_id, subscription_id, created_at)
-         VALUES ($1, $2, $3, NOW())
-         ON CONFLICT (email) DO UPDATE SET stripe_customer_id = $2, subscription_id = $3`,
-        [email, stripe_customer_id, stripe_subscription_id]
-      );
+    try {
+      // Check if customer already exists
+      const existing = await pool.query("SELECT stripe_customer_id FROM users WHERE email = $1", [email]);
+
+      if (existing.rows.length > 0 && existing.rows[0].stripe_customer_id) {
+        stripeCustomerId = existing.rows[0].stripe_customer_id;
+      } else {
+        // Create new Stripe customer
+        const customer = await stripe.customers.create({ email });
+        stripeCustomerId = customer.id;
+      }
+
+      // Create metered subscription
+      const subscription = await stripe.subscriptions.create({
+        customer: stripeCustomerId,
+        items: [{ price: process.env.PRICE_ENTERPRISE }],
+        payment_behavior: "default_incomplete",
+        expand: ["latest_invoice.payment_intent"]
+      });
+
+      stripeSubscriptionId = subscription.id;
+      stripeSubscriptionItemId = subscription.items.data[0].id;
+
+      console.log("Enterprise Stripe subscription created:", stripeSubscriptionId);
+    } catch (stripeErr) {
+      console.error("Stripe subscription creation failed (non-fatal):", stripeErr.message);
     }
 
+    // Save API key and user
+    await pool.query(
+      `INSERT INTO api_keys (email, api_key, plan, monthly_limit, used_this_month, stripe_subscription_item_id, active, created_at)
+       VALUES ($1, $2, 'enterprise', $3, 0, $4, TRUE, NOW())
+       ON CONFLICT (email) DO UPDATE SET api_key = $2, monthly_limit = $3, stripe_subscription_item_id = $4, active = TRUE`,
+      [email, apiKey, monthly_limit || 1000, stripeSubscriptionItemId]
+    );
+
+    await pool.query(
+      `INSERT INTO users (email, stripe_customer_id, subscription_id, created_at)
+       VALUES ($1, $2, $3, NOW())
+       ON CONFLICT (email) DO UPDATE SET stripe_customer_id = $2, subscription_id = $3`,
+      [email, stripeCustomerId, stripeSubscriptionId]
+    );
+
+    // Send welcome email
     const mailgunDomain = process.env.MAILGUN_DOMAIN;
     const mailgunApiKey = process.env.MAILGUN_API_KEY;
 
@@ -328,12 +366,19 @@ app.post("/api/enterprise/generate-key", async (req, res) => {
           from: process.env.MAIL_FROM || "ProofDeed <mailgun@" + mailgunDomain + ">",
           to: email,
           subject: "Your ProofDeed Enterprise API Key",
-          text: "Welcome to ProofDeed Enterprise.\n\nYour API Key: " + apiKey + "\n\nMonthly Limit: " + (monthly_limit || 1000) + " certifications\n\nAPI Documentation: https://proofdeed.com/api-docs\n\nProofDeed\nhttps://proofdeed.com"
+          text: "Welcome to ProofDeed Enterprise.\n\nYour API Key: " + apiKey + "\n\nBilling: Usage-based, billed monthly via Stripe. Graduated pricing starts at $0.76/cert.\n\nAPI Documentation: https://proofdeed.com/api-docs\n\nProofDeed\nhttps://proofdeed.com"
         })
       });
     }
 
-    res.json({ success: true, apiKey, email, monthly_limit: monthly_limit || 1000 });
+    res.json({
+      success: true,
+      apiKey,
+      email,
+      monthly_limit: monthly_limit || 1000,
+      stripe_customer_id: stripeCustomerId,
+      stripe_subscription_id: stripeSubscriptionId
+    });
 
   } catch (error) {
     console.error("Generate API key error:", error);
@@ -371,6 +416,11 @@ app.post("/api/v1/certify", authenticateApiKey, async (req, res) => {
       "UPDATE api_keys SET used_this_month = used_this_month + 1 WHERE api_key = $1",
       [req.apiKey.api_key]
     );
+
+    // Report usage to Stripe for automatic billing
+    if (req.apiKey.stripe_subscription_item_id) {
+      await reportUsageToStripe(req.apiKey.stripe_subscription_item_id, 1);
+    }
 
     if (req.apiKey.webhook_url) {
       try {
@@ -440,14 +490,21 @@ app.post("/api/v1/batch", authenticateApiKey, async (req, res) => {
       results.push({ id, proofId, documentHash, timestamp, polygon_tx });
     }
 
+    const processed = results.filter(r => !r.error).length;
+
     await pool.query(
       "UPDATE api_keys SET used_this_month = used_this_month + $1 WHERE api_key = $2",
-      [results.filter(r => !r.error).length, req.apiKey.api_key]
+      [processed, req.apiKey.api_key]
     );
+
+    // Report batch usage to Stripe for automatic billing
+    if (req.apiKey.stripe_subscription_item_id && processed > 0) {
+      await reportUsageToStripe(req.apiKey.stripe_subscription_item_id, processed);
+    }
 
     res.json({
       success: true,
-      processed: results.filter(r => !r.error).length,
+      processed,
       failed: results.filter(r => r.error).length,
       results
     });
@@ -646,6 +703,7 @@ app.post(["/create-checkout-session", "/api/create-checkout-session"], async (re
       "starter-annual":  process.env.PRICE_STARTER_YEARLY,
       "pro-monthly":     process.env.PRICE_PRO_MONTHLY,
       "pro-annual":      process.env.PRICE_PRO_YEARLY,
+      "enterprise":      process.env.PRICE_ENTERPRISE,
     };
 
     const priceId = priceMap[plan];
@@ -654,7 +712,7 @@ app.post(["/create-checkout-session", "/api/create-checkout-session"], async (re
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       payment_method_types: ["card"],
-      line_items: [{ price: priceId, quantity: 1 }],
+      line_items: [{ price: priceId, quantity: plan === "enterprise" ? undefined : 1 }],
       success_url: success_url || "https://proofdeed.com/success",
       cancel_url: cancel_url || "https://proofdeed.com",
       client_reference_id: referral || null
@@ -690,6 +748,15 @@ app.post(["/stripe-webhook", "/api/stripe-webhook"], express.raw({ type: "applic
     console.log("New subscriber:", email);
 
     try {
+      // Get subscription item ID for metered billing
+      let subscriptionItemId = null;
+      try {
+        const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+        subscriptionItemId = subscription.items.data[0]?.id || null;
+      } catch (err) {
+        console.error("Could not retrieve subscription item:", err.message);
+      }
+
       await pool.query(
         `INSERT INTO users (email, stripe_customer_id, subscription_id, referred_by, created_at)
          VALUES ($1, $2, $3, $4, NOW())
@@ -697,6 +764,14 @@ app.post(["/stripe-webhook", "/api/stripe-webhook"], express.raw({ type: "applic
          SET stripe_customer_id = $2, subscription_id = $3`,
         [email, customerId, subscriptionId, referral || null]
       );
+
+      // Store subscription item ID in api_keys if enterprise
+      if (subscriptionItemId) {
+        await pool.query(
+          `UPDATE api_keys SET stripe_subscription_item_id = $1 WHERE email = $2`,
+          [subscriptionItemId, email]
+        );
+      }
 
       if (referral) {
         try {
@@ -718,6 +793,35 @@ app.post(["/stripe-webhook", "/api/stripe-webhook"], express.raw({ type: "applic
   res.json({ received: true });
 });
 
+/* ---------------- ENTERPRISE CHECKOUT ---------------- */
+app.post(["/enterprise/checkout", "/api/enterprise/checkout"], async (req, res) => {
+  try {
+    const { email, referral } = req.body;
+    if (!email) return res.status(400).json({ error: "Email required." });
+
+    // Create Stripe customer
+    const customer = await stripe.customers.create({ email });
+
+    // Create checkout session with metered enterprise price
+    const session = await stripe.checkout.sessions.create({
+      customer: customer.id,
+      mode: "subscription",
+      payment_method_types: ["card"],
+      line_items: [{ price: process.env.PRICE_ENTERPRISE }],
+      success_url: "https://proofdeed.com/enterprise/success?session_id={CHECKOUT_SESSION_ID}",
+      cancel_url: "https://proofdeed.com/contact",
+      client_reference_id: referral || null,
+      metadata: { email }
+    });
+
+    res.json({ url: session.url });
+
+  } catch (err) {
+    console.error("Enterprise checkout error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /* ---------------- ADMIN DASHBOARD ---------------- */
 app.get(["/admin/stats", "/api/admin/stats"], async (req, res) => {
   try {
@@ -727,22 +831,20 @@ app.get(["/admin/stats", "/api/admin/stats"], async (req, res) => {
     }
 
     const users = await pool.query(
-      `SELECT email, stripe_customer_id, subscription_id, referral_code, 
-       referred_by, revenue_generated, created_at 
+      `SELECT email, stripe_customer_id, subscription_id, referral_code,
+       referred_by, revenue_generated, created_at
        FROM users ORDER BY created_at DESC`
     );
 
-    const certs = await pool.query(
-      `SELECT COUNT(*) as total FROM certifications`
-    );
+    const certs = await pool.query(`SELECT COUNT(*) as total FROM certifications`);
 
     const contacts = await pool.query(
-      `SELECT name, email, company, notes, request_type, created_at 
+      `SELECT name, email, company, notes, request_type, created_at
        FROM contact_submissions ORDER BY created_at DESC LIMIT 50`
     );
 
     const apiKeys = await pool.query(
-      `SELECT email, plan, monthly_limit, used_this_month, active, created_at 
+      `SELECT email, plan, monthly_limit, used_this_month, stripe_subscription_item_id, active, created_at
        FROM api_keys ORDER BY created_at DESC`
     );
 
