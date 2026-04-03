@@ -716,6 +716,7 @@ app.post(["/create-checkout-session", "/api/create-checkout-session"], async (re
       success_url: success_url || "https://proofdeed.com/success",
       cancel_url: cancel_url || "https://proofdeed.com",
     client_reference_id: referral ? referral : undefined
+      metadata: { email: email }
     });
 
     res.json({ url: session.url });
