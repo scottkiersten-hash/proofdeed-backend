@@ -794,6 +794,7 @@ app.post(["/stripe-webhook", "/api/stripe-webhook"], express.raw({ type: "applic
 });
 
 /* ---------------- ENTERPRISE CHECKOUT ---------------- */
+/* ---------------- ENTERPRISE CHECKOUT ---------------- */
 app.post(["/enterprise/checkout", "/api/enterprise/checkout"], async (req, res) => {
   try {
     const { email, referral } = req.body;
@@ -802,30 +803,29 @@ app.post(["/enterprise/checkout", "/api/enterprise/checkout"], async (req, res) 
     // Create Stripe customer
     const customer = await stripe.customers.create({ email });
 
-    // Create checkout session with metered enterprise price
+    // Create checkout session
     const session = await stripe.checkout.sessions.create({
       customer: customer.id,
       mode: "subscription",
       payment_method_types: ["card"],
-      line_items: [{ price: process.env.PRICE_ENTERPRISE }],
+      line_items: [
+        {
+          price: process.env.PRICE_ENTERPRISE,
+        },
+      ],
       success_url: "https://proofdeed.com/enterprise/success?session_id={CHECKOUT_SESSION_ID}",
       cancel_url: "https://proofdeed.com/contact",
-   const session = await stripe.checkout.sessions.create({
-  payment_method_types: ["card"],
-  mode: "subscription",
-  line_items: [
-    {
-      price: priceId,
-      quantity: 1,
-    },
-  ],
-  success_url: success_url,
-  cancel_url: cancel_url,
-  client_reference_id: referral ? referral : undefined,
-  metadata: { email: email }
-}); // ✅ REQUIRED
+      client_reference_id: referral ? referral : undefined,
+      metadata: { email: email }
+    });
 
-res.json({ url: session.url });
+    res.json({ url: session.url });
+
+  } catch (err) {
+    console.error("Enterprise checkout error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 /* ---------------- ADMIN DASHBOARD ---------------- */
 app.get(["/admin/stats", "/api/admin/stats"], async (req, res) => {
