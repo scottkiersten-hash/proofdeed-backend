@@ -715,7 +715,7 @@ app.post(["/create-checkout-session", "/api/create-checkout-session"], async (re
       line_items: [{ price: priceId, quantity: plan === "enterprise" ? undefined : 1 }],
       success_url: success_url || "https://proofdeed.com/success",
       cancel_url: cancel_url || "https://proofdeed.com",
-      client_reference_id: referral || null
+    client_reference_id: referral ? referral : undefined
     });
 
     res.json({ url: session.url });
@@ -810,7 +810,7 @@ app.post(["/enterprise/checkout", "/api/enterprise/checkout"], async (req, res) 
       line_items: [{ price: process.env.PRICE_ENTERPRISE }],
       success_url: "https://proofdeed.com/enterprise/success?session_id={CHECKOUT_SESSION_ID}",
       cancel_url: "https://proofdeed.com/contact",
-      client_reference_id: referral || null,
+     client_reference_id: referral ? referral : undefined
       metadata: { email }
     });
 
