@@ -811,9 +811,9 @@ app.post(["/enterprise/checkout", "/api/enterprise/checkout"], async (req, res) 
       success_url: "https://proofdeed.com/enterprise/success?session_id={CHECKOUT_SESSION_ID}",
       cancel_url: "https://proofdeed.com/contact",
    client_reference_id: referral ? referral : undefined,
-metadata: { email: email }
+metadata: { email: email },
 
-    res.json({ url: session.url });
+res.json({ url: session.url });
 
   } catch (err) {
     console.error("Enterprise checkout error:", err);
