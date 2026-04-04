@@ -83,7 +83,14 @@ const pool = new Pool({
 });
 
 /* ---------------- Middleware ---------------- */
-app.use(express.json({ limit: "5mb" }));
+// Exclude stripe-webhook from global JSON parsing — it needs raw body for signature verification
+app.use((req, res, next) => {
+  if (req.originalUrl === '/api/stripe-webhook' || req.originalUrl === '/stripe-webhook') {
+    next();
+  } else {
+    express.json({ limit: "5mb" })(req, res, next);
+  }
+});
 
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" },
