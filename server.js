@@ -777,33 +777,97 @@ app.post(["/stripe-webhook", "/api/stripe-webhook"], express.raw({ type: "applic
     const customerId = session.customer;
     const subscriptionId = session.subscription;
     const referral = session.client_reference_id;
+    const isOneTime = session.mode === "payment";
 
-    console.log("New subscriber:", email);
+    console.log("Checkout completed:", email, "mode:", session.mode);
 
     try {
-      // Get subscription item ID for metered billing
-      let subscriptionItemId = null;
-      try {
-        const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-        subscriptionItemId = subscription.items.data[0]?.id || null;
-      } catch (err) {
-        console.error("Could not retrieve subscription item:", err.message);
-      }
-
+      // Upsert user record
       await pool.query(
         `INSERT INTO users (email, stripe_customer_id, subscription_id, referred_by, created_at)
          VALUES ($1, $2, $3, $4, NOW())
          ON CONFLICT (email) DO UPDATE
-         SET stripe_customer_id = $2, subscription_id = $3`,
-        [email, customerId, subscriptionId, referral || null]
+         SET stripe_customer_id = $2, subscription_id = COALESCE($3, users.subscription_id)`,
+        [email, customerId, subscriptionId || null, referral || null]
       );
 
-      // Store subscription item ID in api_keys if enterprise
-      if (subscriptionItemId) {
+      if (isOneTime) {
+        // Government pilot — auto-provision API key with 50,000 cert limit
+        const pilotKey = "pd_gov_" + require("crypto").randomBytes(24).toString("hex");
         await pool.query(
-          `UPDATE api_keys SET stripe_subscription_item_id = $1 WHERE email = $2`,
-          [subscriptionItemId, email]
+          `INSERT INTO api_keys (email, api_key, plan, monthly_limit, used_this_month, active, created_at)
+           VALUES ($1, $2, 'government-pilot', 50000, 0, TRUE, NOW())
+           ON CONFLICT (email) DO UPDATE SET api_key = $2, plan = 'government-pilot', monthly_limit = 50000, active = TRUE`,
+          [email, pilotKey]
         );
+        console.log("Government pilot API key provisioned for:", email);
+
+        // Send welcome email with API key
+        const mailgunDomain = process.env.MAILGUN_DOMAIN;
+        const mailgunApiKey = process.env.MAILGUN_API_KEY;
+        if (mailgunDomain && mailgunApiKey) {
+          try {
+            await fetch("https://api.mailgun.net/v3/" + mailgunDomain + "/messages", {
+              method: "POST",
+              headers: {
+                "Authorization": "Basic " + Buffer.from("api:" + mailgunApiKey).toString("base64"),
+                "Content-Type": "application/x-www-form-urlencoded"
+              },
+              body: new URLSearchParams({
+                from: process.env.MAIL_FROM || "ProofDeed <mailgun@" + mailgunDomain + ">",
+                to: email,
+                subject: "ProofDeed Government Pilot — Your API Key & Access Details",
+                text: [
+                  "Welcome to the ProofDeed Government Pilot Program.",
+                  "",
+                  "Your pilot is now active. Below are your access credentials.",
+                  "",
+                  "API Key: " + pilotKey,
+                  "Pilot Duration: 45 days from today",
+                  "Certification Limit: 50,000 documents",
+                  "Access: Upload portal, batch processing, and REST API",
+                  "",
+                  "Getting Started:",
+                  "  • Upload portal: https://proofdeed.com/upload",
+                  "  • API documentation: https://proofdeed.com/api-docs",
+                  "  • Verify a certificate: https://proofdeed.com/verify",
+                  "",
+                  "API Usage:",
+                  "  Include your key in all API requests:",
+                  "  Authorization: Bearer " + pilotKey,
+                  "",
+                  "  Single certification: POST https://proofdeed.com/api/v1/certify",
+                  "  Batch certification: POST https://proofdeed.com/api/v1/certify/batch",
+                  "",
+                  "Keep this key secure. If you need to rotate it, contact us at info@proofdeed.com.",
+                  "",
+                  "ProofDeed",
+                  "https://proofdeed.com"
+                ].join("\n")
+              })
+            });
+            console.log("Pilot welcome email sent to:", email);
+          } catch (mailErr) {
+            console.error("Pilot welcome email failed:", mailErr.message);
+          }
+        }
+
+      } else {
+        // Standard subscription — store subscription item ID for metered billing
+        let subscriptionItemId = null;
+        try {
+          const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+          subscriptionItemId = subscription.items.data[0]?.id || null;
+        } catch (err) {
+          console.error("Could not retrieve subscription item:", err.message);
+        }
+
+        if (subscriptionItemId) {
+          await pool.query(
+            `UPDATE api_keys SET stripe_subscription_item_id = $1 WHERE email = $2`,
+            [subscriptionItemId, email]
+          );
+        }
       }
 
       if (referral) {
@@ -819,7 +883,7 @@ app.post(["/stripe-webhook", "/api/stripe-webhook"], express.raw({ type: "applic
       }
 
     } catch (dbErr) {
-      console.error("User creation failed:", dbErr.message);
+      console.error("Webhook DB error:", dbErr.message);
     }
   }
 
