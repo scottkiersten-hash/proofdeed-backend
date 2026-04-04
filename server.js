@@ -726,7 +726,7 @@ app.post(["/create-checkout-session", "/api/create-checkout-session"], async (re
   try {
     const { plan, success_url, cancel_url, referral } = req.body;
 
-    const priceMap = {
+    const subscriptionPlans = {
       "starter-monthly": process.env.PRICE_STARTER_MONTHLY,
       "starter-annual":  process.env.PRICE_STARTER_YEARLY,
       "pro-monthly":     process.env.PRICE_PRO_MONTHLY,
@@ -734,16 +734,21 @@ app.post(["/create-checkout-session", "/api/create-checkout-session"], async (re
       "enterprise":      process.env.PRICE_ENTERPRISE,
     };
 
-    const priceId = priceMap[plan];
+    const oneTimePlans = {
+      "government-pilot": process.env.PRICE_GOVERNMENT_PILOT,
+    };
+
+    const isOneTime = plan in oneTimePlans;
+    const priceId = isOneTime ? oneTimePlans[plan] : subscriptionPlans[plan];
     if (!priceId) return res.status(400).json({ error: "Invalid plan: " + plan });
 
     const session = await stripe.checkout.sessions.create({
-      mode: "subscription",
+      mode: isOneTime ? "payment" : "subscription",
       payment_method_types: ["card"],
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: success_url || "https://proofdeed.com/success",
       cancel_url: cancel_url || "https://proofdeed.com",
-    client_reference_id: referral ? referral : undefined
+      client_reference_id: referral ? referral : undefined,
     });
 
     res.json({ url: session.url });
