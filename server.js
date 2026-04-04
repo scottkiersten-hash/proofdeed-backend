@@ -23,7 +23,7 @@ const configuredOrigins = [
   "https://proofdeed.com",
   "https://www.proofdeed.com",
   "https://api.proofdeed.com",
-  "https://urchin-app-e33ih.ondigitalocean.app"
+  process.env.DO_APP_URL
 ].filter(Boolean).map((origin) => origin.trim());
 
 const allowedOrigins = [...new Set(configuredOrigins)];
@@ -402,18 +402,11 @@ app.post("/api/v1/certify", authenticateApiKey, async (req, res) => {
     const proofId = "PD-" + Date.now();
     const timestamp = new Date().toISOString();
 
-    let polygon_tx = null;
-    try {
-      polygon_tx = await anchorToPolygon(documentHash);
-    } catch (blockchainErr) {
-      console.error("Blockchain anchoring failed (non-fatal):", blockchainErr.message);
-    }
-
     await pool.query(
       `INSERT INTO certifications (certification_id, hash, polygon_tx, created_at)
        VALUES ($1, $2, $3, NOW())
        ON CONFLICT (certification_id) DO NOTHING`,
-      [proofId, documentHash, polygon_tx]
+      [proofId, documentHash, null]
     );
 
     await pool.query(
@@ -426,19 +419,25 @@ app.post("/api/v1/certify", authenticateApiKey, async (req, res) => {
       await reportUsageToStripe(req.apiKey.stripe_subscription_item_id, 1);
     }
 
-    if (req.apiKey.webhook_url) {
-      try {
-        await fetch(req.apiKey.webhook_url, {
+    // Respond immediately — anchor to blockchain in background
+    res.json({ proofId, timestamp, polygon_tx: null, hash: documentHash, used: req.apiKey.used_this_month + 1, limit: req.apiKey.monthly_limit });
+
+    // Background webhook + blockchain anchor
+    anchorToPolygon(documentHash).then(async (txHash) => {
+      await pool.query(
+        "UPDATE certifications SET polygon_tx = $1 WHERE certification_id = $2",
+        [txHash, proofId]
+      );
+      if (req.apiKey.webhook_url) {
+        fetch(req.apiKey.webhook_url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ proofId, documentHash, timestamp, polygon_tx, event: "certification.created" })
-        });
-      } catch (webhookErr) {
-        console.error("Webhook delivery failed (non-fatal):", webhookErr.message);
+          body: JSON.stringify({ proofId, documentHash, timestamp, polygon_tx: txHash, event: "certification.created" })
+        }).catch((err) => console.error("Webhook delivery failed (non-fatal):", err.message));
       }
-    }
-
-    res.json({ proofId, timestamp, polygon_tx, hash: documentHash, used: req.apiKey.used_this_month + 1, limit: req.apiKey.monthly_limit });
+    }).catch((err) => {
+      console.error("Background blockchain anchor failed for", proofId, err.message);
+    });
 
   } catch (error) {
     console.error("Enterprise certify error:", error);
@@ -546,25 +545,30 @@ app.post(["/create-proof", "/api/create-proof"], async (req, res) => {
       }
     }
 
-    let polygon_tx = null;
-    try {
-      polygon_tx = await anchorToPolygon(documentHash);
-    } catch (blockchainErr) {
-      console.error("Blockchain anchoring failed (non-fatal):", blockchainErr.message);
-    }
-
     await pool.query(
       `INSERT INTO certifications (certification_id, hash, polygon_tx, user_id, created_at)
        VALUES ($1, $2, $3, $4, NOW())
        ON CONFLICT (certification_id) DO NOTHING`,
-      [proofId, documentHash, polygon_tx, userId]
+      [proofId, documentHash, null, userId]
     );
 
+    // Respond immediately — anchor to blockchain in background
     res.json({
       proofId,
       timestamp,
-      polygon_tx,
+      polygon_tx: null,
       verificationText: "Your document fingerprint has been permanently recorded on the Polygon blockchain."
+    });
+
+    // Background blockchain anchoring — updates DB when confirmed
+    anchorToPolygon(documentHash).then(async (txHash) => {
+      await pool.query(
+        "UPDATE certifications SET polygon_tx = $1 WHERE certification_id = $2",
+        [txHash, proofId]
+      );
+      console.log("Blockchain anchor confirmed for", proofId, txHash);
+    }).catch((err) => {
+      console.error("Background blockchain anchor failed for", proofId, err.message);
     });
 
   } catch (error) {
@@ -838,37 +842,8 @@ app.post(["/stripe-webhook", "/api/stripe-webhook"], express.raw({ type: "applic
   res.json({ received: true });
 });
 
-/* ---------------- ENTERPRISE CHECKOUT ---------------- */
-app.post(["/enterprise/checkout", "/api/enterprise/checkout"], async (req, res) => {
-  try {
-    const { email, referral } = req.body;
-    if (!email) return res.status(400).json({ error: "Email required." });
-
-    // Create Stripe customer
-    const customer = await stripe.customers.create({ email });
-
-    // Create checkout session with metered enterprise price
-    const session = await stripe.checkout.sessions.create({
-      customer: customer.id,
-      mode: "subscription",
-      payment_method_types: ["card"],
-      line_items: [{ price: process.env.PRICE_ENTERPRISE }],
-      success_url: "https://proofdeed.com/enterprise/success?session_id={CHECKOUT_SESSION_ID}",
-      cancel_url: "https://proofdeed.com/contact",
-     client_reference_id: referral ? referral : undefined,
-      metadata: { email: email }
-    });
-
-    res.json({ url: session.url });
-
-  } catch (err) {
-    console.error("Enterprise checkout error:", err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
 /* ---------------- ADMIN DASHBOARD ---------------- */
-app.get(["/admin/stats", "/api/admin/stats"], async (req, res) => {
+app.get(["/admin/stats", "/api/admin/stats"], authRateLimit, async (req, res) => {
   try {
     const adminSecret = req.headers["x-admin-secret"];
     if (adminSecret !== process.env.ADMIN_SECRET) {
@@ -906,6 +881,24 @@ app.get(["/admin/stats", "/api/admin/stats"], async (req, res) => {
   }
 });
 
+/* ---------------- DB INDEXES ---------------- */
+// Run once on startup — safe to re-run (IF NOT EXISTS)
+async function ensureIndexes() {
+  try {
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+      CREATE INDEX IF NOT EXISTS idx_certifications_hash ON certifications(hash);
+      CREATE INDEX IF NOT EXISTS idx_certifications_user_id ON certifications(user_id);
+      CREATE INDEX IF NOT EXISTS idx_api_keys_key ON api_keys(api_key);
+      CREATE INDEX IF NOT EXISTS idx_magic_links_token ON magic_links(token);
+    `);
+    console.log("DB indexes ensured.");
+  } catch (err) {
+    console.error("Index creation error (non-fatal):", err.message);
+  }
+}
+ensureIndexes();
+
 /* ---------------- MONTHLY USAGE RESET ---------------- */
 // Runs at 00:00 on the 1st of every month (UTC)
 cron.schedule("0 0 1 * *", async () => {
@@ -914,6 +907,19 @@ cron.schedule("0 0 1 * *", async () => {
     console.log("Monthly API key usage reset completed.");
   } catch (err) {
     console.error("Monthly reset error:", err.message);
+  }
+});
+
+/* ---------------- MAGIC LINK CLEANUP ---------------- */
+// Runs daily at 03:00 UTC — purges expired/used tokens older than 1 day
+cron.schedule("0 3 * * *", async () => {
+  try {
+    const result = await pool.query(
+      "DELETE FROM magic_links WHERE expires_at < NOW() - INTERVAL '1 day'"
+    );
+    console.log("Magic link cleanup: removed", result.rowCount, "expired tokens.");
+  } catch (err) {
+    console.error("Magic link cleanup error:", err.message);
   }
 });
 
@@ -942,7 +948,40 @@ app.post(["/billing/portal", "/api/billing/portal"], authenticateToken, async (r
   }
 });
 
+/* ---------------- Unhandled Errors ---------------- */
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled promise rejection:", reason);
+});
+
+process.on("uncaughtException", (err) => {
+  console.error("Uncaught exception:", err);
+  process.exit(1);
+});
+
 /* ---------------- Start Server ---------------- */
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log("ProofDeed backend running on port " + PORT);
 });
+
+/* ---------------- Graceful Shutdown ---------------- */
+async function shutdown(signal) {
+  console.log(`${signal} received — shutting down gracefully`);
+  server.close(async () => {
+    try {
+      await pool.end();
+      console.log("Database pool closed");
+    } catch (err) {
+      console.error("Error closing pool:", err.message);
+    }
+    process.exit(0);
+  });
+
+  // Force exit if still hanging after 10s
+  setTimeout(() => {
+    console.error("Forced shutdown after timeout");
+    process.exit(1);
+  }, 10000);
+}
+
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
