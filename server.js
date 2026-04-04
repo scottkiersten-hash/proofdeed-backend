@@ -12,6 +12,28 @@ import { anchorToPolygon } from "./polygon.js";
 
 dotenv.config();
 
+/* ---------------- ENV VALIDATION ---------------- */
+const REQUIRED_ENV = [
+  "DATABASE_URL",
+  "JWT_SECRET",
+  "STRIPE_SECRET_KEY",
+  "STRIPE_WEBHOOK_SECRET",
+  "PRICE_STARTER_MONTHLY",
+  "PRICE_STARTER_YEARLY",
+  "PRICE_PRO_MONTHLY",
+  "PRICE_PRO_YEARLY",
+  "PRICE_ENTERPRISE",
+  "POLYGON_RPC_URL",
+  "POLYGON_PRIVATE_KEY",
+  "ADMIN_SECRET",
+];
+
+const missingEnv = REQUIRED_ENV.filter((key) => !process.env[key]);
+if (missingEnv.length > 0) {
+  console.error("FATAL: Missing required environment variables:\n  " + missingEnv.join("\n  "));
+  process.exit(1);
+}
+
 const { Pool } = pkg;
 const app = express();
 app.set("trust proxy", 1);
