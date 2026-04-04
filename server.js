@@ -792,17 +792,18 @@ app.post(["/stripe-webhook", "/api/stripe-webhook"], express.raw({ type: "applic
       );
 
       if (isOneTime) {
-        // Government pilot — auto-provision API key with 50,000 cert limit
-        const pilotKey = "pd_gov_" + require("crypto").randomBytes(24).toString("hex");
+        // Government pilot — payment received but ACH not yet cleared.
+        // Store email + payment_intent ID so we can provision when funds confirm.
+        const paymentIntentId = session.payment_intent;
         await pool.query(
           `INSERT INTO api_keys (email, api_key, plan, monthly_limit, used_this_month, active, created_at)
-           VALUES ($1, $2, 'government-pilot', 50000, 0, TRUE, NOW())
-           ON CONFLICT (email) DO UPDATE SET api_key = $2, plan = 'government-pilot', monthly_limit = 50000, active = TRUE`,
-          [email, pilotKey]
+           VALUES ($1, $2, 'government-pilot-pending', 0, 0, FALSE, NOW())
+           ON CONFLICT (email) DO UPDATE SET plan = 'government-pilot-pending', active = FALSE`,
+          [email, "pending_" + paymentIntentId]
         );
-        console.log("Government pilot API key provisioned for:", email);
+        console.log("Government pilot payment received (pending ACH):", email);
 
-        // Send welcome email with API key
+        // Send "payment received" confirmation — key will follow when funds clear
         const mailgunDomain = process.env.MAILGUN_DOMAIN;
         const mailgunApiKey = process.env.MAILGUN_API_KEY;
         if (mailgunDomain && mailgunApiKey) {
@@ -816,39 +817,29 @@ app.post(["/stripe-webhook", "/api/stripe-webhook"], express.raw({ type: "applic
               body: new URLSearchParams({
                 from: process.env.MAIL_FROM || "ProofDeed <mailgun@" + mailgunDomain + ">",
                 to: email,
-                subject: "ProofDeed Government Pilot — Your API Key & Access Details",
+                subject: "ProofDeed Government Pilot — Payment Received",
                 text: [
-                  "Welcome to the ProofDeed Government Pilot Program.",
+                  "Thank you — your payment for the ProofDeed Government Pilot Program has been received.",
                   "",
-                  "Your pilot is now active. Below are your access credentials.",
+                  "ACH bank transfers take 3–5 business days to clear. Once your payment is confirmed,",
+                  "you will receive a second email with your API key and full access credentials.",
                   "",
-                  "API Key: " + pilotKey,
-                  "Pilot Duration: 45 days from today",
-                  "Certification Limit: 50,000 documents",
-                  "Access: Upload portal, batch processing, and REST API",
+                  "Pilot Summary:",
+                  "  • Duration: 45 days from activation",
+                  "  • Certification limit: 50,000 documents",
+                  "  • Access: Upload portal, batch processing, REST API",
+                  "  • Fixed fee: $15,000 — no variable costs during pilot",
                   "",
-                  "Getting Started:",
-                  "  • Upload portal: https://proofdeed.com/upload",
-                  "  • API documentation: https://proofdeed.com/api-docs",
-                  "  • Verify a certificate: https://proofdeed.com/verify",
-                  "",
-                  "API Usage:",
-                  "  Include your key in all API requests:",
-                  "  Authorization: Bearer " + pilotKey,
-                  "",
-                  "  Single certification: POST https://proofdeed.com/api/v1/certify",
-                  "  Batch certification: POST https://proofdeed.com/api/v1/certify/batch",
-                  "",
-                  "Keep this key secure. If you need to rotate it, contact us at info@proofdeed.com.",
+                  "Questions? Contact us at info@proofdeed.com.",
                   "",
                   "ProofDeed",
                   "https://proofdeed.com"
                 ].join("\n")
               })
             });
-            console.log("Pilot welcome email sent to:", email);
+            console.log("Pilot payment-received email sent to:", email);
           } catch (mailErr) {
-            console.error("Pilot welcome email failed:", mailErr.message);
+            console.error("Pilot payment-received email failed:", mailErr.message);
           }
         }
 
@@ -927,6 +918,82 @@ app.post(["/stripe-webhook", "/api/stripe-webhook"], express.raw({ type: "applic
       } catch (mailErr) {
         console.error("Payment failed email error (non-fatal):", mailErr.message);
       }
+    }
+  }
+
+  // Government pilot — provision API key once ACH payment clears
+  if (event.type === "payment_intent.succeeded") {
+    const paymentIntent = event.data.object;
+    const paymentIntentId = paymentIntent.id;
+
+    try {
+      // Find a pending pilot record that matches this payment_intent
+      const pending = await pool.query(
+        `SELECT email FROM api_keys WHERE api_key = $1 AND plan = 'government-pilot-pending'`,
+        ["pending_" + paymentIntentId]
+      );
+
+      if (pending.rows.length > 0) {
+        const email = pending.rows[0].email;
+        const pilotKey = "pd_gov_" + require("crypto").randomBytes(24).toString("hex");
+
+        await pool.query(
+          `UPDATE api_keys SET api_key = $1, plan = 'government-pilot', monthly_limit = 50000, active = TRUE
+           WHERE email = $2 AND plan = 'government-pilot-pending'`,
+          [pilotKey, email]
+        );
+        console.log("Government pilot ACH cleared — API key activated for:", email);
+
+        // Send access credentials email
+        const mailgunDomain = process.env.MAILGUN_DOMAIN;
+        const mailgunApiKey = process.env.MAILGUN_API_KEY;
+        if (mailgunDomain && mailgunApiKey) {
+          try {
+            await fetch("https://api.mailgun.net/v3/" + mailgunDomain + "/messages", {
+              method: "POST",
+              headers: {
+                "Authorization": "Basic " + Buffer.from("api:" + mailgunApiKey).toString("base64"),
+                "Content-Type": "application/x-www-form-urlencoded"
+              },
+              body: new URLSearchParams({
+                from: process.env.MAIL_FROM || "ProofDeed <mailgun@" + mailgunDomain + ">",
+                to: email,
+                subject: "ProofDeed Government Pilot — Payment Confirmed. Your API Key Is Ready.",
+                text: [
+                  "Your payment has cleared. Your ProofDeed Government Pilot is now active.",
+                  "",
+                  "API Key: " + pilotKey,
+                  "Pilot Duration: 45 days from today",
+                  "Certification Limit: 50,000 documents",
+                  "Access: Upload portal, batch processing, and REST API",
+                  "",
+                  "Getting Started:",
+                  "  • Upload portal: https://proofdeed.com/upload",
+                  "  • API documentation: https://proofdeed.com/api-docs",
+                  "  • Verify a certificate: https://proofdeed.com/verify",
+                  "",
+                  "API Usage:",
+                  "  Include your key in all API requests:",
+                  "  Authorization: Bearer " + pilotKey,
+                  "",
+                  "  Single certification:  POST https://proofdeed.com/api/v1/certify",
+                  "  Batch certification:   POST https://proofdeed.com/api/v1/certify/batch",
+                  "",
+                  "Keep this key secure. To rotate it contact us at info@proofdeed.com.",
+                  "",
+                  "ProofDeed",
+                  "https://proofdeed.com"
+                ].join("\n")
+              })
+            });
+            console.log("Pilot activation email sent to:", email);
+          } catch (mailErr) {
+            console.error("Pilot activation email failed:", mailErr.message);
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Pilot ACH provisioning error:", err.message);
     }
   }
 
