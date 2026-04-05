@@ -1092,7 +1092,7 @@ app.post(["/api/v1/upgrade", "/v1/upgrade"], authenticateApiKeyNoLimit, async (r
     const { type } = req.body; // 'topup' | 'upgrade'
     const email = req.apiKey.email;
 
-    const topupPriceId = process.env.PRICE_TOPUP_1000;
+    const topupPriceId = process.env.PRICE_TOPUP;
 
     if (type === "topup") {
       if (!topupPriceId) return res.status(500).json({ error: "Top-up not configured." });
