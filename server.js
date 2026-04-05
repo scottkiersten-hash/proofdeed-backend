@@ -13,15 +13,20 @@ import QRCode from "qrcode";
 import * as OTPAuth from "otpauth";
 
 function verifyTOTP(secret, token) {
-  const totp = new OTPAuth.TOTP({
-    issuer: "ProofDeed",
-    label: "admin",
-    algorithm: "SHA1",
-    digits: 6,
-    period: 30,
-    secret: OTPAuth.Secret.fromBase32(secret.toUpperCase()),
-  });
-  return totp.validate({ token, window: 1 }) !== null;
+  try {
+    const totp = new OTPAuth.TOTP({
+      issuer: "ProofDeed",
+      label: "admin",
+      algorithm: "SHA1",
+      digits: 6,
+      period: 30,
+      secret: OTPAuth.Secret.fromBase32(secret.toUpperCase()),
+    });
+    return totp.validate({ token, window: 1 }) !== null;
+  } catch (err) {
+    console.error("TOTP verify error — invalid ADMIN_TOTP_SECRET:", err.message);
+    return false;
+  }
 }
 
 function generateTOTPSecret() {
