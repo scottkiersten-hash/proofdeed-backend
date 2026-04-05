@@ -156,6 +156,23 @@ async function authenticateApiKey(req, res, next) {
   }
 }
 
+// Same as authenticateApiKey but does NOT block on limit — used for upgrade/billing endpoints
+async function authenticateApiKeyNoLimit(req, res, next) {
+  const apiKey = req.headers["x-api-key"];
+  if (!apiKey) return res.status(401).json({ error: "API key required." });
+  try {
+    const result = await pool.query(
+      "SELECT * FROM api_keys WHERE api_key = $1 AND active = TRUE",
+      [apiKey]
+    );
+    if (result.rows.length === 0) return res.status(401).json({ error: "Invalid or inactive API key." });
+    req.apiKey = result.rows[0];
+    next();
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+}
+
 /* ---------------- Usage Notifications ---------------- */
 async function checkAndNotifyUsage(keyData) {
   const { email, api_key, used_this_month, monthly_limit, notified_80, notified_100 } = keyData;
@@ -742,7 +759,7 @@ app.get("/api/v1/batch/:batchId", authenticateApiKey, async (req, res) => {
 });
 
 /* ---------------- API USAGE ---------------- */
-app.get("/api/v1/usage", authenticateApiKey, async (req, res) => {
+app.get("/api/v1/usage", authenticateApiKeyNoLimit, async (req, res) => {
   try {
     const recentBatches = await pool.query(
       `SELECT batch_id, status, total, processed, failed, created_at FROM batches WHERE email = $1 ORDER BY created_at DESC LIMIT 10`,
@@ -763,7 +780,7 @@ app.get("/api/v1/usage", authenticateApiKey, async (req, res) => {
 });
 
 /* ---------------- SET WEBHOOK URL ---------------- */
-app.put("/api/v1/webhook", authenticateApiKey, async (req, res) => {
+app.put("/api/v1/webhook", authenticateApiKeyNoLimit, async (req, res) => {
   try {
     const { webhookUrl } = req.body;
     if (webhookUrl && !webhookUrl.startsWith("https://")) {
@@ -780,7 +797,7 @@ app.put("/api/v1/webhook", authenticateApiKey, async (req, res) => {
 });
 
 /* ---------------- LIST CERTIFICATIONS ---------------- */
-app.get("/api/v1/certificates", authenticateApiKey, async (req, res) => {
+app.get("/api/v1/certificates", authenticateApiKeyNoLimit, async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit) || 50, 500);
     const offset = parseInt(req.query.offset) || 0;
@@ -813,7 +830,7 @@ app.get("/api/v1/certificates", authenticateApiKey, async (req, res) => {
 });
 
 /* ---------------- CERTIFICATE PDF DOWNLOAD ---------------- */
-app.get("/api/v1/certificate/:proofId/pdf", authenticateApiKey, async (req, res) => {
+app.get("/api/v1/certificate/:proofId/pdf", authenticateApiKeyNoLimit, async (req, res) => {
   try {
     const { proofId } = req.params;
     const result = await pool.query(
@@ -1070,7 +1087,7 @@ app.post(["/contact", "/api/contact"], async (req, res) => {
 });
 
 /* ---------------- API UPGRADE / TOP-UP CHECKOUT ---------------- */
-app.post(["/api/v1/upgrade", "/v1/upgrade"], authenticateApiKey, async (req, res) => {
+app.post(["/api/v1/upgrade", "/v1/upgrade"], authenticateApiKeyNoLimit, async (req, res) => {
   try {
     const { type } = req.body; // 'topup' | 'upgrade'
     const email = req.apiKey.email;
