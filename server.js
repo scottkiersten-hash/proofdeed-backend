@@ -8,6 +8,7 @@ import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import Stripe from "stripe";
 import cron from "node-cron";
+import PDFDocument from "pdfkit";
 import { anchorToPolygon } from "./polygon.js";
 
 dotenv.config();
@@ -474,7 +475,71 @@ app.post("/api/v1/certify", authenticateApiKey, async (req, res) => {
   }
 });
 
-/* ---------------- ENTERPRISE - BATCH CERTIFY ---------------- */
+/* ---------------- ENTERPRISE - BATCH CERTIFY (ASYNC) ---------------- */
+
+async function processBatchBackground(batchId, certRecords, apiKey) {
+  let processed = 0, failed = 0;
+  for (const cert of certRecords) {
+    try {
+      const txHash = await anchorToPolygon(cert.documentHash);
+      await pool.query(
+        `UPDATE certifications SET polygon_tx = $1 WHERE certification_id = $2`,
+        [txHash, cert.proofId]
+      );
+      processed++;
+    } catch (err) {
+      console.error("Batch anchor failed for", cert.proofId, err.message);
+      failed++;
+    }
+    await pool.query(
+      `UPDATE batches SET processed = $1, failed = $2 WHERE batch_id = $3`,
+      [processed, failed, batchId]
+    );
+  }
+
+  await pool.query(
+    `UPDATE batches SET status = 'completed', processed = $1, failed = $2 WHERE batch_id = $3`,
+    [processed, failed, batchId]
+  );
+
+  if (apiKey.stripe_subscription_item_id && processed > 0) {
+    await reportUsageToStripe(apiKey.stripe_subscription_item_id, processed);
+  }
+
+  // Fire client webhook if configured
+  if (apiKey.webhook_url) {
+    const batchResult = await pool.query(
+      `SELECT certification_id, hash, polygon_tx, label, created_at FROM certifications WHERE batch_id = $1`,
+      [batchId]
+    );
+    try {
+      await fetch(apiKey.webhook_url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          event: "batch.completed",
+          batchId,
+          total: certRecords.length,
+          processed,
+          failed,
+          results: batchResult.rows.map(r => ({
+            proofId: r.certification_id,
+            documentHash: r.hash,
+            label: r.label,
+            polygon_tx: r.polygon_tx,
+            timestamp: r.created_at,
+            verifyUrl: `https://proofdeed.com/verify/${r.certification_id}`
+          }))
+        })
+      });
+      await pool.query(`UPDATE batches SET webhook_notified = TRUE WHERE batch_id = $1`, [batchId]);
+      console.log("Batch webhook fired for:", batchId);
+    } catch (err) {
+      console.error("Batch webhook failed (non-fatal):", err.message);
+    }
+  }
+}
+
 app.post("/api/v1/batch", authenticateApiKey, async (req, res) => {
   try {
     const { documents } = req.body;
@@ -482,67 +547,264 @@ app.post("/api/v1/batch", authenticateApiKey, async (req, res) => {
     if (!Array.isArray(documents) || documents.length === 0) {
       return res.status(400).json({ error: "documents array required." });
     }
-
-    if (documents.length > 100) {
-      return res.status(400).json({ error: "Maximum 100 documents per batch." });
+    if (documents.length > 1000) {
+      return res.status(400).json({ error: "Maximum 1,000 documents per batch." });
     }
 
     const remaining = req.apiKey.monthly_limit - req.apiKey.used_this_month;
     if (documents.length > remaining) {
-      return res.status(429).json({ error: "Batch size exceeds remaining limit. Remaining: " + remaining });
+      return res.status(429).json({ error: `Batch size exceeds remaining limit. Remaining: ${remaining}` });
     }
 
-    const results = [];
+    const batchId = "BATCH-" + Date.now() + "-" + crypto.randomBytes(4).toString("hex");
+    const timestamp = new Date().toISOString();
 
+    // Build cert records, skip invalid hashes immediately
+    const certRecords = [];
+    const invalid = [];
     for (const doc of documents) {
-      const { documentHash, id } = doc;
-
+      const { documentHash, label, id } = doc;
       if (!documentHash || typeof documentHash !== "string" || documentHash.length !== 64) {
-        results.push({ id, error: "Invalid hash", documentHash });
+        invalid.push({ id, label, error: "Invalid SHA-256 hash" });
         continue;
       }
-
-      const proofId = "PD-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5);
-      const timestamp = new Date().toISOString();
-
-      let polygon_tx = null;
-      try {
-        polygon_tx = await anchorToPolygon(documentHash);
-      } catch (err) {
-        console.error("Blockchain failed for doc:", documentHash);
-      }
-
-      await pool.query(
-        `INSERT INTO certifications (certification_id, hash, polygon_tx, created_at)
-         VALUES ($1, $2, $3, NOW())
-         ON CONFLICT (certification_id) DO NOTHING`,
-        [proofId, documentHash, polygon_tx]
-      );
-
-      results.push({ id, proofId, documentHash, timestamp, polygon_tx });
+      const proofId = "PD-" + Date.now() + "-" + crypto.randomBytes(3).toString("hex");
+      certRecords.push({ proofId, documentHash, label: label || id || null });
     }
 
-    const processed = results.filter(r => !r.error).length;
-
+    // Insert batch record
     await pool.query(
-      "UPDATE api_keys SET used_this_month = used_this_month + $1 WHERE api_key = $2",
-      [processed, req.apiKey.api_key]
+      `INSERT INTO batches (batch_id, email, status, total, processed, failed, created_at)
+       VALUES ($1, $2, 'processing', $3, 0, 0, NOW())`,
+      [batchId, req.apiKey.email, certRecords.length]
     );
 
-    // Report batch usage to Stripe for automatic billing
-    if (req.apiKey.stripe_subscription_item_id && processed > 0) {
-      await reportUsageToStripe(req.apiKey.stripe_subscription_item_id, processed);
+    // Insert all certs immediately as pending (polygon_tx = null)
+    for (const cert of certRecords) {
+      await pool.query(
+        `INSERT INTO certifications (certification_id, hash, polygon_tx, batch_id, label, created_at)
+         VALUES ($1, $2, NULL, $3, $4, NOW()) ON CONFLICT (certification_id) DO NOTHING`,
+        [cert.proofId, cert.documentHash, batchId, cert.label]
+      );
     }
 
+    // Deduct usage immediately
+    await pool.query(
+      "UPDATE api_keys SET used_this_month = used_this_month + $1 WHERE api_key = $2",
+      [certRecords.length, req.apiKey.api_key]
+    );
+
+    // Respond immediately — blockchain anchoring happens in background
     res.json({
-      success: true,
-      processed,
-      failed: results.filter(r => r.error).length,
-      results
+      batchId,
+      status: "processing",
+      total: certRecords.length,
+      invalid: invalid.length,
+      statusUrl: `https://proofdeed.com/api/v1/batch/${batchId}`,
+      results: certRecords.map(r => ({
+        proofId: r.proofId,
+        documentHash: r.documentHash,
+        label: r.label,
+        timestamp,
+        polygon_tx: null,
+        verifyUrl: `https://proofdeed.com/verify/${r.proofId}`
+      })),
+      ...(invalid.length > 0 && { invalidDocuments: invalid })
     });
+
+    // Anchor to blockchain in background
+    processBatchBackground(batchId, certRecords, req.apiKey)
+      .catch(err => console.error("processBatchBackground error:", err.message));
 
   } catch (error) {
     console.error("Batch certify error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/* ---------------- BATCH STATUS ---------------- */
+app.get("/api/v1/batch/:batchId", authenticateApiKey, async (req, res) => {
+  try {
+    const { batchId } = req.params;
+    const batch = await pool.query(
+      `SELECT * FROM batches WHERE batch_id = $1 AND email = $2`,
+      [batchId, req.apiKey.email]
+    );
+    if (batch.rows.length === 0) {
+      return res.status(404).json({ error: "Batch not found." });
+    }
+    const b = batch.rows[0];
+    const certs = await pool.query(
+      `SELECT certification_id, hash, polygon_tx, label, created_at FROM certifications WHERE batch_id = $1`,
+      [batchId]
+    );
+    res.json({
+      batchId: b.batch_id,
+      status: b.status,
+      total: b.total,
+      processed: b.processed,
+      failed: b.failed,
+      webhookNotified: b.webhook_notified,
+      createdAt: b.created_at,
+      results: certs.rows.map(r => ({
+        proofId: r.certification_id,
+        documentHash: r.hash,
+        label: r.label,
+        polygon_tx: r.polygon_tx,
+        anchored: !!r.polygon_tx,
+        timestamp: r.created_at,
+        verifyUrl: `https://proofdeed.com/verify/${r.certification_id}`
+      }))
+    });
+  } catch (error) {
+    console.error("Batch status error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/* ---------------- API USAGE ---------------- */
+app.get("/api/v1/usage", authenticateApiKey, async (req, res) => {
+  try {
+    const recentBatches = await pool.query(
+      `SELECT batch_id, status, total, processed, failed, created_at FROM batches WHERE email = $1 ORDER BY created_at DESC LIMIT 10`,
+      [req.apiKey.email]
+    );
+    res.json({
+      email: req.apiKey.email,
+      plan: req.apiKey.plan,
+      monthlyLimit: req.apiKey.monthly_limit,
+      usedThisMonth: req.apiKey.used_this_month,
+      remaining: req.apiKey.monthly_limit - req.apiKey.used_this_month,
+      webhookUrl: req.apiKey.webhook_url || null,
+      recentBatches: recentBatches.rows
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/* ---------------- SET WEBHOOK URL ---------------- */
+app.put("/api/v1/webhook", authenticateApiKey, async (req, res) => {
+  try {
+    const { webhookUrl } = req.body;
+    if (webhookUrl && !webhookUrl.startsWith("https://")) {
+      return res.status(400).json({ error: "Webhook URL must start with https://" });
+    }
+    await pool.query(
+      `UPDATE api_keys SET webhook_url = $1 WHERE api_key = $2`,
+      [webhookUrl || null, req.apiKey.api_key]
+    );
+    res.json({ success: true, webhookUrl: webhookUrl || null });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/* ---------------- LIST CERTIFICATIONS ---------------- */
+app.get("/api/v1/certificates", authenticateApiKey, async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit) || 50, 500);
+    const offset = parseInt(req.query.offset) || 0;
+    const certs = await pool.query(
+      `SELECT certification_id, hash, polygon_tx, label, batch_id, created_at
+       FROM certifications
+       WHERE certification_id LIKE 'PD-%'
+       ORDER BY created_at DESC LIMIT $1 OFFSET $2`,
+      [limit, offset]
+    );
+    res.json({
+      total: certs.rows.length,
+      limit,
+      offset,
+      certificates: certs.rows.map(r => ({
+        proofId: r.certification_id,
+        documentHash: r.hash,
+        label: r.label,
+        batchId: r.batch_id,
+        polygon_tx: r.polygon_tx,
+        anchored: !!r.polygon_tx,
+        timestamp: r.created_at,
+        verifyUrl: `https://proofdeed.com/verify/${r.certification_id}`,
+        pdfUrl: `https://proofdeed.com/api/v1/certificate/${r.certification_id}/pdf`
+      }))
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/* ---------------- CERTIFICATE PDF DOWNLOAD ---------------- */
+app.get("/api/v1/certificate/:proofId/pdf", authenticateApiKey, async (req, res) => {
+  try {
+    const { proofId } = req.params;
+    const result = await pool.query(
+      `SELECT certification_id, hash, polygon_tx, label, created_at FROM certifications WHERE certification_id = $1`,
+      [proofId]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Certificate not found." });
+    }
+    const cert = result.rows[0];
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="ProofDeed-${proofId}.pdf"`);
+
+    const doc = new PDFDocument({ margin: 60, size: "A4" });
+    doc.pipe(res);
+
+    // Header bar
+    doc.rect(0, 0, doc.page.width, 80).fill("#0f172a");
+    doc.fontSize(22).font("Helvetica-Bold").fillColor("#ffffff").text("PROOFDEED", 60, 28);
+    doc.fontSize(9).font("Helvetica").fillColor("#94a3b8").text("Cryptographic Document Certificate", 60, 54);
+
+    // Title
+    doc.moveDown(3);
+    doc.fontSize(16).font("Helvetica-Bold").fillColor("#0f172a").text("Certificate of Document Integrity", { align: "center" });
+    doc.moveDown(0.5);
+    doc.fontSize(9).font("Helvetica").fillColor("#64748b").text("This certificate confirms the existence and integrity of a document at the time of certification.", { align: "center" });
+
+    doc.moveDown(1.5);
+    doc.moveTo(60, doc.y).lineTo(doc.page.width - 60, doc.y).strokeColor("#e2e8f0").lineWidth(1).stroke();
+    doc.moveDown(1);
+
+    // Fields
+    const fields = [
+      { label: "Proof ID", value: cert.certification_id },
+      { label: "Document Label", value: cert.label || "—" },
+      { label: "SHA-256 Hash", value: cert.hash },
+      { label: "Timestamp (UTC)", value: new Date(cert.created_at).toUTCString() },
+      { label: "Blockchain", value: "Polygon (MATIC) Mainnet" },
+      { label: "Transaction Hash", value: cert.polygon_tx || "Pending confirmation" },
+      { label: "Verification URL", value: `https://proofdeed.com/verify/${cert.certification_id}` },
+    ];
+
+    for (const field of fields) {
+      doc.fontSize(8).font("Helvetica-Bold").fillColor("#64748b").text(field.label.toUpperCase(), 60);
+      doc.fontSize(10).font("Helvetica").fillColor("#0f172a").text(field.value, 60, doc.y + 2, { width: doc.page.width - 120, lineBreak: true });
+      doc.moveDown(0.8);
+    }
+
+    doc.moveDown(1);
+    doc.moveTo(60, doc.y).lineTo(doc.page.width - 60, doc.y).strokeColor("#e2e8f0").lineWidth(1).stroke();
+    doc.moveDown(1);
+
+    // Footer note
+    doc.fontSize(8).font("Helvetica").fillColor("#94a3b8").text(
+      "This certificate was generated by ProofDeed (proofdeed.com). The SHA-256 hash uniquely identifies the document at the time of certification. The blockchain transaction provides independent, tamper-evident, and permanent proof of existence. This certificate may be verified by any party at any time without access to ProofDeed systems.",
+      60, doc.y, { width: doc.page.width - 120, align: "left" }
+    );
+
+    // Bottom bar
+    const bottomY = doc.page.height - 40;
+    doc.rect(0, bottomY, doc.page.width, 40).fill("#0f172a");
+    doc.fontSize(8).font("Helvetica").fillColor("#94a3b8").text(
+      `ProofDeed • proofdeed.com • ${new Date().getFullYear()}`,
+      60, bottomY + 14
+    );
+
+    doc.end();
+  } catch (error) {
+    console.error("PDF generation error:", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1050,14 +1312,30 @@ app.get(["/admin/stats", "/api/admin/stats"], authRateLimit, async (req, res) =>
 // Run once on startup — safe to re-run (IF NOT EXISTS)
 async function ensureIndexes() {
   try {
+    // New tables and columns — safe to re-run
     await pool.query(`
+      CREATE TABLE IF NOT EXISTS batches (
+        id               SERIAL PRIMARY KEY,
+        batch_id         TEXT UNIQUE NOT NULL,
+        email            TEXT NOT NULL,
+        status           TEXT DEFAULT 'processing',
+        total            INTEGER DEFAULT 0,
+        processed        INTEGER DEFAULT 0,
+        failed           INTEGER DEFAULT 0,
+        webhook_notified BOOLEAN DEFAULT FALSE,
+        created_at       TIMESTAMPTZ DEFAULT NOW()
+      );
+      ALTER TABLE certifications ADD COLUMN IF NOT EXISTS batch_id TEXT;
+      ALTER TABLE certifications ADD COLUMN IF NOT EXISTS label TEXT;
       CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
       CREATE INDEX IF NOT EXISTS idx_certifications_hash ON certifications(hash);
       CREATE INDEX IF NOT EXISTS idx_certifications_user_id ON certifications(user_id);
+      CREATE INDEX IF NOT EXISTS idx_certifications_batch_id ON certifications(batch_id);
       CREATE INDEX IF NOT EXISTS idx_api_keys_key ON api_keys(api_key);
       CREATE INDEX IF NOT EXISTS idx_magic_links_token ON magic_links(token);
+      CREATE INDEX IF NOT EXISTS idx_batches_batch_id ON batches(batch_id);
     `);
-    console.log("DB indexes ensured.");
+    console.log("DB indexes and schema migrations ensured.");
   } catch (err) {
     console.error("Index creation error (non-fatal):", err.message);
   }
