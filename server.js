@@ -1481,6 +1481,36 @@ app.get(["/admin/stats", "/api/admin/stats"], authRateLimit, async (req, res) =>
   }
 });
 
+/* ---------------- ADMIN ACTIONS ---------------- */
+
+// Toggle API key active/inactive
+app.post(["/admin/api-key/toggle", "/api/admin/api-key/toggle"], authRateLimit, async (req, res) => {
+  const adminSecret = req.headers["x-admin-secret"];
+  if (adminSecret !== process.env.ADMIN_SECRET) return res.status(401).json({ error: "Unauthorized." });
+  const { email, active } = req.body;
+  if (!email || typeof active !== "boolean") return res.status(400).json({ error: "email and active (boolean) required." });
+  try {
+    await pool.query("UPDATE api_keys SET active = $1 WHERE email = $2", [active, email]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Manually set monthly limit for an API key
+app.post(["/admin/api-key/limit", "/api/admin/api-key/limit"], authRateLimit, async (req, res) => {
+  const adminSecret = req.headers["x-admin-secret"];
+  if (adminSecret !== process.env.ADMIN_SECRET) return res.status(401).json({ error: "Unauthorized." });
+  const { email, monthly_limit } = req.body;
+  if (!email || typeof monthly_limit !== "number" || monthly_limit < 0) return res.status(400).json({ error: "email and monthly_limit (number) required." });
+  try {
+    await pool.query("UPDATE api_keys SET monthly_limit = $1 WHERE email = $2", [monthly_limit, email]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /* ---------------- DB INDEXES ---------------- */
 // Run once on startup — safe to re-run (IF NOT EXISTS)
 async function ensureIndexes() {
