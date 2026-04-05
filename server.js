@@ -9,6 +9,8 @@ import crypto from "crypto";
 import Stripe from "stripe";
 import cron from "node-cron";
 import PDFDocument from "pdfkit";
+import { authenticator } from "otplib";
+import QRCode from "qrcode";
 import { anchorToPolygon } from "./polygon.js";
 
 dotenv.config();
@@ -1445,10 +1447,7 @@ app.post(["/stripe-webhook", "/api/stripe-webhook"], express.raw({ type: "applic
 /* ---------------- ADMIN DASHBOARD ---------------- */
 app.get(["/admin/stats", "/api/admin/stats"], authRateLimit, async (req, res) => {
   try {
-    const adminSecret = req.headers["x-admin-secret"];
-    if (adminSecret !== process.env.ADMIN_SECRET) {
-      return res.status(401).json({ error: "Unauthorized." });
-    }
+    if (!verifyAdminAuth(req)) return res.status(401).json({ error: "Unauthorized." });
 
     const users = await pool.query(
       `SELECT email, stripe_customer_id, subscription_id, referral_code,
@@ -1481,12 +1480,52 @@ app.get(["/admin/stats", "/api/admin/stats"], authRateLimit, async (req, res) =>
   }
 });
 
+/* ---------------- ADMIN AUTH HELPER ---------------- */
+function verifyAdminAuth(req) {
+  const adminSecret = req.headers["x-admin-secret"];
+  if (adminSecret !== process.env.ADMIN_SECRET) return false;
+
+  // If TOTP is configured, also verify the token
+  if (process.env.ADMIN_TOTP_SECRET) {
+    const totpToken = req.headers["x-admin-totp"];
+    if (!totpToken) return false;
+    const valid = authenticator.verify({
+      token: totpToken,
+      secret: process.env.ADMIN_TOTP_SECRET
+    });
+    if (!valid) return false;
+  }
+
+  return true;
+}
+
+/* ---------------- TOTP SETUP (run once) ---------------- */
+// Hit this endpoint once with your admin password to get the QR code.
+// Scan it with Google Authenticator, then set ADMIN_TOTP_SECRET in DO env vars.
+app.get(["/admin/totp-setup", "/api/admin/totp-setup"], authRateLimit, async (req, res) => {
+  const adminSecret = req.headers["x-admin-secret"];
+  if (adminSecret !== process.env.ADMIN_SECRET) return res.status(401).json({ error: "Unauthorized." });
+
+  if (process.env.ADMIN_TOTP_SECRET) {
+    return res.status(400).json({ error: "TOTP already configured. Remove ADMIN_TOTP_SECRET from env to regenerate." });
+  }
+
+  const secret = authenticator.generateSecret();
+  const otpauthUrl = authenticator.keyuri("admin", "ProofDeed", secret);
+  const qrDataUrl = await QRCode.toDataURL(otpauthUrl);
+
+  res.json({
+    secret,
+    instructions: "1) Scan the QR code with Google Authenticator. 2) Set ADMIN_TOTP_SECRET=" + secret + " in your DigitalOcean environment variables. 3) Redeploy.",
+    qr: qrDataUrl
+  });
+});
+
 /* ---------------- ADMIN ACTIONS ---------------- */
 
 // Toggle API key active/inactive
 app.post(["/admin/api-key/toggle", "/api/admin/api-key/toggle"], authRateLimit, async (req, res) => {
-  const adminSecret = req.headers["x-admin-secret"];
-  if (adminSecret !== process.env.ADMIN_SECRET) return res.status(401).json({ error: "Unauthorized." });
+  if (!verifyAdminAuth(req)) return res.status(401).json({ error: "Unauthorized." });
   const { email, active } = req.body;
   if (!email || typeof active !== "boolean") return res.status(400).json({ error: "email and active (boolean) required." });
   try {
@@ -1499,8 +1538,7 @@ app.post(["/admin/api-key/toggle", "/api/admin/api-key/toggle"], authRateLimit, 
 
 // Manually set monthly limit for an API key
 app.post(["/admin/api-key/limit", "/api/admin/api-key/limit"], authRateLimit, async (req, res) => {
-  const adminSecret = req.headers["x-admin-secret"];
-  if (adminSecret !== process.env.ADMIN_SECRET) return res.status(401).json({ error: "Unauthorized." });
+  if (!verifyAdminAuth(req)) return res.status(401).json({ error: "Unauthorized." });
   const { email, monthly_limit } = req.body;
   if (!email || typeof monthly_limit !== "number" || monthly_limit < 0) return res.status(400).json({ error: "email and monthly_limit (number) required." });
   try {
