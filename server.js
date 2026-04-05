@@ -156,6 +156,75 @@ async function authenticateApiKey(req, res, next) {
   }
 }
 
+/* ---------------- Usage Notifications ---------------- */
+async function checkAndNotifyUsage(keyData) {
+  const { email, api_key, used_this_month, monthly_limit, notified_80, notified_100 } = keyData;
+  const pct = used_this_month / monthly_limit;
+  const mailgunDomain = process.env.MAILGUN_DOMAIN;
+  const mailgunApiKey = process.env.MAILGUN_API_KEY;
+  if (!mailgunDomain || !mailgunApiKey) return;
+
+  const upgradeUrl = `https://proofdeed.com/api-dashboard`;
+
+  if (pct >= 1.0 && !notified_100) {
+    await pool.query("UPDATE api_keys SET notified_100 = TRUE WHERE api_key = $1", [api_key]);
+    fetch("https://api.mailgun.net/v3/" + mailgunDomain + "/messages", {
+      method: "POST",
+      headers: {
+        "Authorization": "Basic " + Buffer.from("api:" + mailgunApiKey).toString("base64"),
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      body: new URLSearchParams({
+        from: process.env.MAIL_FROM || "ProofDeed <noreply@" + mailgunDomain + ">",
+        to: email,
+        subject: "ProofDeed — Monthly limit reached. Your API is paused.",
+        text: [
+          "Your ProofDeed account has reached its monthly certification limit.",
+          "",
+          `Used: ${used_this_month.toLocaleString()} of ${monthly_limit.toLocaleString()} certifications`,
+          "",
+          "Your API will return 429 errors until you add more credits or upgrade your plan.",
+          "",
+          "Add more credits or upgrade now:",
+          upgradeUrl,
+          "",
+          "Options:",
+          "  • Buy 1,000 more credits — available in your dashboard",
+          "  • Upgrade to a higher plan — increases your monthly limit permanently",
+          "",
+          "ProofDeed\nhttps://proofdeed.com"
+        ].join("\n")
+      })
+    }).catch(err => console.error("Usage 100% email failed:", err.message));
+  } else if (pct >= 0.8 && !notified_80) {
+    await pool.query("UPDATE api_keys SET notified_80 = TRUE WHERE api_key = $1", [api_key]);
+    fetch("https://api.mailgun.net/v3/" + mailgunDomain + "/messages", {
+      method: "POST",
+      headers: {
+        "Authorization": "Basic " + Buffer.from("api:" + mailgunApiKey).toString("base64"),
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      body: new URLSearchParams({
+        from: process.env.MAIL_FROM || "ProofDeed <noreply@" + mailgunDomain + ">",
+        to: email,
+        subject: "ProofDeed — You've used 80% of your monthly certifications",
+        text: [
+          "Heads up — your ProofDeed account is approaching its monthly limit.",
+          "",
+          `Used: ${used_this_month.toLocaleString()} of ${monthly_limit.toLocaleString()} certifications (80%+)`,
+          "",
+          "To avoid interruption, consider adding more credits or upgrading your plan before you hit the limit.",
+          "",
+          "Manage your plan:",
+          upgradeUrl,
+          "",
+          "ProofDeed\nhttps://proofdeed.com"
+        ].join("\n")
+      })
+    }).catch(err => console.error("Usage 80% email failed:", err.message));
+  }
+}
+
 /* ---------------- Report Usage to Stripe ---------------- */
 async function reportUsageToStripe(subscriptionItemId, quantity) {
   try {
@@ -439,14 +508,19 @@ app.post("/api/v1/certify", authenticateApiKey, async (req, res) => {
       [proofId, documentHash, null]
     );
 
-    await pool.query(
-      "UPDATE api_keys SET used_this_month = used_this_month + 1 WHERE api_key = $1",
+    const updatedKey = await pool.query(
+      "UPDATE api_keys SET used_this_month = used_this_month + 1 WHERE api_key = $1 RETURNING *",
       [req.apiKey.api_key]
     );
 
     // Report usage to Stripe for automatic billing
     if (req.apiKey.stripe_subscription_item_id) {
       await reportUsageToStripe(req.apiKey.stripe_subscription_item_id, 1);
+    }
+
+    // Check 80%/100% thresholds and notify
+    if (updatedKey.rows.length > 0) {
+      checkAndNotifyUsage(updatedKey.rows[0]).catch(() => {});
     }
 
     // Respond immediately — anchor to blockchain in background
@@ -589,10 +663,15 @@ app.post("/api/v1/batch", authenticateApiKey, async (req, res) => {
     }
 
     // Deduct usage immediately
-    await pool.query(
-      "UPDATE api_keys SET used_this_month = used_this_month + $1 WHERE api_key = $2",
+    const updatedBatchKey = await pool.query(
+      "UPDATE api_keys SET used_this_month = used_this_month + $1 WHERE api_key = $2 RETURNING *",
       [certRecords.length, req.apiKey.api_key]
     );
+
+    // Check 80%/100% thresholds and notify
+    if (updatedBatchKey.rows.length > 0) {
+      checkAndNotifyUsage(updatedBatchKey.rows[0]).catch(() => {});
+    }
 
     // Respond immediately — blockchain anchoring happens in background
     res.json({
@@ -990,6 +1069,37 @@ app.post(["/contact", "/api/contact"], async (req, res) => {
   }
 });
 
+/* ---------------- API UPGRADE / TOP-UP CHECKOUT ---------------- */
+app.post(["/api/v1/upgrade", "/v1/upgrade"], authenticateApiKey, async (req, res) => {
+  try {
+    const { type } = req.body; // 'topup' | 'upgrade'
+    const email = req.apiKey.email;
+
+    const topupPriceId = process.env.PRICE_TOPUP_1000;
+
+    if (type === "topup") {
+      if (!topupPriceId) return res.status(500).json({ error: "Top-up not configured." });
+      const session = await stripe.checkout.sessions.create({
+        mode: "payment",
+        payment_method_types: ["card"],
+        customer_email: email,
+        line_items: [{ price: topupPriceId, quantity: 1 }],
+        metadata: { type: "topup_1000", api_key: req.apiKey.api_key },
+        success_url: "https://proofdeed.com/api-dashboard?topup=success",
+        cancel_url: "https://proofdeed.com/api-dashboard",
+      });
+      return res.json({ url: session.url });
+    }
+
+    // Upgrade — send to pricing/contact
+    return res.json({ url: "https://proofdeed.com/contact?vertical=enterprise&upgrade=1" });
+
+  } catch (err) {
+    console.error("Upgrade checkout error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /* ---------------- STRIPE CHECKOUT ---------------- */
 app.post(["/create-checkout-session", "/api/create-checkout-session"], async (req, res) => {
   try {
@@ -1059,6 +1169,52 @@ app.post(["/stripe-webhook", "/api/stripe-webhook"], express.raw({ type: "applic
          SET stripe_customer_id = $2, subscription_id = COALESCE($3, users.subscription_id)`,
         [email, customerId, subscriptionId || null, referral || null]
       );
+
+      if (isOneTime && session.metadata?.type === "topup_1000") {
+        // Credit top-up — add 1,000 certs and reset notification flags
+        const apiKeyVal = session.metadata?.api_key;
+        if (apiKeyVal) {
+          await pool.query(
+            `UPDATE api_keys
+             SET monthly_limit = monthly_limit + 1000,
+                 notified_80 = FALSE,
+                 notified_100 = FALSE
+             WHERE api_key = $1`,
+            [apiKeyVal]
+          );
+          console.log("Top-up applied: +1000 certs for key", apiKeyVal);
+
+          // Confirmation email
+          const mailgunDomain = process.env.MAILGUN_DOMAIN;
+          const mailgunApiKey = process.env.MAILGUN_API_KEY;
+          if (email && mailgunDomain && mailgunApiKey) {
+            fetch("https://api.mailgun.net/v3/" + mailgunDomain + "/messages", {
+              method: "POST",
+              headers: {
+                "Authorization": "Basic " + Buffer.from("api:" + mailgunApiKey).toString("base64"),
+                "Content-Type": "application/x-www-form-urlencoded"
+              },
+              body: new URLSearchParams({
+                from: process.env.MAIL_FROM || "ProofDeed <noreply@" + mailgunDomain + ">",
+                to: email,
+                subject: "ProofDeed — 1,000 certifications added to your account",
+                text: [
+                  "Your top-up has been applied.",
+                  "",
+                  "1,000 additional certifications have been added to your monthly limit.",
+                  "Your API is active and ready.",
+                  "",
+                  "View your updated usage:",
+                  "https://proofdeed.com/api-dashboard",
+                  "",
+                  "ProofDeed\nhttps://proofdeed.com"
+                ].join("\n")
+              })
+            }).catch(err => console.error("Top-up email failed:", err.message));
+          }
+        }
+        return;
+      }
 
       if (isOneTime) {
         // Government pilot — payment received but ACH not yet cleared.
@@ -1327,6 +1483,8 @@ async function ensureIndexes() {
       );
       ALTER TABLE certifications ADD COLUMN IF NOT EXISTS batch_id TEXT;
       ALTER TABLE certifications ADD COLUMN IF NOT EXISTS label TEXT;
+      ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS notified_80 BOOLEAN DEFAULT FALSE;
+      ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS notified_100 BOOLEAN DEFAULT FALSE;
       CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
       CREATE INDEX IF NOT EXISTS idx_certifications_hash ON certifications(hash);
       CREATE INDEX IF NOT EXISTS idx_certifications_user_id ON certifications(user_id);
