@@ -10,45 +10,34 @@ import Stripe from "stripe";
 import cron from "node-cron";
 import PDFDocument from "pdfkit";
 import QRCode from "qrcode";
-
-/* ---------------- TOTP (RFC 6238) via built-in crypto ---------------- */
-function base32Decode(secret) {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-  let bits = '';
-  for (const c of secret.toUpperCase().replace(/=+$/, '')) {
-    const v = chars.indexOf(c);
-    if (v === -1) continue;
-    bits += v.toString(2).padStart(5, '0');
-  }
-  const bytes = [];
-  for (let i = 0; i + 8 <= bits.length; i += 8) bytes.push(parseInt(bits.slice(i, i + 8), 2));
-  return Buffer.from(bytes);
-}
-
-function generateTOTP(secret, window = 0) {
-  const key = base32Decode(secret);
-  const step = Math.floor(Date.now() / 1000 / 30) + window;
-  const buf = Buffer.alloc(8);
-  buf.writeBigInt64BE(BigInt(step));
-  const hmac = crypto.createHmac('sha1', key).update(buf).digest();
-  const offset = hmac[19] & 0xf;
-  const code = ((hmac[offset] & 0x7f) << 24 | (hmac[offset+1] & 0xff) << 16 | (hmac[offset+2] & 0xff) << 8 | (hmac[offset+3] & 0xff)) % 1000000;
-  return code.toString().padStart(6, '0');
-}
+import * as OTPAuth from "otpauth";
 
 function verifyTOTP(secret, token) {
-  return [-1, 0, 1].some(w => generateTOTP(secret, w) === token);
+  const totp = new OTPAuth.TOTP({
+    issuer: "ProofDeed",
+    label: "admin",
+    algorithm: "SHA1",
+    digits: 6,
+    period: 30,
+    secret: OTPAuth.Secret.fromBase32(secret.toUpperCase()),
+  });
+  return totp.validate({ token, window: 1 }) !== null;
 }
 
 function generateTOTPSecret() {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-  const bytes = crypto.randomBytes(20);
-  let secret = '', buf = 0, bits = 0;
-  for (const byte of bytes) {
-    buf = (buf << 8) | byte; bits += 8;
-    while (bits >= 5) { secret += chars[(buf >> (bits - 5)) & 31]; bits -= 5; }
-  }
-  return secret;
+  return new OTPAuth.Secret().base32;
+}
+
+function getTOTPUri(secret) {
+  const totp = new OTPAuth.TOTP({
+    issuer: "ProofDeed",
+    label: "admin",
+    algorithm: "SHA1",
+    digits: 6,
+    period: 30,
+    secret: OTPAuth.Secret.fromBase32(secret.toUpperCase()),
+  });
+  return totp.toString();
 }
 import { anchorToPolygon } from "./polygon.js";
 
@@ -1546,7 +1535,7 @@ app.get(["/admin/totp-setup", "/api/admin/totp-setup"], authRateLimit, async (re
   }
 
   const secret = generateTOTPSecret();
-  const otpauthUrl = `otpauth://totp/ProofDeed:admin?secret=${secret}&issuer=ProofDeed&algorithm=SHA1&digits=6&period=30`;
+  const otpauthUrl = getTOTPUri(secret);
   const qrDataUrl = await QRCode.toDataURL(otpauthUrl);
 
   res.json({
