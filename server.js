@@ -1552,6 +1552,38 @@ function verifyAdminAuth(req) {
   return true;
 }
 
+/* ---------------- COMPLIANCE TOKEN (one-time links) ---------------- */
+app.post(["/admin/compliance-token", "/api/admin/compliance-token"], authRateLimit, async (req, res) => {
+  if (!verifyAdminAuth(req)) return res.status(401).json({ error: "Unauthorized." });
+  try {
+    const token = crypto.randomBytes(20).toString("hex");
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+    await pool.query(
+      `INSERT INTO compliance_tokens (token, expires_at, used, created_at) VALUES ($1, $2, FALSE, NOW())`,
+      [token, expiresAt]
+    );
+    res.json({ url: `https://proofdeed.com/security-compliance?token=${token}` });
+  } catch (err) {
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+app.post("/api/compliance-token/validate", async (req, res) => {
+  const { token } = req.body;
+  if (!token) return res.json({ valid: false, reason: "missing" });
+  try {
+    const result = await pool.query(`SELECT * FROM compliance_tokens WHERE token = $1`, [token]);
+    if (result.rows.length === 0) return res.json({ valid: false, reason: "not_found" });
+    const row = result.rows[0];
+    if (row.used) return res.json({ valid: false, reason: "used" });
+    if (row.expires_at && new Date(row.expires_at) < new Date()) return res.json({ valid: false, reason: "expired" });
+    await pool.query(`UPDATE compliance_tokens SET used = TRUE WHERE token = $1`, [token]);
+    res.json({ valid: true });
+  } catch (err) {
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
 /* ---------------- TOTP SETUP (run once) ---------------- */
 // Hit this endpoint once with your admin password to get the QR code.
 // Scan it with Google Authenticator, then set ADMIN_TOTP_SECRET in DO env vars.
@@ -1635,6 +1667,13 @@ async function ensureIndexes() {
       );
       ALTER TABLE certifications ADD COLUMN IF NOT EXISTS batch_id TEXT;
       ALTER TABLE certifications ADD COLUMN IF NOT EXISTS label TEXT;
+      CREATE TABLE IF NOT EXISTS compliance_tokens (
+        id SERIAL PRIMARY KEY,
+        token TEXT UNIQUE NOT NULL,
+        used BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        expires_at TIMESTAMPTZ
+      );
       ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS notified_80 BOOLEAN DEFAULT FALSE;
       ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS notified_100 BOOLEAN DEFAULT FALSE;
       ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS organization_name TEXT;
