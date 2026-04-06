@@ -187,7 +187,7 @@ async function authenticateApiKey(req, res, next) {
     req.apiKey = keyData;
     next();
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: "Internal server error." });
   }
 }
 
@@ -204,7 +204,7 @@ async function authenticateApiKeyNoLimit(req, res, next) {
     req.apiKey = result.rows[0];
     next();
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: "Internal server error." });
   }
 }
 
@@ -308,7 +308,7 @@ app.get("/api/test-cert", async (req, res) => {
     const hash = crypto.createHash("sha256").update(testDocument).digest("hex");
     res.json({ document: testDocument, hash });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: "Internal server error." });
   }
 });
 
@@ -359,7 +359,7 @@ app.post(["/auth/magic-link", "/api/auth/magic-link"], authRateLimit, async (req
 
   } catch (error) {
     console.error("Magic link error:", error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: "Internal server error." });
   }
 });
 
@@ -411,7 +411,7 @@ app.get(["/auth/verify", "/api/auth/verify"], authRateLimit, async (req, res) =>
 
   } catch (error) {
     console.error("Verify error:", error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: "Internal server error." });
   }
 });
 
@@ -441,7 +441,7 @@ app.get(["/user/certifications", "/api/user/certifications"], authenticateToken,
 
   } catch (error) {
     console.error("User certifications error:", error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: "Internal server error." });
   }
 });
 
@@ -537,7 +537,7 @@ app.post("/api/enterprise/generate-key", async (req, res) => {
 
   } catch (error) {
     console.error("Generate API key error:", error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: "Internal server error." });
   }
 });
 
@@ -597,7 +597,7 @@ app.post("/api/v1/certify", authenticateApiKey, async (req, res) => {
 
   } catch (error) {
     console.error("Enterprise certify error:", error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: "Internal server error." });
   }
 });
 
@@ -749,7 +749,7 @@ app.post("/api/v1/batch", authenticateApiKey, async (req, res) => {
 
   } catch (error) {
     console.error("Batch certify error:", error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: "Internal server error." });
   }
 });
 
@@ -789,7 +789,7 @@ app.get("/api/v1/batch/:batchId", authenticateApiKey, async (req, res) => {
     });
   } catch (error) {
     console.error("Batch status error:", error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: "Internal server error." });
   }
 });
 
@@ -810,7 +810,7 @@ app.get("/api/v1/usage", authenticateApiKeyNoLimit, async (req, res) => {
       recentBatches: recentBatches.rows
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: "Internal server error." });
   }
 });
 
@@ -827,7 +827,7 @@ app.put("/api/v1/webhook", authenticateApiKeyNoLimit, async (req, res) => {
     );
     res.json({ success: true, webhookUrl: webhookUrl || null });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: "Internal server error." });
   }
 });
 
@@ -860,7 +860,7 @@ app.get("/api/v1/certificates", authenticateApiKeyNoLimit, async (req, res) => {
       }))
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: "Internal server error." });
   }
 });
 
@@ -936,7 +936,7 @@ app.get("/api/v1/certificate/:proofId/pdf", authenticateApiKeyNoLimit, async (re
     doc.end();
   } catch (error) {
     console.error("PDF generation error:", error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: "Internal server error." });
   }
 });
 
@@ -995,7 +995,7 @@ app.post(["/create-proof", "/api/create-proof"], async (req, res) => {
 
   } catch (error) {
     console.error("Create proof error:", error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: "Internal server error." });
   }
 });
 
@@ -1117,7 +1117,7 @@ app.post(["/contact", "/api/contact"], async (req, res) => {
 
   } catch (error) {
     console.error("Contact form error:", error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: "Internal server error." });
   }
 });
 
@@ -1148,7 +1148,7 @@ app.post(["/api/v1/upgrade", "/v1/upgrade"], authenticateApiKeyNoLimit, async (r
 
   } catch (err) {
     console.error("Upgrade checkout error:", err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: "Internal server error." });
   }
 });
 
@@ -1186,7 +1186,7 @@ app.post(["/create-checkout-session", "/api/create-checkout-session"], async (re
 
   } catch (err) {
     console.error("Stripe error:", err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: "Internal server error." });
   }
 });
 
@@ -1509,7 +1509,7 @@ app.get(["/admin/stats", "/api/admin/stats"], authRateLimit, async (req, res) =>
 
   } catch (error) {
     console.error("Admin stats error:", error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: "Internal server error." });
   }
 });
 
@@ -1561,7 +1561,7 @@ app.post(["/admin/api-key/toggle", "/api/admin/api-key/toggle"], authRateLimit, 
     await pool.query("UPDATE api_keys SET active = $1 WHERE email = $2", [active, email]);
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: "Internal server error." });
   }
 });
 
@@ -1574,7 +1574,7 @@ app.post(["/admin/api-key/limit", "/api/admin/api-key/limit"], authRateLimit, as
     await pool.query("UPDATE api_keys SET monthly_limit = $1 WHERE email = $2", [monthly_limit, email]);
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: "Internal server error." });
   }
 });
 
@@ -1659,7 +1659,7 @@ app.post(["/billing/portal", "/api/billing/portal"], authenticateToken, async (r
 
   } catch (err) {
     console.error("Portal error:", err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: "Internal server error." });
   }
 });
 
