@@ -554,10 +554,10 @@ app.post("/api/v1/certify", authenticateApiKey, async (req, res) => {
     const timestamp = new Date().toISOString();
 
     await pool.query(
-      `INSERT INTO certifications (certification_id, hash, polygon_tx, created_at)
-       VALUES ($1, $2, $3, NOW())
+      `INSERT INTO certifications (certification_id, hash, polygon_tx, api_key_email, ip_address, created_at)
+       VALUES ($1, $2, NULL, $3, $4, NOW())
        ON CONFLICT (certification_id) DO NOTHING`,
-      [proofId, documentHash, null]
+      [proofId, documentHash, req.apiKey.email, req.ip || req.headers["x-forwarded-for"] || null]
     );
 
     const updatedKey = await pool.query(
@@ -708,9 +708,9 @@ app.post("/api/v1/batch", authenticateApiKey, async (req, res) => {
     // Insert all certs immediately as pending (polygon_tx = null)
     for (const cert of certRecords) {
       await pool.query(
-        `INSERT INTO certifications (certification_id, hash, polygon_tx, batch_id, label, created_at)
-         VALUES ($1, $2, NULL, $3, $4, NOW()) ON CONFLICT (certification_id) DO NOTHING`,
-        [cert.proofId, cert.documentHash, batchId, cert.label]
+        `INSERT INTO certifications (certification_id, hash, polygon_tx, batch_id, label, api_key_email, ip_address, created_at)
+         VALUES ($1, $2, NULL, $3, $4, $5, $6, NOW()) ON CONFLICT (certification_id) DO NOTHING`,
+        [cert.proofId, cert.documentHash, batchId, cert.label, req.apiKey.email, req.ip || req.headers["x-forwarded-for"] || null]
       );
     }
 
@@ -880,13 +880,21 @@ app.get("/api/v1/certificate/:proofId/pdf", authenticateApiKeyNoLimit, async (re
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="ProofDeed-${proofId}.pdf"`);
 
+    const orgName = req.apiKey.organization_name || null;
+
     const doc = new PDFDocument({ margin: 60, size: "A4" });
     doc.pipe(res);
 
     // Header bar
     doc.rect(0, 0, doc.page.width, 80).fill("#0f172a");
-    doc.fontSize(22).font("Helvetica-Bold").fillColor("#ffffff").text("PROOFDEED", 60, 28);
-    doc.fontSize(9).font("Helvetica").fillColor("#94a3b8").text("Cryptographic Document Certificate", 60, 54);
+    if (orgName) {
+      doc.fontSize(22).font("Helvetica-Bold").fillColor("#ffffff").text(orgName.toUpperCase(), 60, 22);
+      doc.fontSize(8).font("Helvetica").fillColor("#94a3b8").text("Powered by ProofDeed", 60, 48);
+      doc.fontSize(8).font("Helvetica").fillColor("#64748b").text("Cryptographic Document Certificate", 60, 60);
+    } else {
+      doc.fontSize(22).font("Helvetica-Bold").fillColor("#ffffff").text("PROOFDEED", 60, 28);
+      doc.fontSize(9).font("Helvetica").fillColor("#94a3b8").text("Cryptographic Document Certificate", 60, 54);
+    }
 
     // Title
     doc.moveDown(3);
@@ -1369,6 +1377,22 @@ app.post(["/stripe-webhook", "/api/stripe-webhook"], express.raw({ type: "applic
     }
   }
 
+  if (event.type === "invoice.paid") {
+    const invoice = event.data.object;
+    const email = invoice.customer_email;
+    const amountCents = invoice.amount_paid || 0;
+    if (email && amountCents > 0) {
+      try {
+        await pool.query(
+          `UPDATE users SET revenue_generated = COALESCE(revenue_generated, 0) + $1 WHERE email = $2`,
+          [amountCents, email]
+        );
+      } catch (err) {
+        console.error("Revenue tracking error:", err.message);
+      }
+    }
+  }
+
   if (event.type === "invoice.payment_failed") {
     const invoice = event.data.object;
     const customerId = invoice.customer;
@@ -1492,11 +1516,11 @@ app.get(["/admin/stats", "/api/admin/stats"], authRateLimit, async (req, res) =>
 
     const contacts = await pool.query(
       `SELECT name, email, company, notes, request_type, created_at
-       FROM contact_submissions ORDER BY created_at DESC LIMIT 50`
+       FROM contact_submissions ORDER BY created_at DESC`
     );
 
     const apiKeys = await pool.query(
-      `SELECT email, plan, monthly_limit, used_this_month, stripe_subscription_item_id, active, created_at
+      `SELECT email, plan, monthly_limit, used_this_month, stripe_subscription_item_id, active, organization_name, created_at
        FROM api_keys ORDER BY created_at DESC`
     );
 
@@ -1565,6 +1589,20 @@ app.post(["/admin/api-key/toggle", "/api/admin/api-key/toggle"], authRateLimit, 
   }
 });
 
+// Set organization name (white-label) for an API key
+app.post(["/admin/api-key/org", "/api/admin/api-key/org"], authRateLimit, async (req, res) => {
+  const adminSecret = req.headers["x-admin-secret"];
+  if (adminSecret !== process.env.ADMIN_SECRET) return res.status(401).json({ error: "Unauthorized." });
+  const { email, organization_name } = req.body;
+  if (!email) return res.status(400).json({ error: "email required." });
+  try {
+    await pool.query("UPDATE api_keys SET organization_name = $1 WHERE email = $2", [organization_name || null, email]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
 // Manually set monthly limit for an API key
 app.post(["/admin/api-key/limit", "/api/admin/api-key/limit"], authRateLimit, async (req, res) => {
   if (!verifyAdminAuth(req)) return res.status(401).json({ error: "Unauthorized." });
@@ -1599,6 +1637,9 @@ async function ensureIndexes() {
       ALTER TABLE certifications ADD COLUMN IF NOT EXISTS label TEXT;
       ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS notified_80 BOOLEAN DEFAULT FALSE;
       ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS notified_100 BOOLEAN DEFAULT FALSE;
+      ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS organization_name TEXT;
+      ALTER TABLE certifications ADD COLUMN IF NOT EXISTS api_key_email TEXT;
+      ALTER TABLE certifications ADD COLUMN IF NOT EXISTS ip_address TEXT;
       CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
       CREATE INDEX IF NOT EXISTS idx_certifications_hash ON certifications(hash);
       CREATE INDEX IF NOT EXISTS idx_certifications_user_id ON certifications(user_id);
