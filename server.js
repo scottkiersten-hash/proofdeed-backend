@@ -1828,6 +1828,45 @@ cron.schedule("0 4 * * *", async () => {
   }
 });
 
+/* ---------------- API KEY BILLING PORTAL ---------------- */
+app.post(["/api/v1/billing-portal", "/v1/billing-portal"], authenticateApiKeyNoLimit, async (req, res) => {
+  try {
+    const { email } = req.apiKey;
+    const userResult = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
+    const user = userResult.rows[0];
+    if (!user || !user.stripe_customer_id) {
+      return res.status(404).json({ error: "No billing account found. Contact info@proofdeed.com." });
+    }
+    const session = await stripe.billingPortal.sessions.create({
+      customer: user.stripe_customer_id,
+      return_url: "https://proofdeed.com/api-dashboard",
+    });
+    res.json({ url: session.url });
+  } catch (err) {
+    console.error("API billing portal error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+/* ---------------- DAILY USAGE CHART DATA ---------------- */
+app.get(["/api/v1/usage/daily", "/v1/usage/daily"], authenticateApiKey, async (req, res) => {
+  try {
+    const { email } = req.apiKey;
+    const result = await pool.query(
+      `SELECT DATE(created_at) as day, COUNT(*) as count
+       FROM certifications
+       WHERE api_key_email = $1 AND created_at >= NOW() - INTERVAL '30 days'
+       GROUP BY DATE(created_at)
+       ORDER BY day ASC`,
+      [email]
+    );
+    res.json({ daily: result.rows });
+  } catch (err) {
+    console.error("Daily usage error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
 /* ---------------- STRIPE CUSTOMER PORTAL ---------------- */
 app.post(["/billing/portal", "/api/billing/portal"], authenticateToken, async (req, res) => {
   try {
