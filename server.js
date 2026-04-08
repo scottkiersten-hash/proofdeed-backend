@@ -1351,7 +1351,7 @@ app.post(["/stripe-webhook", "/api/stripe-webhook"], express.raw({ type: "applic
                 "Content-Type": "application/x-www-form-urlencoded"
               },
               body: new URLSearchParams({
-                from: process.env.MAIL_FROM || "ProofDeed <mailgun@" + mailgunDomain + ">",
+                from: "ProofDeed Government <gov@proofdeed.com>",
                 to: email,
                 subject: "ProofDeed Government Pilot — Payment Received",
                 text: [
@@ -1366,7 +1366,7 @@ app.post(["/stripe-webhook", "/api/stripe-webhook"], express.raw({ type: "applic
                   "  • Access: Upload portal, batch processing, REST API",
                   "  • Fixed fee: $15,000 — no variable costs during pilot",
                   "",
-                  "Questions? Contact us at info@proofdeed.com.",
+                  "Questions? Contact us at gov@proofdeed.com.",
                   "",
                   "ProofDeed",
                   "https://proofdeed.com"
@@ -1517,7 +1517,7 @@ app.post(["/stripe-webhook", "/api/stripe-webhook"], express.raw({ type: "applic
                 "Content-Type": "application/x-www-form-urlencoded"
               },
               body: new URLSearchParams({
-                from: process.env.MAIL_FROM || "ProofDeed <mailgun@" + mailgunDomain + ">",
+                from: "ProofDeed Government <gov@proofdeed.com>",
                 to: email,
                 subject: "ProofDeed Government Pilot — Payment Confirmed. Your API Key Is Ready.",
                 text: [
@@ -1799,7 +1799,7 @@ cron.schedule("0 4 * * *", async () => {
             "Content-Type": "application/x-www-form-urlencoded"
           },
           body: new URLSearchParams({
-            from: process.env.MAIL_FROM || "ProofDeed <mailgun@" + mailgunDomain + ">",
+            from: "ProofDeed Government <gov@proofdeed.com>",
             to: row.email,
             subject: "ProofDeed Government Pilot — Your 45-Day Pilot Has Ended",
             text: [
@@ -1809,7 +1809,7 @@ cron.schedule("0 4 * * *", async () => {
               "",
               "To continue using ProofDeed, please contact us to discuss volume pricing for your agency:",
               "",
-              "  Email: info@proofdeed.com",
+              "  Email: gov@proofdeed.com",
               "  Enterprise pricing starts at $0.76/certification, dropping to $0.15 at scale.",
               "",
               "We would love to continue supporting your agency's record integrity needs.",
