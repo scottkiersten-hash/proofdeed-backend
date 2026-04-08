@@ -957,23 +957,46 @@ app.post(["/create-proof", "/api/create-proof"], async (req, res) => {
       return res.status(400).json({ error: "Invalid document hash. Must be a 64-character SHA-256 hex string." });
     }
 
+    // Require a valid JWT — no anonymous certifications
+    const authHeader = req.headers["authorization"];
+    if (!authHeader) {
+      return res.status(401).json({ error: "Authentication required." });
+    }
+
+    let decoded;
+    try {
+      const token = authHeader.split(" ")[1];
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (err) {
+      return res.status(401).json({ error: "Invalid or expired session. Please sign in again." });
+    }
+
+    const userResult = await pool.query("SELECT * FROM users WHERE email = $1", [decoded.email]);
+    if (userResult.rows.length === 0) {
+      return res.status(401).json({ error: "User not found." });
+    }
+    const user = userResult.rows[0];
+    const userId = user.id;
+
+    // Enforce plan limits
+    const plan = user.subscription_id ? "pro" : "starter";
+    const certLimit = plan === "pro" ? 70 : 25;
+    const usedCount = await pool.query(
+      "SELECT COUNT(*) FROM certifications WHERE user_id = $1 AND created_at > date_trunc('month', NOW())",
+      [userId]
+    );
+    const used = parseInt(usedCount.rows[0].count) || 0;
+    if (used >= certLimit) {
+      return res.status(429).json({
+        error: "Monthly certification limit reached. Please upgrade your plan.",
+        used,
+        limit: certLimit,
+        plan
+      });
+    }
+
     const proofId = "PD-" + Date.now();
     const timestamp = new Date().toISOString();
-
-    let userId = null;
-    const authHeader = req.headers["authorization"];
-    if (authHeader) {
-      try {
-        const token = authHeader.split(" ")[1];
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const userResult = await pool.query("SELECT id FROM users WHERE email = $1", [decoded.email]);
-        if (userResult.rows.length > 0) {
-          userId = userResult.rows[0].id;
-        }
-      } catch (err) {
-        console.log("No valid JWT — anonymous certification");
-      }
-    }
 
     await pool.query(
       `INSERT INTO certifications (certification_id, hash, polygon_tx, user_id, created_at)
@@ -1368,10 +1391,18 @@ app.post(["/stripe-webhook", "/api/stripe-webhook"], express.raw({ type: "applic
     const customerId = subscription.customer;
     console.log("Subscription cancelled for customer:", customerId);
     try {
-      await pool.query(
-        `UPDATE users SET subscription_id = NULL WHERE stripe_customer_id = $1`,
+      const userRes = await pool.query(
+        `UPDATE users SET subscription_id = NULL WHERE stripe_customer_id = $1 RETURNING email`,
         [customerId]
       );
+      if (userRes.rows.length > 0) {
+        const email = userRes.rows[0].email;
+        await pool.query(
+          `UPDATE api_keys SET active = FALSE WHERE email = $1 AND plan NOT IN ('government-pilot', 'government-pilot-pending')`,
+          [email]
+        );
+        console.log("API key deactivated on subscription cancellation for:", email);
+      }
     } catch (dbErr) {
       console.error("Subscription cancellation DB update failed:", dbErr.message);
     }
