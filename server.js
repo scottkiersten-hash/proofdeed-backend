@@ -1436,6 +1436,53 @@ app.post(["/stripe-webhook", "/api/stripe-webhook"], express.raw({ type: "applic
     }
   }
 
+  if (event.type === "invoice.upcoming") {
+    const invoice = event.data.object;
+    const email = invoice.customer_email;
+    const amountCents = invoice.amount_due || 0;
+    const renewalDate = invoice.next_payment_attempt
+      ? new Date(invoice.next_payment_attempt * 1000).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+      : "your next billing date";
+    const amountFormatted = "$" + (amountCents / 100).toFixed(2);
+
+    const mailgunDomain = process.env.MAILGUN_DOMAIN;
+    const mailgunApiKey = process.env.MAILGUN_API_KEY;
+    if (mailgunDomain && mailgunApiKey && email) {
+      try {
+        await fetch("https://api.mailgun.net/v3/" + mailgunDomain + "/messages", {
+          method: "POST",
+          headers: {
+            "Authorization": "Basic " + Buffer.from("api:" + mailgunApiKey).toString("base64"),
+            "Content-Type": "application/x-www-form-urlencoded"
+          },
+          body: new URLSearchParams({
+            from: process.env.MAIL_FROM || "ProofDeed <info@proofdeed.com>",
+            to: email,
+            subject: "Your ProofDeed subscription renews on " + renewalDate,
+            text: [
+              "Hi,",
+              "",
+              "This is a reminder that your ProofDeed subscription will automatically renew on " + renewalDate + " for " + amountFormatted + ".",
+              "",
+              "No action is needed — your access will continue uninterrupted.",
+              "",
+              "To update your payment method, change your plan, or cancel before you're charged:",
+              "  https://proofdeed.com/api-dashboard",
+              "",
+              "Questions? Reply to this email or contact us at info@proofdeed.com.",
+              "",
+              "ProofDeed",
+              "https://proofdeed.com"
+            ].join("\n")
+          })
+        });
+        console.log("Renewal reminder sent to:", email, "for", amountFormatted, "on", renewalDate);
+      } catch (mailErr) {
+        console.error("Renewal reminder email failed:", mailErr.message);
+      }
+    }
+  }
+
   if (event.type === "invoice.paid") {
     const invoice = event.data.object;
     const email = invoice.customer_email;
