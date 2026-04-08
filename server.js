@@ -1013,6 +1013,92 @@ app.post(["/create-proof", "/api/create-proof"], async (req, res) => {
       verificationText: "Your document fingerprint has been permanently recorded on the Polygon blockchain."
     });
 
+    // Certificate delivery email
+    const mailgunDomain = process.env.MAILGUN_DOMAIN;
+    const mailgunApiKey = process.env.MAILGUN_API_KEY;
+    if (mailgunDomain && mailgunApiKey && user.email) {
+      fetch("https://api.mailgun.net/v3/" + mailgunDomain + "/messages", {
+        method: "POST",
+        headers: {
+          "Authorization": "Basic " + Buffer.from("api:" + mailgunApiKey).toString("base64"),
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: new URLSearchParams({
+          from: process.env.MAIL_FROM || "ProofDeed <info@proofdeed.com>",
+          to: user.email,
+          subject: "ProofDeed Certificate — " + proofId,
+          text: [
+            "Your document has been certified and permanently anchored to the Polygon blockchain.",
+            "",
+            "Certificate ID: " + proofId,
+            "SHA-256 Hash:   " + documentHash,
+            "Certified:      " + new Date(timestamp).toUTCString(),
+            "",
+            "Verify this certificate at any time:",
+            "https://proofdeed.com/verify/" + proofId,
+            "",
+            "This certificate is court-admissible under FRE Rule 901. Keep this email as your record.",
+            "",
+            "ProofDeed",
+            "https://proofdeed.com"
+          ].join("\n")
+        })
+      }).catch(err => console.error("Cert delivery email failed:", err.message));
+    }
+
+    // Usage warning for JWT users (80% and 100%)
+    const newUsed = used + 1;
+    const pct = newUsed / certLimit;
+    if (pct >= 1.0) {
+      fetch("https://api.mailgun.net/v3/" + mailgunDomain + "/messages", {
+        method: "POST",
+        headers: {
+          "Authorization": "Basic " + Buffer.from("api:" + mailgunApiKey).toString("base64"),
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: new URLSearchParams({
+          from: process.env.MAIL_FROM || "ProofDeed <info@proofdeed.com>",
+          to: user.email,
+          subject: "ProofDeed — Monthly limit reached",
+          text: [
+            "You have used all " + certLimit + " certifications in your plan this month.",
+            "",
+            "Your account is now paused until your limit resets on the 1st of next month.",
+            "",
+            "To certify more documents now, upgrade your plan:",
+            "https://proofdeed.com/#pricing",
+            "",
+            "ProofDeed",
+            "https://proofdeed.com"
+          ].join("\n")
+        })
+      }).catch(() => {});
+    } else if (pct >= 0.8) {
+      fetch("https://api.mailgun.net/v3/" + mailgunDomain + "/messages", {
+        method: "POST",
+        headers: {
+          "Authorization": "Basic " + Buffer.from("api:" + mailgunApiKey).toString("base64"),
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: new URLSearchParams({
+          from: process.env.MAIL_FROM || "ProofDeed <info@proofdeed.com>",
+          to: user.email,
+          subject: "ProofDeed — You've used 80% of your monthly certifications",
+          text: [
+            "Heads up — you've used " + newUsed + " of " + certLimit + " certifications this month.",
+            "",
+            "To avoid interruption, consider upgrading your plan before you hit the limit:",
+            "https://proofdeed.com/#pricing",
+            "",
+            "Your limit resets on the 1st of each month.",
+            "",
+            "ProofDeed",
+            "https://proofdeed.com"
+          ].join("\n")
+        })
+      }).catch(() => {});
+    }
+
     // Background blockchain anchoring — updates DB when confirmed
     anchorToPolygon(documentHash).then(async (txHash) => {
       await pool.query(
@@ -1239,6 +1325,7 @@ app.post(["/create-checkout-session", "/api/create-checkout-session"], async (re
       success_url: success_url || "https://proofdeed.com/success",
       cancel_url: cancel_url || "https://proofdeed.com",
       client_reference_id: referral ? referral : undefined,
+      metadata: { plan },
     });
 
     res.json({ url: session.url });
@@ -1409,6 +1496,46 @@ app.post(["/stripe-webhook", "/api/stripe-webhook"], express.raw({ type: "applic
         }
       }
 
+      // Welcome email for new subscribers (not government pilot or top-ups)
+      if (!isOneTime && email) {
+        const planName = session.metadata?.plan || "starter";
+        const planLabel = planName.includes("pro") ? "Professional" : "Starter";
+        const certLimit = planName.includes("pro") ? "70" : "25";
+        const mailgunDomain = process.env.MAILGUN_DOMAIN;
+        const mailgunApiKey = process.env.MAILGUN_API_KEY;
+        if (mailgunDomain && mailgunApiKey) {
+          fetch("https://api.mailgun.net/v3/" + mailgunDomain + "/messages", {
+            method: "POST",
+            headers: {
+              "Authorization": "Basic " + Buffer.from("api:" + mailgunApiKey).toString("base64"),
+              "Content-Type": "application/x-www-form-urlencoded"
+            },
+            body: new URLSearchParams({
+              from: process.env.MAIL_FROM || "ProofDeed <info@proofdeed.com>",
+              to: email,
+              subject: "Welcome to ProofDeed — your account is active",
+              text: [
+                "Your ProofDeed " + planLabel + " subscription is now active.",
+                "",
+                "You have " + certLimit + " certifications per month. Every document you certify receives a permanent, court-admissible proof anchored to the Polygon blockchain.",
+                "",
+                "Getting started:",
+                "  • Certify a document: https://proofdeed.com/upload",
+                "  • View your dashboard: https://proofdeed.com/dashboard",
+                "  • Verify any certificate: https://proofdeed.com/verify",
+                "",
+                "Your document is hashed entirely in your browser — we never see or store your files.",
+                "",
+                "Questions? Reply to this email or contact us at info@proofdeed.com.",
+                "",
+                "ProofDeed",
+                "https://proofdeed.com"
+              ].join("\n")
+            })
+          }).catch(err => console.error("Welcome email failed:", err.message));
+        }
+      }
+
     } catch (dbErr) {
       console.error("Webhook DB error:", dbErr.message);
     }
@@ -1430,6 +1557,38 @@ app.post(["/stripe-webhook", "/api/stripe-webhook"], express.raw({ type: "applic
           [email]
         );
         console.log("API key deactivated on subscription cancellation for:", email);
+
+        // Win-back email
+        const mailgunDomain = process.env.MAILGUN_DOMAIN;
+        const mailgunApiKey = process.env.MAILGUN_API_KEY;
+        if (mailgunDomain && mailgunApiKey) {
+          fetch("https://api.mailgun.net/v3/" + mailgunDomain + "/messages", {
+            method: "POST",
+            headers: {
+              "Authorization": "Basic " + Buffer.from("api:" + mailgunApiKey).toString("base64"),
+              "Content-Type": "application/x-www-form-urlencoded"
+            },
+            body: new URLSearchParams({
+              from: process.env.MAIL_FROM || "ProofDeed <info@proofdeed.com>",
+              to: email,
+              subject: "Your ProofDeed subscription has been cancelled",
+              text: [
+                "Your ProofDeed subscription has been cancelled and your access has ended.",
+                "",
+                "Every certificate you created remains permanently on the Polygon blockchain — your proofs are yours forever, regardless of your subscription status.",
+                "",
+                "If you cancelled by mistake or would like to resubscribe:",
+                "  https://proofdeed.com/#pricing",
+                "",
+                "If there was something we could have done better, we'd genuinely like to know.",
+                "Reply to this email — we read every response.",
+                "",
+                "ProofDeed",
+                "https://proofdeed.com"
+              ].join("\n")
+            })
+          }).catch(err => console.error("Win-back email failed:", err.message));
+        }
       }
     } catch (dbErr) {
       console.error("Subscription cancellation DB update failed:", dbErr.message);
