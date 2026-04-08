@@ -1183,7 +1183,7 @@ app.post(["/create-checkout-session", "/api/create-checkout-session"], async (re
 
     const session = await stripe.checkout.sessions.create({
       mode: isOneTime ? "payment" : "subscription",
-      payment_method_types: ["card"],
+      payment_method_types: isOneTime ? ["card", "us_bank_account"] : ["card"],
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: success_url || "https://proofdeed.com/success",
       cancel_url: cancel_url || "https://proofdeed.com",
