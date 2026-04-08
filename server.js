@@ -1143,6 +1143,34 @@ app.post(["/contact", "/api/contact"], async (req, res) => {
       }
     }
 
+    // Notify admin of every contact/inquiry submission
+    if (mailgunDomain && mailgunApiKey && !proofId) {
+      fetch("https://api.mailgun.net/v3/" + mailgunDomain + "/messages", {
+        method: "POST",
+        headers: {
+          "Authorization": "Basic " + Buffer.from("api:" + mailgunApiKey).toString("base64"),
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: new URLSearchParams({
+          from: process.env.MAIL_FROM || "ProofDeed <noreply@" + mailgunDomain + ">",
+          to: "info@proofdeed.com",
+          subject: "New " + (request_type || "contact") + " submission — " + name + " (" + (resolvedCompany || "no company") + ")",
+          text: [
+            "New submission on ProofDeed.",
+            "",
+            "Name: " + name,
+            "Email: " + email,
+            "Organization: " + (resolvedCompany || "N/A"),
+            "Phone: " + (phone || "N/A"),
+            "Type: " + (request_type || "contact"),
+            "Message: " + (resolvedNotes || "N/A"),
+            "",
+            "Reply directly to: " + email
+          ].join("\n")
+        })
+      }).catch(err => console.error("Admin notification email failed:", err.message));
+    }
+
     console.log("New " + (request_type || "contact") + " submission from: " + email);
     res.json({ success: true });
 
