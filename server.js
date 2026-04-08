@@ -1438,10 +1438,11 @@ app.post(["/stripe-webhook", "/api/stripe-webhook"], express.raw({ type: "applic
         const email = pending.rows[0].email;
         const pilotKey = "pd_gov_" + require("crypto").randomBytes(24).toString("hex");
 
+        const pilotExpiresAt = new Date(Date.now() + 45 * 24 * 60 * 60 * 1000);
         await pool.query(
-          `UPDATE api_keys SET api_key = $1, plan = 'government-pilot', monthly_limit = 50000, active = TRUE
+          `UPDATE api_keys SET api_key = $1, plan = 'government-pilot', monthly_limit = 50000, active = TRUE, pilot_expires_at = $3
            WHERE email = $2 AND plan = 'government-pilot-pending'`,
-          [pilotKey, email]
+          [pilotKey, email, pilotExpiresAt]
         );
         console.log("Government pilot ACH cleared — API key activated for:", email);
 
@@ -1677,6 +1678,7 @@ async function ensureIndexes() {
       ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS notified_80 BOOLEAN DEFAULT FALSE;
       ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS notified_100 BOOLEAN DEFAULT FALSE;
       ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS organization_name TEXT;
+      ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS pilot_expires_at TIMESTAMPTZ;
       ALTER TABLE certifications ADD COLUMN IF NOT EXISTS api_key_email TEXT;
       ALTER TABLE certifications ADD COLUMN IF NOT EXISTS ip_address TEXT;
       CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
@@ -1715,6 +1717,55 @@ cron.schedule("0 3 * * *", async () => {
     console.log("Magic link cleanup: removed", result.rowCount, "expired tokens.");
   } catch (err) {
     console.error("Magic link cleanup error:", err.message);
+  }
+});
+
+/* ---------------- GOVERNMENT PILOT EXPIRY ---------------- */
+// Runs daily at 04:00 UTC — deactivates expired pilots and emails them
+cron.schedule("0 4 * * *", async () => {
+  try {
+    const expired = await pool.query(
+      `UPDATE api_keys SET active = FALSE
+       WHERE plan = 'government-pilot' AND active = TRUE AND pilot_expires_at < NOW()
+       RETURNING email`
+    );
+    for (const row of expired.rows) {
+      const mailgunDomain = process.env.MAILGUN_DOMAIN;
+      const mailgunApiKey = process.env.MAILGUN_API_KEY;
+      if (mailgunDomain && mailgunApiKey) {
+        fetch("https://api.mailgun.net/v3/" + mailgunDomain + "/messages", {
+          method: "POST",
+          headers: {
+            "Authorization": "Basic " + Buffer.from("api:" + mailgunApiKey).toString("base64"),
+            "Content-Type": "application/x-www-form-urlencoded"
+          },
+          body: new URLSearchParams({
+            from: process.env.MAIL_FROM || "ProofDeed <mailgun@" + mailgunDomain + ">",
+            to: row.email,
+            subject: "ProofDeed Government Pilot — Your 45-Day Pilot Has Ended",
+            text: [
+              "Your ProofDeed Government Pilot Program has now concluded.",
+              "",
+              "All records certified during your pilot remain permanently on the Polygon blockchain — fully verifiable forever.",
+              "",
+              "To continue using ProofDeed, please contact us to discuss volume pricing for your agency:",
+              "",
+              "  Email: info@proofdeed.com",
+              "  Enterprise pricing starts at $0.76/certification, dropping to $0.15 at scale.",
+              "",
+              "We would love to continue supporting your agency's record integrity needs.",
+              "",
+              "ProofDeed",
+              "https://proofdeed.com"
+            ].join("\n")
+          })
+        }).catch(err => console.error("Pilot expiry email failed:", err.message));
+      }
+      console.log("Government pilot expired and deactivated:", row.email);
+    }
+    if (expired.rowCount > 0) console.log("Pilot expiry job: deactivated", expired.rowCount, "pilots.");
+  } catch (err) {
+    console.error("Pilot expiry job error:", err.message);
   }
 });
 
