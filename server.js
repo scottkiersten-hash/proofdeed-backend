@@ -124,7 +124,7 @@ app.use((req, res, next) => {
   if (req.originalUrl === '/api/stripe-webhook' || req.originalUrl === '/stripe-webhook') {
     next();
   } else {
-    express.json({ limit: "5mb" })(req, res, next);
+    express.json({ limit: "50mb" })(req, res, next);
   }
 });
 
@@ -718,7 +718,7 @@ app.post("/api/v1/batch", authenticateApiKey, async (req, res) => {
     if (!Array.isArray(documents) || documents.length === 0) {
       return res.status(400).json({ error: "documents array required." });
     }
-    const batchLimit = req.apiKey.plan === 'enterprise' ? 100000 : 1000;
+    const batchLimit = req.apiKey.plan === 'enterprise' ? 500000 : 1000;
     if (documents.length > batchLimit) {
       return res.status(400).json({ error: `Maximum ${batchLimit.toLocaleString()} documents per batch.` });
     }
