@@ -605,28 +605,68 @@ app.post("/api/v1/certify", authenticateApiKey, async (req, res) => {
 
 async function processBatchBackground(batchId, certRecords, apiKey) {
   let processed = 0, failed = 0;
-  for (const cert of certRecords) {
-    try {
-      const txHash = await anchorToPolygon(cert.documentHash);
+
+  try {
+    // Build Merkle tree from all document hashes — one Polygon tx covers entire batch
+    const { MerkleTree } = await import("merkletreejs");
+    const { default: keccak256 } = await import("keccak256");
+
+    const leaves = certRecords.map(c => keccak256(c.documentHash));
+    const tree = new MerkleTree(leaves, keccak256, { sortPairs: true });
+    const merkleRoot = tree.getRoot().toString("hex");
+
+    // Single blockchain transaction for the entire batch
+    const txHash = await anchorToPolygon(merkleRoot);
+
+    // Update every cert with shared tx + individual Merkle proof
+    for (const cert of certRecords) {
+      try {
+        const leaf = keccak256(cert.documentHash);
+        const proof = tree.getProof(leaf).map(p => ({
+          data: p.data.toString("hex"),
+          position: p.position
+        }));
+        await pool.query(
+          `UPDATE certifications SET polygon_tx = $1, merkle_root = $2, merkle_proof = $3 WHERE certification_id = $4`,
+          [txHash, merkleRoot, JSON.stringify(proof), cert.proofId]
+        );
+        processed++;
+      } catch (err) {
+        console.error("Merkle proof update failed for", cert.proofId, err.message);
+        failed++;
+      }
+    }
+
+    await pool.query(
+      `UPDATE batches SET status = 'completed', processed = $1, failed = $2, merkle_root = $3, polygon_tx = $4 WHERE batch_id = $5`,
+      [processed, failed, merkleRoot, txHash, batchId]
+    );
+
+  } catch (err) {
+    console.error("Batch Merkle anchor failed:", err.message);
+    // Fall back to individual anchoring if Merkle fails
+    for (const cert of certRecords) {
+      try {
+        const txHash = await anchorToPolygon(cert.documentHash);
+        await pool.query(
+          `UPDATE certifications SET polygon_tx = $1 WHERE certification_id = $2`,
+          [txHash, cert.proofId]
+        );
+        processed++;
+      } catch (e) {
+        console.error("Fallback anchor failed for", cert.proofId, e.message);
+        failed++;
+      }
       await pool.query(
-        `UPDATE certifications SET polygon_tx = $1 WHERE certification_id = $2`,
-        [txHash, cert.proofId]
+        `UPDATE batches SET processed = $1, failed = $2 WHERE batch_id = $3`,
+        [processed, failed, batchId]
       );
-      processed++;
-    } catch (err) {
-      console.error("Batch anchor failed for", cert.proofId, err.message);
-      failed++;
     }
     await pool.query(
-      `UPDATE batches SET processed = $1, failed = $2 WHERE batch_id = $3`,
+      `UPDATE batches SET status = 'completed', processed = $1, failed = $2 WHERE batch_id = $3`,
       [processed, failed, batchId]
     );
   }
-
-  await pool.query(
-    `UPDATE batches SET status = 'completed', processed = $1, failed = $2 WHERE batch_id = $3`,
-    [processed, failed, batchId]
-  );
 
   if (apiKey.stripe_subscription_item_id && processed > 0) {
     await reportUsageToStripe(apiKey.stripe_subscription_item_id, processed);
@@ -635,7 +675,7 @@ async function processBatchBackground(batchId, certRecords, apiKey) {
   // Fire client webhook if configured
   if (apiKey.webhook_url) {
     const batchResult = await pool.query(
-      `SELECT certification_id, hash, polygon_tx, label, created_at FROM certifications WHERE batch_id = $1`,
+      `SELECT certification_id, hash, polygon_tx, label, merkle_root, merkle_proof, created_at FROM certifications WHERE batch_id = $1`,
       [batchId]
     );
     try {
@@ -653,6 +693,8 @@ async function processBatchBackground(batchId, certRecords, apiKey) {
             documentHash: r.hash,
             label: r.label,
             polygon_tx: r.polygon_tx,
+            merkleRoot: r.merkle_root || null,
+            merkleProof: r.merkle_proof || null,
             timestamp: r.created_at,
             verifyUrl: `https://proofdeed.com/verify/${r.certification_id}`
           }))
@@ -673,8 +715,9 @@ app.post("/api/v1/batch", authenticateApiKey, async (req, res) => {
     if (!Array.isArray(documents) || documents.length === 0) {
       return res.status(400).json({ error: "documents array required." });
     }
-    if (documents.length > 1000) {
-      return res.status(400).json({ error: "Maximum 1,000 documents per batch." });
+    const batchLimit = req.apiKey.plan === 'enterprise' ? 100000 : 1000;
+    if (documents.length > batchLimit) {
+      return res.status(400).json({ error: `Maximum ${batchLimit.toLocaleString()} documents per batch.` });
     }
 
     const remaining = req.apiKey.monthly_limit - req.apiKey.used_this_month;
@@ -766,7 +809,7 @@ app.get("/api/v1/batch/:batchId", authenticateApiKey, async (req, res) => {
     }
     const b = batch.rows[0];
     const certs = await pool.query(
-      `SELECT certification_id, hash, polygon_tx, label, created_at FROM certifications WHERE batch_id = $1`,
+      `SELECT certification_id, hash, polygon_tx, label, merkle_root, merkle_proof, created_at FROM certifications WHERE batch_id = $1`,
       [batchId]
     );
     res.json({
@@ -775,6 +818,8 @@ app.get("/api/v1/batch/:batchId", authenticateApiKey, async (req, res) => {
       total: b.total,
       processed: b.processed,
       failed: b.failed,
+      merkleRoot: b.merkle_root || null,
+      polygonTx: b.polygon_tx || null,
       webhookNotified: b.webhook_notified,
       createdAt: b.created_at,
       results: certs.rows.map(r => ({
@@ -782,6 +827,8 @@ app.get("/api/v1/batch/:batchId", authenticateApiKey, async (req, res) => {
         documentHash: r.hash,
         label: r.label,
         polygon_tx: r.polygon_tx,
+        merkleRoot: r.merkle_root || null,
+        merkleProof: r.merkle_proof || null,
         anchored: !!r.polygon_tx,
         timestamp: r.created_at,
         verifyUrl: `https://proofdeed.com/verify/${r.certification_id}`
@@ -1933,6 +1980,10 @@ async function ensureIndexes() {
       );
       ALTER TABLE certifications ADD COLUMN IF NOT EXISTS batch_id TEXT;
       ALTER TABLE certifications ADD COLUMN IF NOT EXISTS label TEXT;
+      ALTER TABLE certifications ADD COLUMN IF NOT EXISTS merkle_root TEXT;
+      ALTER TABLE certifications ADD COLUMN IF NOT EXISTS merkle_proof JSONB;
+      ALTER TABLE batches ADD COLUMN IF NOT EXISTS merkle_root TEXT;
+      ALTER TABLE batches ADD COLUMN IF NOT EXISTS polygon_tx TEXT;
       CREATE TABLE IF NOT EXISTS compliance_tokens (
         id SERIAL PRIMARY KEY,
         token TEXT UNIQUE NOT NULL,
