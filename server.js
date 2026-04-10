@@ -453,7 +453,7 @@ app.post("/api/enterprise/generate-key", async (req, res) => {
       return res.status(401).json({ error: "Unauthorized." });
     }
 
-    const { email, monthly_limit } = req.body;
+    const { email, monthly_limit, custom_price_per_cert, organization_name, contract_notes } = req.body;
     if (!email) return res.status(400).json({ error: "Email required." });
 
     const apiKey = "pd_live_" + crypto.randomBytes(32).toString("hex");
@@ -493,10 +493,10 @@ app.post("/api/enterprise/generate-key", async (req, res) => {
 
     // Save API key and user
     await pool.query(
-      `INSERT INTO api_keys (email, api_key, plan, monthly_limit, used_this_month, stripe_subscription_item_id, active, created_at)
-       VALUES ($1, $2, 'enterprise', $3, 0, $4, TRUE, NOW())
-       ON CONFLICT (email) DO UPDATE SET api_key = $2, monthly_limit = $3, stripe_subscription_item_id = $4, active = TRUE`,
-      [email, apiKey, monthly_limit || 1000, stripeSubscriptionItemId]
+      `INSERT INTO api_keys (email, api_key, plan, monthly_limit, used_this_month, stripe_subscription_item_id, organization_name, custom_price_per_cert, contract_notes, active, created_at)
+       VALUES ($1, $2, 'enterprise', $3, 0, $4, $5, $6, $7, TRUE, NOW())
+       ON CONFLICT (email) DO UPDATE SET api_key = $2, monthly_limit = $3, stripe_subscription_item_id = $4, organization_name = $5, custom_price_per_cert = $6, contract_notes = $7, active = TRUE`,
+      [email, apiKey, monthly_limit || 1000, stripeSubscriptionItemId, organization_name || null, custom_price_per_cert || null, contract_notes || null]
     );
 
     await pool.query(
@@ -530,7 +530,10 @@ app.post("/api/enterprise/generate-key", async (req, res) => {
       success: true,
       apiKey,
       email,
+      organization_name: organization_name || null,
       monthly_limit: monthly_limit || 1000,
+      custom_price_per_cert: custom_price_per_cert || null,
+      contract_notes: contract_notes || null,
       stripe_customer_id: stripeCustomerId,
       stripe_subscription_id: stripeSubscriptionId
     });
@@ -1984,6 +1987,8 @@ async function ensureIndexes() {
       ALTER TABLE certifications ADD COLUMN IF NOT EXISTS merkle_proof JSONB;
       ALTER TABLE batches ADD COLUMN IF NOT EXISTS merkle_root TEXT;
       ALTER TABLE batches ADD COLUMN IF NOT EXISTS polygon_tx TEXT;
+      ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS custom_price_per_cert NUMERIC(10,4);
+      ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS contract_notes TEXT;
       CREATE TABLE IF NOT EXISTS compliance_tokens (
         id SERIAL PRIMARY KEY,
         token TEXT UNIQUE NOT NULL,
