@@ -2568,6 +2568,109 @@ app.put(['/api/admin/outreach/contacts/:id', '/admin/outreach/contacts/:id'], au
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+/* ---------------- Outreach Autopilot (daily 8am UTC) ---------------- */
+async function sendOutreachFollowUp(contact, day) {
+  if (!process.env.RESEND_API_KEY) return;
+  const { Resend } = await import('resend');
+  const resend = new Resend(process.env.RESEND_API_KEY);
+  const first = contact.name.split(' ')[0];
+
+  let text, subject;
+  if (day === 7) {
+    text = `Hi ${first},
+
+Following up on my note from last week about blockchain document certification for ${contact.company}.
+
+Document fraud and post-transaction disputes are rising across every industry that handles high-value records — and organizations that have anchored their document workflows to blockchain certification are in the strongest position to protect themselves and satisfy court admissibility requirements under FRE Rule 901.
+
+ProofDeed requires no system replacement, integrates via a single lightweight API call, and can go live within days of a decision.
+
+See it live in 2 minutes: proofdeed.com/demo
+
+Would you have 20 minutes this week for a quick walkthrough?
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`;
+    subject = `Re: Blockchain Document Certification for ${contact.company}`;
+  } else {
+    text = `Hi ${first},
+
+I've reached out a couple of times about blockchain document certification for ${contact.company} and haven't heard back — so I'll assume the timing isn't right and close out my follow-ups.
+
+If that changes, I'm happy to reconnect. ProofDeed certifies documents on the Polygon blockchain with court-admissible proof under FRE Rule 901 — no system replacement, live in days.
+
+One last ask: if there's someone else at ${contact.company} better suited for this conversation, I'd appreciate a quick introduction.
+
+Either way, appreciate your time and wish you well.
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`;
+    subject = `Re: Blockchain Document Certification for ${contact.company}`;
+  }
+
+  const replyTag = crypto.randomBytes(8).toString('hex');
+  await resend.emails.send({
+    from: 'Scott Kiersten <gov@send.proofdeed.com>',
+    reply_to: `reply+${replyTag}@send.proofdeed.com`,
+    to: contact.email,
+    subject,
+    text,
+  });
+
+  await pool.query(
+    `UPDATE outreach_contacts SET status='sent', last_contact_at=NOW(), reply_to_tag=$1 WHERE id=$2`,
+    [replyTag, contact.id]
+  );
+  await pool.query(
+    `INSERT INTO outreach_events (contact_id, event_type, event_source, metadata, occurred_at)
+     VALUES ($1, $2, 'autopilot', $3, NOW())`,
+    [contact.id, day === 7 ? 'follow_up_1' : 'breakup', JSON.stringify({ subject, day })]
+  );
+}
+
+cron.schedule('0 8 * * *', async () => {
+  console.log('[Autopilot] Running daily follow-up check...');
+  try {
+    // Day 7: no reply, first_sent_at between 7-8 days ago
+    const day7 = await pool.query(`
+      SELECT * FROM outreach_contacts
+      WHERE status NOT IN ('replied','in_talks','closed_won','closed_lost','bounced','complained','unsubscribed')
+      AND first_sent_at <= NOW() - INTERVAL '7 days'
+      AND first_sent_at > NOW() - INTERVAL '8 days'
+    `);
+    for (const c of day7.rows) {
+      try { await sendOutreachFollowUp(c, 7); console.log(`[Autopilot] Day 7 → ${c.name}`); }
+      catch (e) { console.error(`[Autopilot] Day 7 fail ${c.email}:`, e.message); }
+      await new Promise(r => setTimeout(r, 3000));
+    }
+
+    // Day 21: breakup — no reply, first_sent_at between 21-22 days ago
+    const day21 = await pool.query(`
+      SELECT * FROM outreach_contacts
+      WHERE status NOT IN ('replied','in_talks','closed_won','closed_lost','bounced','complained','unsubscribed')
+      AND first_sent_at <= NOW() - INTERVAL '21 days'
+      AND first_sent_at > NOW() - INTERVAL '22 days'
+    `);
+    for (const c of day21.rows) {
+      try {
+        await sendOutreachFollowUp(c, 21);
+        await pool.query(`UPDATE outreach_contacts SET status='closed_lost' WHERE id=$1`, [c.id]);
+        console.log(`[Autopilot] Day 21 breakup → ${c.name}`);
+      }
+      catch (e) { console.error(`[Autopilot] Day 21 fail ${c.email}:`, e.message); }
+      await new Promise(r => setTimeout(r, 3000));
+    }
+
+    console.log(`[Autopilot] Done. Day7: ${day7.rows.length}, Day21: ${day21.rows.length}`);
+  } catch (err) {
+    console.error('[Autopilot] Cron error:', err.message);
+  }
+}, { timezone: 'America/Los_Angeles' });
+
 /* ---------------- Start Server ---------------- */
 const server = app.listen(PORT, () => {
   console.log("ProofDeed backend running on port " + PORT);
