@@ -2008,6 +2008,112 @@ app.post(["/admin/api-key/org", "/api/admin/api-key/org"], authRateLimit, async 
 });
 
 // Manually set monthly limit for an API key
+/* ---------------- ADMIN: REVENUE ---------------- */
+app.get(["/admin/revenue", "/api/admin/revenue"], authRateLimit, async (req, res) => {
+  if (!verifyAdminAuth(req)) return res.status(401).json({ error: "Unauthorized." });
+  try {
+    // Pull active subscriptions from Stripe for real MRR
+    const subscriptions = await stripe.subscriptions.list({ status: 'active', limit: 100, expand: ['data.plan'] });
+    let mrr = 0;
+    const plans = {};
+    for (const sub of subscriptions.data) {
+      const amt = (sub.items.data[0]?.price?.unit_amount || 0) / 100;
+      const interval = sub.items.data[0]?.price?.recurring?.interval;
+      const monthly = interval === 'year' ? amt / 12 : amt;
+      mrr += monthly;
+      const nickname = sub.items.data[0]?.price?.nickname || sub.items.data[0]?.price?.id || 'Unknown';
+      plans[nickname] = (plans[nickname] || 0) + 1;
+    }
+
+    // Recent charges
+    const charges = await stripe.charges.list({ limit: 20 });
+    const recentPayments = charges.data.filter(c => c.paid).map(c => ({
+      amount: c.amount / 100,
+      email: c.billing_details?.email || c.receipt_email || '—',
+      date: new Date(c.created * 1000).toISOString(),
+      description: c.description || 'Payment',
+    }));
+
+    // Cert volume by day (last 30 days)
+    const certsByDay = await pool.query(`
+      SELECT DATE(created_at) as day, COUNT(*) as count
+      FROM certifications
+      WHERE created_at > NOW() - INTERVAL '30 days'
+      GROUP BY day ORDER BY day ASC
+    `);
+
+    // Demo cert count
+    const demoCerts = await pool.query(`SELECT COUNT(*) as total FROM certifications WHERE document_data LIKE '%"demo":true%'`);
+
+    res.json({
+      mrr: Math.round(mrr * 100) / 100,
+      arr: Math.round(mrr * 12 * 100) / 100,
+      activeSubscriptions: subscriptions.data.length,
+      planBreakdown: plans,
+      recentPayments,
+      certsByDay: certsByDay.rows,
+      demoCertifications: parseInt(demoCerts.rows[0].total),
+    });
+  } catch (error) {
+    console.error("Admin revenue error:", error);
+    res.status(500).json({ error: "Failed to load revenue data." });
+  }
+});
+
+/* ---------------- ADMIN: OUTREACH CRM ---------------- */
+app.get(["/admin/outreach", "/api/admin/outreach"], authRateLimit, async (req, res) => {
+  if (!verifyAdminAuth(req)) return res.status(401).json({ error: "Unauthorized." });
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS outreach_contacts (
+        id SERIAL PRIMARY KEY, name TEXT NOT NULL, email TEXT, company TEXT,
+        title TEXT, industry TEXT, county TEXT, state TEXT,
+        status TEXT DEFAULT 'sent', notes TEXT,
+        first_sent_at TIMESTAMPTZ, last_contact_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    const result = await pool.query(`SELECT * FROM outreach_contacts ORDER BY last_contact_at DESC NULLS LAST, created_at DESC`);
+    res.json({ contacts: result.rows });
+  } catch (error) {
+    console.error("Outreach CRM error:", error);
+    res.status(500).json({ error: "Failed to load outreach contacts." });
+  }
+});
+
+app.post(["/admin/outreach/import", "/api/admin/outreach/import"], authRateLimit, async (req, res) => {
+  if (!verifyAdminAuth(req)) return res.status(401).json({ error: "Unauthorized." });
+  try {
+    const { contacts } = req.body;
+    if (!Array.isArray(contacts)) return res.status(400).json({ error: "contacts array required." });
+    let imported = 0;
+    for (const c of contacts) {
+      await pool.query(`
+        INSERT INTO outreach_contacts (name, email, company, title, industry, county, state, status, first_sent_at, last_contact_at)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,'sent', NOW(), NOW())
+        ON CONFLICT DO NOTHING
+      `, [c.name||'', c.email||'', c.company||'', c.title||'', c.industry||'government', c.county||'', c.state||'']);
+      imported++;
+    }
+    res.json({ success: true, imported });
+  } catch (error) {
+    res.status(500).json({ error: "Import failed." });
+  }
+});
+
+app.post(["/admin/outreach/update", "/api/admin/outreach/update"], authRateLimit, async (req, res) => {
+  if (!verifyAdminAuth(req)) return res.status(401).json({ error: "Unauthorized." });
+  try {
+    const { id, status, notes } = req.body;
+    await pool.query(`
+      UPDATE outreach_contacts SET status=$1, notes=$2, last_contact_at=NOW() WHERE id=$3
+    `, [status, notes, id]);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: "Update failed." });
+  }
+});
+
 app.post(["/admin/api-key/limit", "/api/admin/api-key/limit"], authRateLimit, async (req, res) => {
   if (!verifyAdminAuth(req)) return res.status(401).json({ error: "Unauthorized." });
   const { email, monthly_limit } = req.body;

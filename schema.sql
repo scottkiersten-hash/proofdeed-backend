@@ -60,6 +60,23 @@ CREATE TABLE IF NOT EXISTS contact_submissions (
   created_at    TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Outreach CRM
+CREATE TABLE IF NOT EXISTS outreach_contacts (
+  id            SERIAL PRIMARY KEY,
+  name          TEXT NOT NULL,
+  email         TEXT,
+  company       TEXT,
+  title         TEXT,
+  industry      TEXT,        -- 'government' | 'auto' | 'institutional'
+  county        TEXT,
+  state         TEXT,
+  status        TEXT DEFAULT 'sent',  -- 'sent' | 'replied' | 'in_talks' | 'closed_won' | 'closed_lost' | 'unsubscribed'
+  notes         TEXT,
+  first_sent_at TIMESTAMPTZ,
+  last_contact_at TIMESTAMPTZ,
+  created_at    TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_users_email              ON users(email);
 CREATE INDEX IF NOT EXISTS idx_certifications_hash      ON certifications(hash);
