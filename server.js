@@ -2642,23 +2642,20 @@ async function runLeadEngine() {
     const response = await anthropic.messages.create({
       model: 'claude-opus-4-6',
       max_tokens: 2000,
-      tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 4 }],
+      tools: [{ type: 'web_search_20250305', name: 'web_search' }],
       messages: [{
         role: 'user',
-        content: `Find 6 real ${target.title} executives at ${target.industry.replace(/_/g,' ')} organizations in the USA.
-Use web search to find real people — check company websites, LinkedIn public pages, press releases, conference speaker lists, and news articles.
-For each person return their full name, exact title, company name, and most likely work email (guess firstname.lastname@companydomain.com if not publicly listed — check the company website for their email format first).
-Only include people who are clearly real and currently in this role.
-Return ONLY a JSON array, no other text:
-[{"name":"Full Name","title":"Exact Title","company":"Company Name","email":"email@company.com","industry":"${target.industry}","source":"url where found"}]`
+        content: `Search the web and find 6 real ${target.title} executives at ${target.industry.replace(/_/g,' ')} organizations in the USA. Check company websites, press releases, conference speaker lists, and news articles to find real people currently in this role. For each person, find their full name, exact title, company name, and most likely work email address (check the company website for email format, otherwise guess firstname.lastname@companydomain.com). Return ONLY a valid JSON array with no other text before or after it, like this: [{"name":"Full Name","title":"Exact Title","company":"Company Name","email":"email@company.com","industry":"${target.industry}","source":"url"}]`
       }]
     });
 
     // Extract JSON from response
     const text = response.content.filter((b) => b.type === 'text').map((b) => b.text).join('');
+    console.log('[LeadEngine] Response preview:', text.substring(0, 300));
     const match = text.match(/\[[\s\S]*\]/);
-    if (!match) { console.log('[LeadEngine] No JSON found in response'); return; }
+    if (!match) { console.log('[LeadEngine] No JSON found in response — full text:', text.substring(0, 500)); return; }
     const leads = JSON.parse(match[0]);
+    console.log(`[LeadEngine] Found ${leads.length} leads from Claude`);
 
     const { Resend } = await import('resend');
     const resend = new Resend(process.env.RESEND_API_KEY);
