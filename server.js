@@ -1175,6 +1175,21 @@ app.get(["/verify/:certId", "/api/verify/:certId"], async (req, res) => {
       return res.status(400).json({ success: false, error: "Certificate ID required." });
     }
 
+    // Demo certificate — always returns a live-looking result for the /demo page
+    if (certId === 'PD-1774689084') {
+      return res.json({
+        success: true,
+        certification: {
+          certification_id: 'PD-1774689084',
+          hash: 'a3f8d2c1e9b047563f2a1d8e4c7b09f23a1e5d7c8b2f4609e3a7d1c5b8f2e4a9',
+          polygon_tx: '0x29bfe7c1d3a8f042e91bc7354d2a80f5e6c1d398',
+          created_at: '2026-04-09T10:42:18.000Z',
+          document_data: { fileName: 'Executed_Purchase_Agreement_v3.pdf' },
+          is_demo: true
+        }
+      });
+    }
+
     const result = await pool.query(
       `SELECT certification_id, hash, polygon_tx, created_at, document_data
        FROM certifications WHERE certification_id = $1`,
