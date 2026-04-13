@@ -2198,6 +2198,12 @@ async function ensureIndexes() {
         created_at      TIMESTAMPTZ DEFAULT NOW()
       );
 
+      CREATE TABLE IF NOT EXISTS lead_engine_state (
+        key        TEXT PRIMARY KEY,
+        value      TEXT,
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
       CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
       CREATE INDEX IF NOT EXISTS idx_certifications_hash ON certifications(hash);
       CREATE INDEX IF NOT EXISTS idx_certifications_user_id ON certifications(user_id);
@@ -2566,6 +2572,186 @@ app.put(['/api/admin/outreach/contacts/:id', '/admin/outreach/contacts/:id'], au
     `, [status, notes, req.params.id]);
     res.json({ success: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+/* ---------------- Lead Engine ---------------- */
+const LEAD_TARGETS = [
+  { industry: 'government',       title: 'County Recorder',          query: 'County Recorder "contact" OR "email" site:*.gov USA 2024 2025' },
+  { industry: 'government',       title: 'Register of Deeds',        query: '"Register of Deeds" contact email county USA' },
+  { industry: 'title_insurance',  title: 'Chief Risk Officer',       query: '"Chief Risk Officer" "title insurance" OR "title company" USA email' },
+  { industry: 'title_insurance',  title: 'Chief Technology Officer', query: 'CTO "title insurance" company USA executive contact' },
+  { industry: 'title_insurance',  title: 'Chief Compliance Officer', query: '"Chief Compliance Officer" "title insurance" USA contact' },
+  { industry: 'mortgage',         title: 'Chief Digital Officer',    query: '"Chief Digital Officer" mortgage lender USA contact email' },
+  { industry: 'mortgage',         title: 'Chief Risk Officer',       query: '"Chief Risk Officer" mortgage company USA executive' },
+  { industry: 'auto',             title: 'Chief Technology Officer', query: 'CTO "auto auction" OR "vehicle history" OR "remarketing" USA executive' },
+  { industry: 'insurance',        title: 'Chief Digital Officer',    query: '"Chief Digital Officer" insurance company USA "document" OR "fraud"' },
+  { industry: 'banking',          title: 'Chief Digital Officer',    query: '"Chief Digital Officer" bank "document management" OR "fraud prevention" USA' },
+  { industry: 'real_estate',      title: 'Chief Technology Officer', query: 'CTO "real estate" proptech USA "document" OR "fraud" OR "blockchain"' },
+  { industry: 'legal',            title: 'Chief Technology Officer', query: 'CTO "law firm" OR "legal services" USA document management technology' },
+];
+
+const INITIAL_EMAIL = (name, company, industry) => {
+  const first = name.split(' ')[0];
+  const angles = {
+    government: `county recorders and clerks across the country`,
+    title_insurance: `title companies dealing with post-closing disputes`,
+    mortgage: `mortgage lenders managing high-value document workflows`,
+    auto: `auto industry leaders tracking vehicle history and title records`,
+    insurance: `insurance companies managing policy and claims documentation`,
+    banking: `banks protecting high-value transaction records`,
+    real_estate: `real estate organizations securing property transaction records`,
+    legal: `law firms managing court-admissible document chains of custody`,
+  };
+  const angle = angles[industry] || `organizations managing critical document workflows`;
+  return `Hi ${first},
+
+I'm reaching out because ProofDeed is helping ${angle} protect themselves against document fraud and satisfy court admissibility requirements under FRE Rule 901.
+
+In short: we anchor documents to the Polygon blockchain at the moment they're certified — creating a tamper-proof, timestamped record that holds up in court. No system replacement required. Single API call. Live in days.
+
+The liability exposure from a single disputed or fraudulent document typically dwarfs the entire cost of implementation — which is why this is usually a straightforward decision once legal and compliance teams see how it works.
+
+See it live in 2 minutes: proofdeed.com/demo
+
+Would you have 20 minutes this week for a quick walkthrough?
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`;
+};
+
+async function runLeadEngine() {
+  if (!process.env.ANTHROPIC_API_KEY || !process.env.RESEND_API_KEY) {
+    console.log('[LeadEngine] Missing API keys — skipping.');
+    return;
+  }
+
+  // Get current rotation index
+  const idxRow = await pool.query(`SELECT value FROM lead_engine_state WHERE key='rotation_index'`).catch(() => ({ rows: [] }));
+  const currentIdx = idxRow.rows[0] ? parseInt(idxRow.rows[0].value) : 0;
+  const target = LEAD_TARGETS[currentIdx % LEAD_TARGETS.length];
+  const nextIdx = (currentIdx + 1) % LEAD_TARGETS.length;
+
+  console.log(`[LeadEngine] Running — ${target.title} / ${target.industry}`);
+
+  try {
+    const Anthropic = (await import('@anthropic-ai/sdk')).default;
+    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+    const response = await anthropic.messages.create({
+      model: 'claude-opus-4-6',
+      max_tokens: 2000,
+      tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 4 }],
+      messages: [{
+        role: 'user',
+        content: `Find 6 real ${target.title} executives at ${target.industry.replace(/_/g,' ')} organizations in the USA.
+Use web search to find real people — check company websites, LinkedIn public pages, press releases, conference speaker lists, and news articles.
+For each person return their full name, exact title, company name, and most likely work email (guess firstname.lastname@companydomain.com if not publicly listed — check the company website for their email format first).
+Only include people who are clearly real and currently in this role.
+Return ONLY a JSON array, no other text:
+[{"name":"Full Name","title":"Exact Title","company":"Company Name","email":"email@company.com","industry":"${target.industry}","source":"url where found"}]`
+      }]
+    });
+
+    // Extract JSON from response
+    const text = response.content.filter((b) => b.type === 'text').map((b) => b.text).join('');
+    const match = text.match(/\[[\s\S]*\]/);
+    if (!match) { console.log('[LeadEngine] No JSON found in response'); return; }
+    const leads = JSON.parse(match[0]);
+
+    const { Resend } = await import('resend');
+    const resend = new Resend(process.env.RESEND_API_KEY);
+
+    let sent = 0, skipped = 0;
+    for (const lead of leads) {
+      if (!lead.email || !lead.name || !lead.company) { skipped++; continue; }
+      // Deduplicate
+      const exists = await pool.query('SELECT id FROM outreach_contacts WHERE email=$1', [lead.email.toLowerCase()]);
+      if (exists.rows.length > 0) { skipped++; continue; }
+
+      const replyTag = crypto.randomBytes(8).toString('hex');
+      const emailBody = INITIAL_EMAIL(lead.name, lead.company, lead.industry || target.industry);
+      const subject = `Blockchain Document Certification for ${lead.company}`;
+
+      try {
+        const result = await resend.emails.send({
+          from: 'Scott Kiersten <gov@send.proofdeed.com>',
+          reply_to: `reply+${replyTag}@send.proofdeed.com`,
+          to: lead.email,
+          subject,
+          text: emailBody,
+        });
+
+        await pool.query(
+          `INSERT INTO outreach_contacts (name, email, company, title, industry, status, reply_to_tag, resend_message_id, first_sent_at, last_contact_at)
+           VALUES ($1,$2,$3,$4,$5,'sent',$6,$7,NOW(),NOW())`,
+          [lead.name, lead.email.toLowerCase(), lead.company, lead.title, lead.industry || target.industry, replyTag, result.data?.id || null]
+        );
+        await pool.query(
+          `INSERT INTO outreach_events (contact_id, event_type, event_source, metadata, occurred_at)
+           SELECT id, 'sent', 'lead_engine', $1, NOW() FROM outreach_contacts WHERE email=$2`,
+          [JSON.stringify({ subject, source: lead.source }), lead.email.toLowerCase()]
+        );
+
+        sent++;
+        console.log(`[LeadEngine] Sent → ${lead.name} (${lead.company})`);
+        await new Promise(r => setTimeout(r, 3000));
+      } catch (e) {
+        console.error(`[LeadEngine] Send fail ${lead.email}:`, e.message);
+        skipped++;
+      }
+    }
+
+    // Update rotation index
+    await pool.query(
+      `INSERT INTO lead_engine_state (key, value, updated_at) VALUES ('rotation_index',$1,NOW())
+       ON CONFLICT (key) DO UPDATE SET value=$1, updated_at=NOW()`,
+      [String(nextIdx)]
+    );
+    await pool.query(
+      `INSERT INTO lead_engine_state (key, value, updated_at) VALUES ('last_run',$1,NOW())
+       ON CONFLICT (key) DO UPDATE SET value=$1, updated_at=NOW()`,
+      [new Date().toISOString()]
+    );
+    await pool.query(
+      `INSERT INTO lead_engine_state (key, value, updated_at) VALUES ('last_result',$1,NOW())
+       ON CONFLICT (key) DO UPDATE SET value=$1, updated_at=NOW()`,
+      [JSON.stringify({ target: `${target.title} / ${target.industry}`, sent, skipped, total: leads.length })]
+    );
+
+    console.log(`[LeadEngine] Done. Sent: ${sent}, Skipped: ${skipped}, Next: ${LEAD_TARGETS[nextIdx].title}/${LEAD_TARGETS[nextIdx].industry}`);
+  } catch (err) {
+    console.error('[LeadEngine] Error:', err.message);
+  }
+}
+
+// Run every Monday at 9am PT
+cron.schedule('0 9 * * 1', () => runLeadEngine(), { timezone: 'America/Los_Angeles' });
+
+/* ---------------- Lead Engine API ----------------  */
+app.get(['/api/admin/lead-engine', '/admin/lead-engine'], authRateLimit, async (req, res) => {
+  if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
+  try {
+    const rows = await pool.query('SELECT key, value, updated_at FROM lead_engine_state').catch(() => ({ rows: [] }));
+    const state = {};
+    rows.rows.forEach(r => { state[r.key] = { value: r.value, updated_at: r.updated_at }; });
+    res.json({
+      enabled: true,
+      targets: LEAD_TARGETS.map((t, i) => ({ ...t, index: i })),
+      currentIndex: parseInt(state.rotation_index?.value || '0'),
+      lastRun: state.last_run?.value || null,
+      lastResult: state.last_result?.value ? JSON.parse(state.last_result.value) : null,
+      nextTarget: LEAD_TARGETS[parseInt(state.rotation_index?.value || '0') % LEAD_TARGETS.length],
+      schedule: 'Every Monday 9am PT',
+    });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post(['/api/admin/lead-engine/run', '/admin/lead-engine/run'], authRateLimit, async (req, res) => {
+  if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
+  res.json({ success: true, message: 'Lead engine started — check CRM in ~60 seconds.' });
+  runLeadEngine(); // fire and forget
 });
 
 /* ---------------- Outreach Autopilot (daily 8am UTC) ---------------- */
