@@ -2373,7 +2373,7 @@ function statusBeats(incoming, current) {
 }
 
 // ---------- Resend OUTBOUND webhook (opened/clicked/bounced/delivered) ----------
-app.post('/api/webhooks/resend', express.raw({ type: '*/*' }), async (req, res) => {
+app.post(['/api/webhooks/resend', '/webhooks/resend'], express.raw({ type: '*/*' }), async (req, res) => {
   res.status(200).json({ received: true }); // always ack immediately
 
   try {
@@ -2443,7 +2443,7 @@ app.post('/api/webhooks/resend', express.raw({ type: '*/*' }), async (req, res) 
 });
 
 // ---------- Resend INBOUND webhook (reply detection) ----------
-app.post('/api/webhooks/resend-inbound', async (req, res) => {
+app.post(['/api/webhooks/resend-inbound', '/webhooks/resend-inbound'], async (req, res) => {
   res.status(200).json({ received: true });
   try {
     if (process.env.RESEND_INBOUND_SECRET && req.query.secret !== process.env.RESEND_INBOUND_SECRET) return;
@@ -2478,7 +2478,7 @@ app.post('/api/webhooks/resend-inbound', async (req, res) => {
 });
 
 // ---------- Admin: Outreach Stats ----------
-app.get('/api/admin/outreach/stats', authRateLimit, async (req, res) => {
+app.get(['/api/admin/outreach/stats', '/admin/outreach/stats'], authRateLimit, async (req, res) => {
   if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
   try {
     const statusCounts = await pool.query(`SELECT status, COUNT(*) as count FROM outreach_contacts GROUP BY status`);
@@ -2493,7 +2493,7 @@ app.get('/api/admin/outreach/stats', authRateLimit, async (req, res) => {
 });
 
 // ---------- Admin: Outreach Activity Feed ----------
-app.get('/api/admin/outreach/feed', authRateLimit, async (req, res) => {
+app.get(['/api/admin/outreach/feed', '/admin/outreach/feed'], authRateLimit, async (req, res) => {
   if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
   try {
     const result = await pool.query(`
@@ -2509,7 +2509,7 @@ app.get('/api/admin/outreach/feed', authRateLimit, async (req, res) => {
 });
 
 // ---------- Admin: Outreach Contacts (paginated, searchable) ----------
-app.get('/api/admin/outreach/contacts', authRateLimit, async (req, res) => {
+app.get(['/api/admin/outreach/contacts', '/admin/outreach/contacts'], authRateLimit, async (req, res) => {
   if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
   try {
     const search = req.query.search ? `%${req.query.search}%` : '%';
@@ -2544,7 +2544,7 @@ app.get('/api/admin/outreach/contacts', authRateLimit, async (req, res) => {
 });
 
 // ---------- Admin: Contact Timeline ----------
-app.get('/api/admin/outreach/contacts/:id/timeline', authRateLimit, async (req, res) => {
+app.get(['/api/admin/outreach/contacts/:id/timeline', '/admin/outreach/contacts/:id/timeline'], authRateLimit, async (req, res) => {
   if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
   try {
     const contact = await pool.query('SELECT * FROM outreach_contacts WHERE id=$1', [req.params.id]);
@@ -2557,7 +2557,7 @@ app.get('/api/admin/outreach/contacts/:id/timeline', authRateLimit, async (req, 
 });
 
 // ---------- Admin: Update Contact ----------
-app.put('/api/admin/outreach/contacts/:id', authRateLimit, async (req, res) => {
+app.put(['/api/admin/outreach/contacts/:id', '/admin/outreach/contacts/:id'], authRateLimit, async (req, res) => {
   if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
   try {
     const { status, notes } = req.body;
