@@ -2166,7 +2166,22 @@ async function ensureIndexes() {
       ALTER TABLE certifications ADD COLUMN IF NOT EXISTS api_key_email TEXT;
       ALTER TABLE certifications ADD COLUMN IF NOT EXISTS ip_address TEXT;
 
-      -- Outreach CRM: new columns on existing table
+      -- Outreach CRM table + new columns
+      CREATE TABLE IF NOT EXISTS outreach_contacts (
+        id              SERIAL PRIMARY KEY,
+        name            TEXT NOT NULL,
+        email           TEXT UNIQUE NOT NULL,
+        company         TEXT,
+        title           TEXT,
+        industry        TEXT,
+        county          TEXT,
+        state           TEXT,
+        status          TEXT DEFAULT 'pending',
+        notes           TEXT,
+        first_sent_at   TIMESTAMPTZ,
+        last_contact_at TIMESTAMPTZ,
+        created_at      TIMESTAMPTZ DEFAULT NOW()
+      );
       ALTER TABLE outreach_contacts ADD COLUMN IF NOT EXISTS reply_to_tag TEXT UNIQUE;
       ALTER TABLE outreach_contacts ADD COLUMN IF NOT EXISTS resend_message_id TEXT;
       ALTER TABLE outreach_contacts ADD COLUMN IF NOT EXISTS opened_count INTEGER DEFAULT 0;
