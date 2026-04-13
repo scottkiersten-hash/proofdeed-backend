@@ -1,0 +1,170 @@
+[
+  {
+    "name": "Teneshia Hudspeth",
+    "county": "Harris",
+    "email": "help@cco.hctx.net",
+    "subject": "Harris County's 40 Stolen Properties — Blockchain Certification as the Permanent Solution",
+    "status": "sent",
+    "timestamp": "2026-04-11T10:38:25.396Z"
+  },
+  {
+    "name": "Mike Caruso",
+    "county": "Palm Beach",
+    "email": "PropertyFraudAlerts@mypalmbeachclerk.com",
+    "subject": "Palm Beach County's Deed Theft Epidemic — Blockchain Certification as the Next Layer",
+    "status": "sent",
+    "timestamp": "2026-04-11T10:38:28.868Z"
+  },
+  {
+    "name": "Tonya Buckingham",
+    "county": "Sedgwick",
+    "email": "tonya.buckingham@sedgwick.gov",
+    "subject": "Sedgwick County's New Fraud Alert Program + Blockchain Certification — The Natural Next Step",
+    "status": "sent",
+    "timestamp": "2026-04-11T10:38:33.067Z"
+  },
+  {
+    "name": "Fredrick Smith",
+    "county": "Mecklenburg",
+    "email": "fred.smith@mecklenburgcountync.gov",
+    "subject": "Mecklenburg County Deed Fraud — Blockchain Certification Closes the Gap",
+    "status": "sent",
+    "timestamp": "2026-04-11T10:38:37.248Z"
+  },
+  {
+    "name": "Lucy Adame-Clark",
+    "county": "Bexar",
+    "email": "lucy.adame-clark@bexar.org",
+    "subject": "Bexar County Document Security — Texas SB 1734 and Blockchain Certification",
+    "status": "sent",
+    "timestamp": "2026-04-11T10:38:40.746Z"
+  },
+  {
+    "name": "Scott Crowley",
+    "county": "Hamilton",
+    "email": "recordersoffice@hamilton-co.org",
+    "subject": "Hamilton County's Fraud Response — Blockchain Certification as the Permanent Infrastructure",
+    "status": "sent",
+    "timestamp": "2026-04-11T10:38:44.188Z"
+  },
+  {
+    "name": "Debra DeBerry",
+    "county": "DeKalb",
+    "email": "cscinfo@dekalbcountyga.gov",
+    "subject": "DeKalb County's Anti-Fraud Registry + Georgia HB 1292 — Blockchain Certification Fills the Gap",
+    "status": "sent",
+    "timestamp": "2026-04-11T10:38:47.810Z"
+  },
+  {
+    "name": "Phil Diamond",
+    "county": "Orange",
+    "email": "comptroller@occompt.com",
+    "subject": "Orange County Florida's Fraud Alert Program + Blockchain Certification — The Next Layer",
+    "status": "sent",
+    "timestamp": "2026-04-11T10:38:51.293Z"
+  },
+  {
+    "name": "Kalie Work",
+    "county": "Washoe",
+    "email": "record@washoecounty.gov",
+    "subject": "Washoe County's Blockchain Program — ProofDeed as the Enterprise-Grade Next Step",
+    "status": "sent",
+    "timestamp": "2026-04-11T10:38:54.879Z"
+  },
+  {
+    "name": "Records Division",
+    "county": "Broward",
+    "email": "Records@broward.org",
+    "subject": "Broward County Florida Document Security — Florida's July 2024 Mandate and Blockchain Certification",
+    "status": "sent",
+    "timestamp": "2026-04-11T10:38:58.359Z"
+  },
+  {
+    "name": "Recording Services",
+    "county": "King",
+    "email": "kcrocust@kingcounty.gov",
+    "subject": "King County Document Security — Blockchain Certification for Seattle's Real Estate Market",
+    "status": "sent",
+    "timestamp": "2026-04-11T10:39:01.841Z"
+  },
+  {
+    "name": "Recording Division",
+    "county": "Hennepin",
+    "email": "recordinginfo@hennepin.us",
+    "subject": "Hennepin County's Property Watch Program + Blockchain Certification — The Natural Next Step",
+    "status": "sent",
+    "timestamp": "2026-04-11T10:39:05.390Z"
+  },
+  {
+    "name": "Gabriella Cazares-Kelly",
+    "county": "Pima",
+    "email": "recorder@pima.gov",
+    "subject": "Pima County Document Security — Arizona's 2025 Mandate and Blockchain Certification",
+    "status": "sent",
+    "timestamp": "2026-04-11T10:39:08.905Z"
+  },
+  {
+    "name": "Debbie Conway",
+    "county": "Clark",
+    "email": "RecRNS@ClarkCountyNV.gov",
+    "subject": "Clark County's Recording Notification Service — Blockchain Certification as the Next Layer",
+    "status": "sent",
+    "timestamp": "2026-04-11T10:39:12.490Z"
+  },
+  {
+    "name": "Justin Heap",
+    "county": "Maricopa",
+    "email": "WEBFORM",
+    "status": "skipped",
+    "reason": "web form only"
+  },
+  {
+    "name": "Mary Louise Nicholson",
+    "county": "Tarrant",
+    "email": "WEBFORM",
+    "status": "skipped",
+    "reason": "web form only"
+  },
+  {
+    "name": "Ché Alexander",
+    "county": "Fulton",
+    "email": "WEBFORM",
+    "status": "skipped",
+    "reason": "web form only"
+  },
+  {
+    "name": "Victor Crist",
+    "county": "Hillsborough",
+    "email": "WEBFORM",
+    "status": "skipped",
+    "reason": "web form only"
+  },
+  {
+    "name": "Karen Stukel",
+    "county": "Will",
+    "email": "WEBFORM",
+    "status": "skipped",
+    "reason": "web form only"
+  },
+  {
+    "name": "Jody Phillips",
+    "county": "Duval",
+    "email": "WEBFORM",
+    "status": "skipped",
+    "reason": "web form only"
+  },
+  {
+    "name": "Cuyahoga Recording",
+    "county": "Cuyahoga",
+    "email": "WEBFORM",
+    "status": "skipped",
+    "reason": "web form only"
+  },
+  {
+    "name": "Register of Deeds",
+    "county": "Beaufort",
+    "email": "WEBFORM",
+    "status": "skipped",
+    "reason": "web form only"
+  }
+]

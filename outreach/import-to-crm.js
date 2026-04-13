@@ -13,7 +13,7 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const API = 'https://api.proofdeed.com';
+const API = 'https://proofdeed.com';
 const ADMIN_SECRET = process.env.ADMIN_SECRET;
 const ADMIN_TOTP   = process.env.ADMIN_TOTP || '';
 
@@ -75,9 +75,20 @@ const res = await fetch(`${API}/api/admin/outreach/import`, {
   body: JSON.stringify({ contacts: allContacts }),
 });
 
-const data = await res.json();
+const text = await res.text();
+if (!text) {
+  console.error(`❌ Empty response (status ${res.status}) — backend may still be deploying. Wait 2 min and retry.`);
+  process.exit(1);
+}
+
+let data;
+try { data = JSON.parse(text); } catch {
+  console.error(`❌ Invalid JSON response (status ${res.status}):\n${text}`);
+  process.exit(1);
+}
+
 if (data.success) {
   console.log(`✅ Imported ${data.imported} contacts into CRM.`);
 } else {
-  console.error('❌ Import failed:', data.error);
+  console.error('❌ Import failed:', data.error || JSON.stringify(data));
 }

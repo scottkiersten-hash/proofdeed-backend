@@ -1,0 +1,162 @@
+[
+  {
+    "name": "Michael Kearns",
+    "county": "Erie",
+    "email": "michael.kearns@erie.gov",
+    "subject": "Erie County Document Security — Blockchain Certification for Buffalo's Recording Office",
+    "status": "sent",
+    "timestamp": "2026-04-12T09:12:29.715Z"
+  },
+  {
+    "name": "Vincent Puleo",
+    "county": "Suffolk",
+    "email": "vincent.puleo@suffolkcountyny.gov",
+    "subject": "Suffolk County Document Security — Blockchain Certification for New York's Second Largest County",
+    "status": "sent",
+    "timestamp": "2026-04-12T09:12:33.699Z"
+  },
+  {
+    "name": "Maureen O'Connell",
+    "county": "Nassau",
+    "email": "moconnell@nassaucountyny.gov",
+    "subject": "Nassau County Document Security — Blockchain Certification for One of the Northeast's Busiest Recording Offices",
+    "status": "sent",
+    "timestamp": "2026-04-12T09:12:38.716Z"
+  },
+  {
+    "name": "Juan Rivera Jr.",
+    "county": "Essex",
+    "email": "info@essexregister.com",
+    "subject": "Essex County Document Security — Blockchain Certification for Records Dating to 1637",
+    "status": "sent",
+    "timestamp": "2026-04-12T09:12:42.607Z"
+  },
+  {
+    "name": "John Hogan",
+    "county": "Bergen",
+    "email": "countyclerk@bergencountynj.gov",
+    "subject": "Bergen County Document Security — Blockchain Certification for New Jersey's Most Populous County",
+    "status": "sent",
+    "timestamp": "2026-04-12T09:12:47.523Z"
+  },
+  {
+    "name": "Veronica Dwyer",
+    "county": "Monmouth",
+    "email": "veronica.dwyer@co.monmouth.nj.us",
+    "subject": "Monmouth County Document Security — Blockchain Certification for a Fast-Growing Coastal County",
+    "status": "sent",
+    "timestamp": "2026-04-12T09:12:51.415Z"
+  },
+  {
+    "name": "Kristi Chlebowski",
+    "county": "Dane",
+    "email": "chlebowski@danecounty.gov",
+    "subject": "Dane County Document Security — Blockchain Certification for Madison's Tech-Forward Government",
+    "status": "sent",
+    "timestamp": "2026-04-12T09:12:55.612Z"
+  },
+  {
+    "name": "Israel Ramon",
+    "county": "Milwaukee",
+    "email": "israel.ramon@milwaukeecountywi.gov",
+    "subject": "Milwaukee County Document Security — Blockchain Certification for Wisconsin's Largest County",
+    "status": "sent",
+    "timestamp": "2026-04-12T09:12:59.456Z"
+  },
+  {
+    "name": "Julie Haggerty",
+    "county": "Polk",
+    "email": "recorder@polkcountyiowa.gov",
+    "subject": "Polk County Document Security — Blockchain Certification for Iowa's Largest Recording Office",
+    "status": "sent",
+    "timestamp": "2026-04-12T09:13:03.497Z"
+  },
+  {
+    "name": "Carolyn Siebrecht",
+    "county": "Linn",
+    "email": "recorder@linncountyiowa.gov",
+    "subject": "Linn County's Property Fraud Alert System — Blockchain Certification as the Next Layer",
+    "status": "sent",
+    "timestamp": "2026-04-12T09:13:07.694Z"
+  },
+  {
+    "name": "Michael Willis",
+    "county": "Tulsa",
+    "email": "mwillis@tulsacounty.org",
+    "subject": "Tulsa County's Deed Fraud Notification Service — Blockchain Certification as the Natural Next Step",
+    "status": "sent",
+    "timestamp": "2026-04-12T09:13:11.586Z"
+  },
+  {
+    "name": "Andrea Allen",
+    "county": "Utah",
+    "email": "andrea@utahcounty.gov",
+    "subject": "Utah County Document Security — Blockchain Certification for Property Rights Protection",
+    "status": "sent",
+    "timestamp": "2026-04-12T09:13:15.478Z"
+  },
+  {
+    "name": "William O'Donnell",
+    "county": "Norfolk",
+    "email": "registerodonnell@norfolkdeeds.org",
+    "subject": "Norfolk County Document Security — Blockchain Certification for Boston's High-Value Suburban Market",
+    "status": "sent",
+    "timestamp": "2026-04-12T09:13:19.778Z"
+  },
+  {
+    "name": "Susan Lamb",
+    "county": "Fayette",
+    "email": "susanl@lfucg.com",
+    "subject": "Fayette County Document Security — Blockchain Certification for Lexington's Recording Office",
+    "status": "sent",
+    "timestamp": "2026-04-12T09:13:24.080Z"
+  },
+  {
+    "name": "David Yates",
+    "county": "Jefferson",
+    "email": "countyclerk@jeffersoncountyclerk.org",
+    "subject": "Jefferson County Document Security — Blockchain Certification for Louisville's Recording Office",
+    "status": "sent",
+    "timestamp": "2026-04-12T09:13:27.970Z"
+  },
+  {
+    "name": "Karen Hollings",
+    "county": "Charleston",
+    "email": "PWCustomerService@CharlestonCounty.org",
+    "subject": "Charleston County Document Security — Blockchain Certification for One of South Carolina's Busiest Deed Offices",
+    "status": "sent",
+    "timestamp": "2026-04-12T09:13:31.861Z"
+  },
+  {
+    "name": "Marion Foxworth III",
+    "county": "Horry",
+    "email": "hcg.RegisterOfDeeds@horrycountysc.gov",
+    "subject": "Horry County's Property Fraud Detection System — Blockchain Certification as the Next Layer",
+    "status": "sent",
+    "timestamp": "2026-04-12T09:13:35.938Z"
+  },
+  {
+    "name": "Timothy Nanney",
+    "county": "Greenville",
+    "email": "timothy.nanney@greenvillecounty.org",
+    "subject": "Greenville County Document Security — Blockchain Certification for South Carolina's Largest County",
+    "status": "sent",
+    "timestamp": "2026-04-12T09:13:39.778Z"
+  },
+  {
+    "name": "Anne Brady-Romero",
+    "county": "Sandoval",
+    "email": "clerk@sandovalcountynm.gov",
+    "subject": "Sandoval County Document Security — Blockchain Certification for New Mexico's Fastest-Growing County",
+    "status": "sent",
+    "timestamp": "2026-04-12T09:13:43.639Z"
+  },
+  {
+    "name": "Joel Beckman",
+    "county": "Dakota",
+    "email": "records@co.dakota.mn.us",
+    "subject": "Dakota County Document Security — Blockchain Certification for the Twin Cities' Largest Suburb",
+    "status": "sent",
+    "timestamp": "2026-04-12T09:13:47.836Z"
+  }
+]

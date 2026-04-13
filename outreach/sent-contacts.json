@@ -1,0 +1,567 @@
+[
+  {
+    "name": "Shelly Scott",
+    "county": "Marin",
+    "state": "CA"
+  },
+  {
+    "name": "Paul Dictos",
+    "county": "Fresno",
+    "state": "CA"
+  },
+  {
+    "name": "Kristin Connelly",
+    "county": "Contra Costa",
+    "state": "CA"
+  },
+  {
+    "name": "Dean Logan",
+    "county": "Los Angeles",
+    "state": "CA"
+  },
+  {
+    "name": "Jordan Marks",
+    "county": "San Diego",
+    "state": "CA"
+  },
+  {
+    "name": "Hugh Nguyen",
+    "county": "Orange",
+    "state": "CA"
+  },
+  {
+    "name": "Peter Aldana",
+    "county": "Riverside",
+    "state": "CA"
+  },
+  {
+    "name": "Josie Gonzales",
+    "county": "San Bernardino",
+    "state": "CA"
+  },
+  {
+    "name": "Regina Alcomendras",
+    "county": "Santa Clara",
+    "state": "CA"
+  },
+  {
+    "name": "Melissa Wilk",
+    "county": "Alameda",
+    "state": "CA"
+  },
+  {
+    "name": "Florence Evans",
+    "county": "Sacramento",
+    "state": "CA"
+  },
+  {
+    "name": "Bernard Youngblood",
+    "county": "Wayne",
+    "state": "MI"
+  },
+  {
+    "name": "Monica Gordon",
+    "county": "Cook",
+    "state": "IL"
+  },
+  {
+    "name": "Juan Fernandez-Barquin",
+    "county": "Miami-Dade",
+    "state": "FL"
+  },
+  {
+    "name": "Gerald Smith",
+    "county": "St. Louis",
+    "state": "MO"
+  },
+  {
+    "name": "Mary Dempsey",
+    "county": "St. Charles",
+    "state": "MO"
+  },
+  {
+    "name": "Amy Fincher",
+    "county": "Angelina",
+    "state": "TX"
+  },
+  {
+    "name": "Sandy Yates",
+    "county": "Nacogdoches",
+    "state": "TX"
+  },
+  {
+    "name": "Teneshia Hudspeth",
+    "county": "Harris",
+    "state": "TX"
+  },
+  {
+    "name": "Mike Caruso",
+    "county": "Palm Beach",
+    "state": "FL"
+  },
+  {
+    "name": "Tonya Buckingham",
+    "county": "Sedgwick",
+    "state": "KS"
+  },
+  {
+    "name": "Fredrick Smith",
+    "county": "Mecklenburg",
+    "state": "NC"
+  },
+  {
+    "name": "Lucy Adame-Clark",
+    "county": "Bexar",
+    "state": "TX"
+  },
+  {
+    "name": "Scott Crowley",
+    "county": "Hamilton",
+    "state": "OH"
+  },
+  {
+    "name": "Debra DeBerry",
+    "county": "DeKalb",
+    "state": "GA"
+  },
+  {
+    "name": "Phil Diamond",
+    "county": "Orange",
+    "state": "FL"
+  },
+  {
+    "name": "Kalie Work",
+    "county": "Washoe",
+    "state": "NV"
+  },
+  {
+    "name": "Records Division",
+    "county": "Broward",
+    "state": "FL"
+  },
+  {
+    "name": "Recording Services",
+    "county": "King",
+    "state": "WA"
+  },
+  {
+    "name": "Recording Division",
+    "county": "Hennepin",
+    "state": "MN"
+  },
+  {
+    "name": "Gabriella Cazares-Kelly",
+    "county": "Pima",
+    "state": "AZ"
+  },
+  {
+    "name": "Debbie Conway",
+    "county": "Clark",
+    "state": "NV"
+  },
+  {
+    "name": "Justin Heap",
+    "county": "Maricopa",
+    "state": "AZ"
+  },
+  {
+    "name": "Stacey Kemp",
+    "county": "Collin",
+    "state": "TX"
+  },
+  {
+    "name": "L. Brandon Steinmann",
+    "county": "Montgomery",
+    "state": "TX"
+  },
+  {
+    "name": "Daniel O'Connor Jr.",
+    "county": "Franklin",
+    "state": "OH"
+  },
+  {
+    "name": "Lori Kennedy",
+    "county": "Montgomery",
+    "state": "OH"
+  },
+  {
+    "name": "Kristen Scalise",
+    "county": "Summit",
+    "state": "OH"
+  },
+  {
+    "name": "Victor Crist",
+    "county": "Hillsborough",
+    "state": "FL"
+  },
+  {
+    "name": "James Leonard",
+    "county": "Philadelphia",
+    "state": "PA"
+  },
+  {
+    "name": "Robin Robinson",
+    "county": "Bucks",
+    "state": "PA"
+  },
+  {
+    "name": "Diane O'Dwyer",
+    "county": "Chester",
+    "state": "PA"
+  },
+  {
+    "name": "Tammy Brunner",
+    "county": "Wake",
+    "state": "NC"
+  },
+  {
+    "name": "Jeff Thigpen",
+    "county": "Guilford",
+    "state": "NC"
+  },
+  {
+    "name": "Lynne Johnson",
+    "county": "Forsyth",
+    "state": "NC"
+  },
+  {
+    "name": "Karen Johnson",
+    "county": "Davidson",
+    "state": "TN"
+  },
+  {
+    "name": "Willie Brooks Jr.",
+    "county": "Shelby",
+    "state": "TN"
+  },
+  {
+    "name": "Kate Sweeney Bell",
+    "county": "Marion",
+    "state": "IN"
+  },
+  {
+    "name": "Garth Fell",
+    "county": "Snohomish",
+    "state": "WA"
+  },
+  {
+    "name": "Real Estate Division",
+    "county": "Cobb",
+    "state": "GA"
+  },
+  {
+    "name": "Gary Clemens",
+    "county": "Loudoun",
+    "state": "VA"
+  },
+  {
+    "name": "Paul Lopez",
+    "county": "Denver",
+    "state": "CO"
+  },
+  {
+    "name": "Karen Bushell",
+    "county": "Montgomery",
+    "state": "MD"
+  },
+  {
+    "name": "Michael Kearns",
+    "county": "Erie",
+    "state": "NY"
+  },
+  {
+    "name": "Vincent Puleo",
+    "county": "Suffolk",
+    "state": "NY"
+  },
+  {
+    "name": "Maureen O'Connell",
+    "county": "Nassau",
+    "state": "NY"
+  },
+  {
+    "name": "Juan Rivera Jr.",
+    "county": "Essex",
+    "state": "NJ"
+  },
+  {
+    "name": "John Hogan",
+    "county": "Bergen",
+    "state": "NJ"
+  },
+  {
+    "name": "Veronica Dwyer",
+    "county": "Monmouth",
+    "state": "NJ"
+  },
+  {
+    "name": "Kristi Chlebowski",
+    "county": "Dane",
+    "state": "WI"
+  },
+  {
+    "name": "Israel Ramon",
+    "county": "Milwaukee",
+    "state": "WI"
+  },
+  {
+    "name": "Julie Haggerty",
+    "county": "Polk",
+    "state": "IA"
+  },
+  {
+    "name": "Carolyn Siebrecht",
+    "county": "Linn",
+    "state": "IA"
+  },
+  {
+    "name": "Michael Willis",
+    "county": "Tulsa",
+    "state": "OK"
+  },
+  {
+    "name": "Andrea Allen",
+    "county": "Utah",
+    "state": "UT"
+  },
+  {
+    "name": "William O'Donnell",
+    "county": "Norfolk",
+    "state": "MA"
+  },
+  {
+    "name": "Susan Lamb",
+    "county": "Fayette",
+    "state": "KY"
+  },
+  {
+    "name": "David Yates",
+    "county": "Jefferson",
+    "state": "KY"
+  },
+  {
+    "name": "Karen Hollings",
+    "county": "Charleston",
+    "state": "SC"
+  },
+  {
+    "name": "Marion Foxworth III",
+    "county": "Horry",
+    "state": "SC"
+  },
+  {
+    "name": "Timothy Nanney",
+    "county": "Greenville",
+    "state": "SC"
+  },
+  {
+    "name": "Anne Brady-Romero",
+    "county": "Sandoval",
+    "state": "NM"
+  },
+  {
+    "name": "Joel Beckman",
+    "county": "Dakota",
+    "state": "MN"
+  },
+  {
+    "name": "Jeff Patton",
+    "email": "jeff.patton@sos.iowa.gov",
+    "county": "Johnson",
+    "state": "IA",
+    "role": "County Recorder",
+    "fraud_angle": "Johnson County (Iowa City) has seen increasing property fraud attempts tied to its growing real estate market and university-adjacent properties.",
+    "subject": "Protecting Johnson County property records from rising fraud attempts",
+    "timestamp": "2026-04-12T09:37:19.116Z"
+  },
+  {
+    "name": "Karen Wheeler",
+    "email": "kwheeler@hamiltontn.gov",
+    "county": "Hamilton",
+    "state": "TN",
+    "role": "Register of Deeds",
+    "fraud_angle": "Chattanooga's booming real estate market has made Hamilton County a target for fraudulent deed filings.",
+    "subject": "Protecting Hamilton County Deeds from Fraud with Blockchain",
+    "timestamp": "2026-04-12T09:37:34.476Z"
+  },
+  {
+    "name": "John O'Brien",
+    "email": "jobrien@suffolkdeeds.com",
+    "county": "Suffolk",
+    "state": "MA",
+    "role": "Register of Deeds",
+    "fraud_angle": "A nationally recognized anti-deed-fraud advocate who has publicly campaigned against forged mortgage documents and fraudulent recordings.",
+    "subject": "Suffolk County deed fraud prevention via blockchain certification",
+    "timestamp": "2026-04-12T09:37:49.501Z"
+  },
+  {
+    "name": "Darcy Olsen",
+    "email": "darcy.olsen@coconino.az.gov",
+    "county": "Coconino",
+    "state": "AZ",
+    "role": "County Recorder",
+    "fraud_angle": "Coconino County handles recordings for high-value Flagstaff and Sedona-area properties increasingly targeted by fraud schemes.",
+    "subject": "Protecting Coconino County Property Records from Fraud",
+    "timestamp": "2026-04-12T09:38:03.703Z"
+  },
+  {
+    "name": "Phil Dunton",
+    "email": "recorder@Ada.id.gov",
+    "county": "Ada",
+    "state": "ID",
+    "role": "County Recorder",
+    "fraud_angle": "Boise's explosive growth has dramatically increased recording volumes and fraud exposure in Ada County.",
+    "subject": "Ada County's Recording Volume Surge Deserves Stronger Fraud Protection",
+    "timestamp": "2026-04-12T09:38:17.894Z"
+  },
+  {
+    "name": "Debbie Standridge",
+    "email": "dstandridge@madisoncountyal.gov",
+    "county": "Madison",
+    "state": "AL",
+    "role": "Probate Judge/Recording",
+    "fraud_angle": "Huntsville's tech-driven real estate boom has elevated deed fraud risks in Madison County.",
+    "subject": "Protecting Madison County deed records amid Huntsville's tech boom",
+    "timestamp": "2026-04-12T09:38:33.355Z"
+  },
+  {
+    "name": "Brenda Downes",
+    "email": "bdownes@co.cumberland.me.us",
+    "county": "Cumberland",
+    "state": "ME",
+    "role": "Register of Deeds",
+    "fraud_angle": "Portland-area property values make Cumberland County recordings a prime target for title fraud.",
+    "subject": "Protecting Cumberland County deed records from title fraud",
+    "timestamp": "2026-04-12T09:38:47.589Z"
+  },
+  {
+    "name": "Tim Kearns",
+    "email": "tkearns@onondagacounty.com",
+    "county": "Onondaga",
+    "state": "NY",
+    "role": "County Clerk",
+    "fraud_angle": "Syracuse-area vacant and distressed properties are frequent targets for fraudulent deed transfers.",
+    "subject": "Protecting Onondaga County deeds from fraudulent transfers",
+    "timestamp": "2026-04-12T09:39:03.359Z"
+  },
+  {
+    "name": "Malia Zimmerman",
+    "email": "recorder@honolulucounty.gov",
+    "county": "Honolulu",
+    "state": "HI",
+    "role": "Bureau of Conveyances Registrar",
+    "fraud_angle": "Hawaii's extremely high property values and absentee ownership patterns create significant deed fraud vulnerabilities.",
+    "subject": "Protecting Honolulu property records from deed fraud",
+    "timestamp": "2026-04-12T09:39:17.288Z"
+  },
+  {
+    "name": "Kyle Strosahl",
+    "email": "kstrosahl@douglascounty-ne.gov",
+    "county": "Douglas",
+    "state": "NE",
+    "role": "Register of Deeds",
+    "fraud_angle": "Omaha's largest county processes high recording volumes with growing concerns about fraudulent filings.",
+    "subject": "Douglas County's Fraudulent Filing Problem Has a Fix",
+    "timestamp": "2026-04-12T09:39:32.543Z"
+  },
+  {
+    "name": "Pam Anderson",
+    "email": "panderson@jeffco.us",
+    "county": "Jefferson",
+    "state": "CO",
+    "role": "County Clerk and Recorder",
+    "fraud_angle": "Jefferson County is Colorado's fourth-largest county with substantial recording volumes and suburban fraud exposure.",
+    "subject": "Blockchain Certification for Jefferson County's Recording Volume",
+    "timestamp": "2026-04-12T09:39:47.596Z"
+  },
+  {
+    "name": "Rebecca Grover",
+    "email": "rgrover@washoecounty.gov",
+    "county": "Washoe",
+    "state": "NV",
+    "role": "Deputy Recorder",
+    "fraud_angle": "Reno's rapidly appreciating property market has made it increasingly attractive for deed fraud schemes.",
+    "subject": "Protecting Washoe County deed integrity amid Reno's property boom",
+    "timestamp": "2026-04-12T09:40:03.058Z"
+  },
+  {
+    "name": "Laura Padgett",
+    "email": "lpadgett@chesterfieldcounty.gov",
+    "county": "Chesterfield",
+    "state": "VA",
+    "role": "Circuit Court Clerk - Land Records",
+    "fraud_angle": "Richmond-metro Chesterfield County has seen a spike in fraudulent deed filings targeting suburban homeowners.",
+    "subject": "Protecting Chesterfield Deed Records from Fraud with Blockchain",
+    "timestamp": "2026-04-12T09:40:17.190Z"
+  },
+  {
+    "name": "Linda Bloom",
+    "email": "lbloom@lickingcounty.gov",
+    "county": "Licking",
+    "state": "OH",
+    "role": "County Recorder",
+    "fraud_angle": "Growing Columbus-adjacent county experiencing increased recording volumes and emerging fraud patterns.",
+    "subject": "Protecting Licking County Records as Recording Volumes Surge",
+    "timestamp": "2026-04-12T09:40:32.450Z"
+  },
+  {
+    "name": "Mark Ladd",
+    "email": "mladd@elpasoco.com",
+    "county": "El Paso",
+    "state": "CO",
+    "role": "Clerk and Recorder",
+    "fraud_angle": "Colorado Springs' military population and frequent relocations create unique vulnerabilities for deed fraud.",
+    "subject": "Protecting El Paso County deed records amid military relocations",
+    "timestamp": "2026-04-12T09:40:47.273Z"
+  },
+  {
+    "name": "Tammy Patrick",
+    "email": "tpatrick@sc.pima.gov",
+    "county": "Pinal",
+    "state": "AZ",
+    "role": "County Recorder",
+    "fraud_angle": "One of America's fastest-growing counties with massive new subdivisions vulnerable to fraudulent deed activity.",
+    "subject": "Protecting Pinal County's New Subdivisions from Deed Fraud",
+    "timestamp": "2026-04-12T09:41:01.119Z"
+  },
+  {
+    "name": "Maria Gonzalez",
+    "email": "mgonzalez@nuecesco.com",
+    "county": "Nueces",
+    "state": "TX",
+    "role": "County Clerk",
+    "fraud_angle": "Corpus Christi-area coastal properties are targets for deed fraud due to absentee ownership and vacation homes.",
+    "subject": "Protecting Nueces County Coastal Property Deeds from Title Fraud",
+    "timestamp": "2026-04-12T09:41:16.172Z"
+  },
+  {
+    "name": "Katie DeLand",
+    "email": "kdeland@ramseycounty.us",
+    "county": "Ramsey",
+    "state": "MN",
+    "role": "County Recorder",
+    "fraud_angle": "St. Paul's diverse housing stock and high transaction volumes make Ramsey County a fraud-prone jurisdiction.",
+    "subject": "Protecting Ramsey County Property Records from Title Fraud",
+    "timestamp": "2026-04-12T09:41:29.353Z"
+  },
+  {
+    "name": "Sally Ganem",
+    "email": "sganem@livingstoncounty.org",
+    "county": "Livingston",
+    "state": "MI",
+    "role": "Register of Deeds",
+    "fraud_angle": "Detroit-metro suburban county with rising property values and increasing sophistication in fraud attempts.",
+    "subject": "Protecting Livingston County deed integrity as fraud grows more sophisticated",
+    "timestamp": "2026-04-12T09:41:44.276Z"
+  },
+  {
+    "name": "Janet Klasson",
+    "email": "jklasson@co.stearns.mn.us",
+    "county": "Stearns",
+    "state": "MN",
+    "role": "County Recorder",
+    "fraud_angle": "Central Minnesota's largest county with agricultural and residential properties targeted by vacant-land deed fraud.",
+    "subject": "Protecting Stearns County land records from vacant-lot deed fraud",
+    "timestamp": "2026-04-12T09:41:58.817Z"
+  }
+]

@@ -1,0 +1,311 @@
+[
+  {
+    "name": "Shelly Scott",
+    "county": "Marin",
+    "email": "WEBFORM",
+    "status": "skipped",
+    "reason": "web form only"
+  },
+  {
+    "name": "Paul Dictos",
+    "county": "Fresno",
+    "email": "RecorderWebmail@fresnocountyca.gov",
+    "subject": "Fresno County's FCPOPA Program + Blockchain Certification — The Next Layer",
+    "status": "sent",
+    "timestamp": "2026-04-11T10:35:10.294Z"
+  },
+  {
+    "name": "Kristin Connelly",
+    "county": "Contra Costa",
+    "email": "Kristin.Connelly@vote.cccounty.us",
+    "subject": "Contra Costa's New Recording Alert Program + Blockchain Certification — A Strong Pairing",
+    "status": "sent",
+    "timestamp": "2026-04-11T10:35:14.512Z"
+  },
+  {
+    "name": "Dean Logan",
+    "county": "Los Angeles",
+    "email": "recorder@rrcc.lacounty.gov",
+    "subject": "Blockchain Document Certification for Los Angeles County — Complement to Your e-Notification Program",
+    "status": "sent",
+    "timestamp": "2026-04-11T10:35:18.815Z"
+  },
+  {
+    "name": "Jordan Marks",
+    "county": "San Diego",
+    "email": "ARCCHELP@sdcounty.ca.gov",
+    "subject": "Blockchain Document Certification for San Diego County — Tamper-Evident Recording at Scale",
+    "status": "sent",
+    "timestamp": "2026-04-11T10:35:22.498Z"
+  },
+  {
+    "name": "Hugh Nguyen",
+    "county": "Orange",
+    "email": "Hugh.Nguyen@ocgov.com",
+    "subject": "Blockchain Document Certification for Orange County — Beyond Courtesy Notices",
+    "status": "sent",
+    "timestamp": "2026-04-11T10:35:25.982Z"
+  },
+  {
+    "name": "Peter Aldana",
+    "county": "Riverside",
+    "email": "WEBFORM",
+    "status": "skipped",
+    "reason": "web form only"
+  },
+  {
+    "name": "Josie Gonzales",
+    "county": "San Bernardino",
+    "email": "WEBFORM",
+    "status": "skipped",
+    "reason": "web form only"
+  },
+  {
+    "name": "Regina Alcomendras",
+    "county": "Santa Clara",
+    "email": "ClerkRecorder@cco.sccgov.org",
+    "subject": "Blockchain Document Certification for Santa Clara County — Built for a Tech-Forward Office",
+    "status": "sent",
+    "timestamp": "2026-04-11T10:35:29.394Z"
+  },
+  {
+    "name": "Melissa Wilk",
+    "county": "Alameda",
+    "email": "CROCustomerService@acgov.org",
+    "subject": "Blockchain Document Certification for Alameda County — Tamper-Evident Recording for Oakland and Beyond",
+    "status": "sent",
+    "timestamp": "2026-04-11T10:35:32.829Z"
+  },
+  {
+    "name": "Florence Evans",
+    "county": "Sacramento",
+    "email": "sacrec@saccounty.net",
+    "subject": "Blockchain Document Certification for Sacramento County — A Fresh Start with Proven Technology",
+    "status": "sent",
+    "timestamp": "2026-04-11T10:35:36.387Z"
+  },
+  {
+    "name": "Bernard Youngblood",
+    "county": "Wayne",
+    "email": "rodhelp@waynecountymi.gov",
+    "subject": "Wayne County's Deed Fraud Crisis — Blockchain Certification as the Permanent Fix",
+    "status": "sent",
+    "timestamp": "2026-04-11T10:35:39.906Z"
+  },
+  {
+    "name": "Monica Gordon",
+    "county": "Cook",
+    "email": "recording.helpdesk@cookcountyil.gov",
+    "subject": "Blockchain Document Certification for Cook County Recordings — Built for Your Scale",
+    "status": "sent",
+    "timestamp": "2026-04-11T10:35:43.390Z"
+  },
+  {
+    "name": "Juan Fernandez-Barquin",
+    "county": "Miami-Dade",
+    "email": "clerksoffice@miamidade.gov",
+    "subject": "Miami-Dade Document Fraud — Blockchain Certification as the Permanent Solution",
+    "status": "sent",
+    "timestamp": "2026-04-11T10:35:46.972Z"
+  },
+  {
+    "name": "Gerald Smith",
+    "county": "St. Louis",
+    "email": "GSmith@stlouiscountymo.gov",
+    "subject": "St. Louis County's Active Fraud Warnings — Blockchain Certification as the Next Step",
+    "status": "sent",
+    "timestamp": "2026-04-11T10:35:50.454Z"
+  },
+  {
+    "name": "Mary Dempsey",
+    "county": "St. Charles",
+    "email": "recorder@sccmo.org",
+    "subject": "St. Charles County + St. Louis County — Regional Blockchain Certification Opportunity",
+    "status": "sent",
+    "timestamp": "2026-04-11T10:35:53.934Z"
+  },
+  {
+    "name": "Amy Fincher",
+    "county": "Angelina",
+    "email": "afincher@angelinacounty.net",
+    "subject": "Angelina County's Fraud Alert System + Blockchain Certification — The Natural Upgrade",
+    "status": "sent",
+    "timestamp": "2026-04-11T10:35:57.519Z"
+  },
+  {
+    "name": "Sandy Yates",
+    "county": "Nacogdoches",
+    "email": "cclk@co.nacogdoches.tx.us",
+    "subject": "Nacogdoches County Fraud Prevention + Blockchain Certification — Bundle Opportunity with Angelina County",
+    "status": "sent",
+    "timestamp": "2026-04-11T10:36:00.985Z"
+  },
+  {
+    "name": "Teneshia Hudspeth",
+    "county": "Harris",
+    "email": "help@cco.hctx.net",
+    "subject": "Harris County's 40 Stolen Properties — Blockchain Certification as the Permanent Solution",
+    "status": "sent",
+    "timestamp": "2026-04-11T10:36:04.584Z"
+  },
+  {
+    "name": "Mike Caruso",
+    "county": "Palm Beach",
+    "email": "PropertyFraudAlerts@mypalmbeachclerk.com",
+    "subject": "Palm Beach County's Deed Theft Epidemic — Blockchain Certification as the Next Layer",
+    "status": "sent",
+    "timestamp": "2026-04-11T10:36:08.066Z"
+  },
+  {
+    "name": "Tonya Buckingham",
+    "county": "Sedgwick",
+    "email": "tonya.buckingham@sedgwick.gov",
+    "subject": "Sedgwick County's New Fraud Alert Program + Blockchain Certification — The Natural Next Step",
+    "status": "sent",
+    "timestamp": "2026-04-11T10:36:11.541Z"
+  },
+  {
+    "name": "Fredrick Smith",
+    "county": "Mecklenburg",
+    "email": "fred.smith@mecklenburgcountync.gov",
+    "subject": "Mecklenburg County Deed Fraud — Blockchain Certification Closes the Gap",
+    "status": "sent",
+    "timestamp": "2026-04-11T10:36:15.133Z"
+  },
+  {
+    "name": "Lucy Adame-Clark",
+    "county": "Bexar",
+    "email": "lucy.adame-clark@bexar.org",
+    "subject": "Bexar County Document Security — Texas SB 1734 and Blockchain Certification",
+    "status": "sent",
+    "timestamp": "2026-04-11T10:36:18.586Z"
+  },
+  {
+    "name": "Scott Crowley",
+    "county": "Hamilton",
+    "email": "recordersoffice@hamilton-co.org",
+    "subject": "Hamilton County's Fraud Response — Blockchain Certification as the Permanent Infrastructure",
+    "status": "sent",
+    "timestamp": "2026-04-11T10:36:22.044Z"
+  },
+  {
+    "name": "Debra DeBerry",
+    "county": "DeKalb",
+    "email": "cscinfo@dekalbcountyga.gov",
+    "subject": "DeKalb County's Anti-Fraud Registry + Georgia HB 1292 — Blockchain Certification Fills the Gap",
+    "status": "sent",
+    "timestamp": "2026-04-11T10:36:25.470Z"
+  },
+  {
+    "name": "Phil Diamond",
+    "county": "Orange",
+    "email": "comptroller@occompt.com",
+    "subject": "Orange County Florida's Fraud Alert Program + Blockchain Certification — The Next Layer",
+    "status": "sent",
+    "timestamp": "2026-04-11T10:36:28.851Z"
+  },
+  {
+    "name": "Kalie Work",
+    "county": "Washoe",
+    "email": "record@washoecounty.gov",
+    "subject": "Washoe County's Blockchain Program — ProofDeed as the Enterprise-Grade Next Step",
+    "status": "sent",
+    "timestamp": "2026-04-11T10:36:32.241Z"
+  },
+  {
+    "name": "(Dept)",
+    "county": "Cuyahoga",
+    "email": "WEBFORM",
+    "status": "skipped",
+    "reason": "web form only"
+  },
+  {
+    "name": "Justin Heap",
+    "county": "Maricopa",
+    "email": "WEBFORM",
+    "status": "skipped",
+    "reason": "web form only"
+  },
+  {
+    "name": "Records Division",
+    "county": "Broward",
+    "email": "Records@broward.org",
+    "subject": "Broward County Florida Document Security — Florida's July 2024 Mandate and Blockchain Certification",
+    "status": "sent",
+    "timestamp": "2026-04-11T10:36:35.714Z"
+  },
+  {
+    "name": "Recording Services",
+    "county": "King",
+    "email": "kcrocust@kingcounty.gov",
+    "subject": "King County Document Security — Blockchain Certification for Seattle's Real Estate Market",
+    "status": "sent",
+    "timestamp": "2026-04-11T10:36:39.105Z"
+  },
+  {
+    "name": "Mary Louise Nicholson",
+    "county": "Tarrant",
+    "email": "WEBFORM",
+    "status": "skipped",
+    "reason": "web form only"
+  },
+  {
+    "name": "Recording Division",
+    "county": "Hennepin",
+    "email": "recordinginfo@hennepin.us",
+    "subject": "Hennepin County's Property Watch Program + Blockchain Certification — The Natural Next Step",
+    "status": "sent",
+    "timestamp": "2026-04-11T10:36:42.677Z"
+  },
+  {
+    "name": "Ché Alexander",
+    "county": "Fulton",
+    "email": "WEBFORM",
+    "status": "skipped",
+    "reason": "web form only"
+  },
+  {
+    "name": "Victor Crist",
+    "county": "Hillsborough",
+    "email": "WEBFORM",
+    "status": "skipped",
+    "reason": "web form only"
+  },
+  {
+    "name": "Karen Stukel",
+    "county": "Will",
+    "email": "WEBFORM",
+    "status": "skipped",
+    "reason": "web form only"
+  },
+  {
+    "name": "Jody Phillips",
+    "county": "Duval",
+    "email": "WEBFORM",
+    "status": "skipped",
+    "reason": "web form only"
+  },
+  {
+    "name": "Gabriella Cazares-Kelly",
+    "county": "Pima",
+    "email": "recorder@pima.gov",
+    "subject": "Pima County Document Security — Arizona's 2025 Mandate and Blockchain Certification",
+    "status": "sent",
+    "timestamp": "2026-04-11T10:36:46.075Z"
+  },
+  {
+    "name": "Register of Deeds",
+    "county": "Beaufort",
+    "email": "WEBFORM",
+    "status": "skipped",
+    "reason": "web form only"
+  },
+  {
+    "name": "Debbie Conway",
+    "county": "Clark",
+    "email": "RecRNS@ClarkCountyNV.gov",
+    "subject": "Clark County's Recording Notification Service — Blockchain Certification as the Next Layer",
+    "status": "sent",
+    "timestamp": "2026-04-11T10:36:49.481Z"
+  }
+]

@@ -119,9 +119,10 @@ const pool = new Pool({
 });
 
 /* ---------------- Middleware ---------------- */
-// Exclude stripe-webhook from global JSON parsing — it needs raw body for signature verification
+// Exclude stripe + resend webhooks from global JSON parsing — they need raw body
 app.use((req, res, next) => {
-  if (req.originalUrl === '/api/stripe-webhook' || req.originalUrl === '/stripe-webhook') {
+  const raw = ['/api/stripe-webhook', '/stripe-webhook', '/api/webhooks/resend'];
+  if (raw.includes(req.originalUrl)) {
     next();
   } else {
     express.json({ limit: "50mb" })(req, res, next);
@@ -2164,6 +2165,24 @@ async function ensureIndexes() {
       ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS pilot_expires_at TIMESTAMPTZ;
       ALTER TABLE certifications ADD COLUMN IF NOT EXISTS api_key_email TEXT;
       ALTER TABLE certifications ADD COLUMN IF NOT EXISTS ip_address TEXT;
+
+      -- Outreach CRM: new columns on existing table
+      ALTER TABLE outreach_contacts ADD COLUMN IF NOT EXISTS reply_to_tag TEXT UNIQUE;
+      ALTER TABLE outreach_contacts ADD COLUMN IF NOT EXISTS resend_message_id TEXT;
+      ALTER TABLE outreach_contacts ADD COLUMN IF NOT EXISTS opened_count INTEGER DEFAULT 0;
+
+      -- Outreach events log
+      CREATE TABLE IF NOT EXISTS outreach_events (
+        id              SERIAL PRIMARY KEY,
+        contact_id      INTEGER REFERENCES outreach_contacts(id) ON DELETE CASCADE,
+        event_type      TEXT NOT NULL,
+        event_source    TEXT DEFAULT 'resend',
+        resend_event_id TEXT UNIQUE,
+        metadata        JSONB,
+        occurred_at     TIMESTAMPTZ DEFAULT NOW(),
+        created_at      TIMESTAMPTZ DEFAULT NOW()
+      );
+
       CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
       CREATE INDEX IF NOT EXISTS idx_certifications_hash ON certifications(hash);
       CREATE INDEX IF NOT EXISTS idx_certifications_user_id ON certifications(user_id);
@@ -2324,6 +2343,214 @@ process.on("unhandledRejection", (reason) => {
 process.on("uncaughtException", (err) => {
   console.error("Uncaught exception:", err);
   process.exit(1);
+});
+
+/* ================================================================
+   OUTREACH AUTOMATION — WEBHOOKS + ADMIN CRM API
+   ================================================================ */
+
+// Status priority — higher index wins, except 'replied' always wins
+const STATUS_PRIORITY = ['pending','sent','delivered','opened','clicked','replied','bounced','complained','unsubscribed'];
+function statusBeats(incoming, current) {
+  if (incoming === 'replied') return true;
+  if (['bounced','complained','unsubscribed'].includes(current)) return false;
+  return STATUS_PRIORITY.indexOf(incoming) > STATUS_PRIORITY.indexOf(current);
+}
+
+// ---------- Resend OUTBOUND webhook (opened/clicked/bounced/delivered) ----------
+app.post('/api/webhooks/resend', express.raw({ type: '*/*' }), async (req, res) => {
+  res.status(200).json({ received: true }); // always ack immediately
+
+  try {
+    let event;
+    // Verify signature if secret is configured
+    if (process.env.RESEND_WEBHOOK_SECRET) {
+      try {
+        const { Webhook } = await import('svix');
+        const wh = new Webhook(process.env.RESEND_WEBHOOK_SECRET);
+        event = wh.verify(req.body, req.headers);
+      } catch { return; }
+    } else {
+      event = JSON.parse(req.body.toString());
+    }
+
+    const typeMap = {
+      'email.delivered':  'delivered',
+      'email.opened':     'opened',
+      'email.clicked':    'clicked',
+      'email.bounced':    'bounced',
+      'email.complained': 'complained',
+    };
+    const newStatus = typeMap[event.type];
+    if (!newStatus) return;
+
+    const data = event.data || {};
+    const tags = Array.isArray(data.tags) ? data.tags : [];
+    const contactIdTag = tags.find((t) => t.name === 'contact_id');
+
+    let contact = null;
+    if (contactIdTag) {
+      const r = await pool.query('SELECT * FROM outreach_contacts WHERE id=$1', [contactIdTag.value]);
+      contact = r.rows[0];
+    }
+    if (!contact && data.email_id) {
+      const r = await pool.query('SELECT * FROM outreach_contacts WHERE resend_message_id=$1', [data.email_id]);
+      contact = r.rows[0];
+    }
+    if (!contact) return;
+
+    const eventId = data.email_id ? `${data.email_id}:${event.type}` : null;
+    const metadata = {
+      email_id: data.email_id,
+      to: data.to,
+      link: data.click?.link,
+      bounce_type: data.bounce?.type,
+      bounce_message: data.bounce?.message,
+      ip_address: data.ip_address,
+      user_agent: data.user_agent,
+    };
+
+    await pool.query(`
+      INSERT INTO outreach_events (contact_id, event_type, event_source, resend_event_id, metadata, occurred_at)
+      VALUES ($1,$2,'resend',$3,$4,NOW())
+      ON CONFLICT (resend_event_id) DO NOTHING
+    `, [contact.id, newStatus, eventId, JSON.stringify(metadata)]);
+
+    if (statusBeats(newStatus, contact.status)) {
+      const extra = newStatus === 'opened' ? ', opened_count = COALESCE(opened_count,0) + 1' : '';
+      await pool.query(`
+        UPDATE outreach_contacts SET status=$1, last_contact_at=NOW()${extra} WHERE id=$2
+      `, [newStatus, contact.id]);
+    }
+  } catch (err) {
+    console.error('Resend webhook error:', err.message);
+  }
+});
+
+// ---------- Resend INBOUND webhook (reply detection) ----------
+app.post('/api/webhooks/resend-inbound', async (req, res) => {
+  res.status(200).json({ received: true });
+  try {
+    if (process.env.RESEND_INBOUND_SECRET && req.query.secret !== process.env.RESEND_INBOUND_SECRET) return;
+
+    const body = req.body || {};
+    const toField = body.to || body.To || '';
+    const match = toField.match(/reply\+([^@\s<>]+)@send\.proofdeed\.com/i);
+    if (!match) return;
+
+    const tag = match[1];
+    const r = await pool.query('SELECT * FROM outreach_contacts WHERE reply_to_tag=$1', [tag]);
+    const contact = r.rows[0];
+    if (!contact) return;
+
+    const fromField = body.from || body.From || '';
+    const subject = body.subject || body.Subject || '';
+    const textSnippet = (body.text || body.Text || '').substring(0, 500);
+
+    await pool.query(`
+      INSERT INTO outreach_events (contact_id, event_type, event_source, metadata, occurred_at)
+      VALUES ($1,'replied','inbound',$2,NOW())
+    `, [contact.id, JSON.stringify({ from: fromField, subject, snippet: textSnippet })]);
+
+    await pool.query(`
+      UPDATE outreach_contacts SET status='replied', last_contact_at=NOW() WHERE id=$1
+    `, [contact.id]);
+
+    console.log(`✅ Reply detected from ${fromField} → contact #${contact.id} (${contact.name})`);
+  } catch (err) {
+    console.error('Inbound webhook error:', err.message);
+  }
+});
+
+// ---------- Admin: Outreach Stats ----------
+app.get('/api/admin/outreach/stats', authRateLimit, async (req, res) => {
+  if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
+  try {
+    const statusCounts = await pool.query(`SELECT status, COUNT(*) as count FROM outreach_contacts GROUP BY status`);
+    const totalEvents = await pool.query(`SELECT COUNT(*) as total FROM outreach_events WHERE occurred_at > NOW() - INTERVAL '24 hours'`);
+    const totalContacts = await pool.query(`SELECT COUNT(*) as total FROM outreach_contacts`);
+    res.json({
+      byStatus: statusCounts.rows.reduce((acc, r) => { acc[r.status] = parseInt(r.count); return acc; }, {}),
+      eventsToday: parseInt(totalEvents.rows[0].total),
+      totalContacts: parseInt(totalContacts.rows[0].total),
+    });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ---------- Admin: Outreach Activity Feed ----------
+app.get('/api/admin/outreach/feed', authRateLimit, async (req, res) => {
+  if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
+  try {
+    const result = await pool.query(`
+      SELECT e.id, e.event_type, e.occurred_at, e.metadata,
+             c.id as contact_id, c.name, c.email, c.company, c.industry, c.status
+      FROM outreach_events e
+      JOIN outreach_contacts c ON c.id = e.contact_id
+      ORDER BY e.occurred_at DESC
+      LIMIT 50
+    `);
+    res.json({ events: result.rows });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ---------- Admin: Outreach Contacts (paginated, searchable) ----------
+app.get('/api/admin/outreach/contacts', authRateLimit, async (req, res) => {
+  if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
+  try {
+    const search = req.query.search ? `%${req.query.search}%` : '%';
+    const status = req.query.status || '';
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(200, parseInt(req.query.limit) || 50);
+    const offset = (page - 1) * limit;
+
+    const where = status ? 'AND status=$3' : '';
+    const params = status ? [search, offset, status] : [search, offset];
+    const limitParam = status ? '$4' : '$3';
+
+    const result = await pool.query(`
+      SELECT * FROM outreach_contacts
+      WHERE (name ILIKE $1 OR email ILIKE $1 OR company ILIKE $1)
+      ${where}
+      ORDER BY
+        CASE status WHEN 'replied' THEN 0 WHEN 'in_talks' THEN 1 WHEN 'clicked' THEN 2
+          WHEN 'opened' THEN 3 WHEN 'delivered' THEN 4 ELSE 5 END,
+        last_contact_at DESC NULLS LAST
+      LIMIT ${limitParam} OFFSET $2
+    `, [...params, limit]);
+
+    const countResult = await pool.query(`
+      SELECT COUNT(*) as total FROM outreach_contacts
+      WHERE (name ILIKE $1 OR email ILIKE $1 OR company ILIKE $1)
+      ${status ? 'AND status=$2' : ''}
+    `, status ? [search, status] : [search]);
+
+    res.json({ contacts: result.rows, total: parseInt(countResult.rows[0].total), page, limit });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ---------- Admin: Contact Timeline ----------
+app.get('/api/admin/outreach/contacts/:id/timeline', authRateLimit, async (req, res) => {
+  if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
+  try {
+    const contact = await pool.query('SELECT * FROM outreach_contacts WHERE id=$1', [req.params.id]);
+    if (!contact.rows[0]) return res.status(404).json({ error: 'Not found.' });
+    const events = await pool.query(`
+      SELECT * FROM outreach_events WHERE contact_id=$1 ORDER BY occurred_at ASC
+    `, [req.params.id]);
+    res.json({ contact: contact.rows[0], events: events.rows });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ---------- Admin: Update Contact ----------
+app.put('/api/admin/outreach/contacts/:id', authRateLimit, async (req, res) => {
+  if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
+  try {
+    const { status, notes } = req.body;
+    await pool.query(`
+      UPDATE outreach_contacts SET status=COALESCE($1,status), notes=COALESCE($2,notes), last_contact_at=NOW() WHERE id=$3
+    `, [status, notes, req.params.id]);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 /* ---------------- Start Server ---------------- */
