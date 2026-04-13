@@ -2623,7 +2623,7 @@ gov@proofdeed.com | proofdeed.com`;
 
 async function runLeadEngine() {
   if (!process.env.ANTHROPIC_API_KEY || !process.env.RESEND_API_KEY) {
-    console.log('[LeadEngine] Missing API keys — skipping.');
+    console.log(`[LeadEngine] Missing API keys — ANTHROPIC: ${!!process.env.ANTHROPIC_API_KEY}, RESEND: ${!!process.env.RESEND_API_KEY}`);
     return;
   }
 
