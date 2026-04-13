@@ -141,6 +141,14 @@ const authRateLimit = rateLimit({
   message: { error: "Too many requests. Please wait and try again." }
 });
 
+// Demo endpoint rate limit: 5 certifications per IP per hour
+const demoRateLimit = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  keyGenerator: (req) => req.headers['x-forwarded-for']?.split(',')[0] || req.ip,
+  message: { success: false, error: "Demo limit reached. Sign up for a free account to continue." }
+});
+
 /* ---------------- OpenAI ---------------- */
 /* ---------------- Stripe ---------------- */
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
@@ -1167,6 +1175,39 @@ app.post(["/create-proof", "/api/create-proof"], async (req, res) => {
 });
 
 /* ---------------- VERIFY CERTIFICATE ---------------- */
+/* ---------------- PUBLIC DEMO CERTIFY ---------------- */
+app.post(["/api/demo/certify", "/demo/certify"], demoRateLimit, async (req, res) => {
+  try {
+    const { hash, fileName } = req.body;
+    if (!hash || typeof hash !== 'string' || !/^[a-f0-9]{64}$/.test(hash)) {
+      return res.status(400).json({ success: false, error: "Valid SHA-256 hash required." });
+    }
+
+    const proofId = "PD-" + Date.now();
+    const timestamp = new Date().toISOString();
+    const documentData = { fileName: fileName || 'document', demo: true };
+
+    await pool.query(
+      `INSERT INTO certifications (certification_id, hash, polygon_tx, api_key_email, created_at, document_data)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (certification_id) DO NOTHING`,
+      [proofId, hash, null, 'demo@proofdeed.com', timestamp, JSON.stringify(documentData)]
+    );
+
+    res.json({
+      success: true,
+      proofId,
+      hash,
+      timestamp,
+      polygon_tx: null,
+      verifyUrl: `https://proofdeed.com/verify/${proofId}`
+    });
+  } catch (error) {
+    console.error("Demo certify error:", error);
+    res.status(500).json({ success: false, error: "Certification failed." });
+  }
+});
+
 app.get(["/verify/:certId", "/api/verify/:certId"], async (req, res) => {
   try {
     const { certId } = req.params;
