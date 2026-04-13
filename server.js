@@ -2594,6 +2594,24 @@ Scott Kiersten
 Founder & CEO, ProofDeed
 gov@proofdeed.com | proofdeed.com`;
     subject = `Re: Blockchain Document Certification for ${contact.company}`;
+  } else if (day === 14) {
+    text = `Hi ${first},
+
+I wanted to reach out one more time regarding blockchain document certification for ${contact.company}.
+
+A quick question: is document authenticity and fraud prevention something on your radar for this year, or is the timing simply not right?
+
+Either answer helps me — I don't want to keep following up if it's not relevant. But if it is, I'd love to show you how organizations like yours are using ProofDeed to anchor their most critical documents to the blockchain in under a minute.
+
+See it live: proofdeed.com/demo
+
+Happy to work around your schedule if a 15-minute call makes sense.
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`;
+    subject = `Re: Blockchain Document Certification for ${contact.company}`;
   } else {
     text = `Hi ${first},
 
@@ -2648,6 +2666,19 @@ cron.schedule('0 8 * * *', async () => {
       await new Promise(r => setTimeout(r, 3000));
     }
 
+    // Day 14: second follow-up — no reply, first_sent_at between 14-15 days ago
+    const day14 = await pool.query(`
+      SELECT * FROM outreach_contacts
+      WHERE status NOT IN ('replied','in_talks','closed_won','closed_lost','bounced','complained','unsubscribed')
+      AND first_sent_at <= NOW() - INTERVAL '14 days'
+      AND first_sent_at > NOW() - INTERVAL '15 days'
+    `);
+    for (const c of day14.rows) {
+      try { await sendOutreachFollowUp(c, 14); console.log(`[Autopilot] Day 14 → ${c.name}`); }
+      catch (e) { console.error(`[Autopilot] Day 14 fail ${c.email}:`, e.message); }
+      await new Promise(r => setTimeout(r, 3000));
+    }
+
     // Day 21: breakup — no reply, first_sent_at between 21-22 days ago
     const day21 = await pool.query(`
       SELECT * FROM outreach_contacts
@@ -2665,7 +2696,7 @@ cron.schedule('0 8 * * *', async () => {
       await new Promise(r => setTimeout(r, 3000));
     }
 
-    console.log(`[Autopilot] Done. Day7: ${day7.rows.length}, Day21: ${day21.rows.length}`);
+    console.log(`[Autopilot] Done. Day7: ${day7.rows.length}, Day14: ${day14.rows.length}, Day21: ${day21.rows.length}`);
   } catch (err) {
     console.error('[Autopilot] Cron error:', err.message);
   }
