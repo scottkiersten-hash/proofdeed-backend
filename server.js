@@ -1311,7 +1311,7 @@ app.post(["/contact", "/api/contact"], async (req, res) => {
         },
         body: new URLSearchParams({
           from: process.env.MAIL_FROM || "ProofDeed <mailgun@" + mailgunDomain + ">",
-          to: "gov@proofdeed.com",
+          to: process.env.MAIL_TO || process.env.ADMIN_EMAIL || "gov@proofdeed.com",
           subject: "🏛 PO Request: $15K Pilot — " + (resolvedCompany || name),
           text: "Purchase Order request received.\n\nName: " + name + "\nAgency: " + (resolvedCompany || "N/A") + "\nEmail: " + email + "\nMessage: " + (resolvedNotes || "N/A") + "\n\nAction required: Send invoice to " + email + "\n\nProofDeed Admin\nhttps://proofdeed.com/admin"
         })
