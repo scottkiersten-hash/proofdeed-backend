@@ -2540,16 +2540,68 @@ app.post(['/api/webhooks/resend', '/webhooks/resend'], express.raw({ type: '*/*'
   }
 });
 
-// ---------- Resend INBOUND webhook (reply detection) ----------
+// ---------- Resend INBOUND webhook (reply detection + inbox catch-all) ----------
 app.post(['/api/webhooks/resend-inbound', '/webhooks/resend-inbound'], async (req, res) => {
   res.status(200).json({ received: true });
   try {
     if (process.env.RESEND_INBOUND_SECRET && req.query.secret !== process.env.RESEND_INBOUND_SECRET) return;
 
     const body = req.body || {};
-    const toField = body.to || body.To || '';
+    const toField  = Array.isArray(body.to) ? body.to.join(',') : (body.to || body.To || '');
+    const fromField = body.from || body.From || '';
+    const subject   = body.subject || body.Subject || '(no subject)';
+    const bodyText  = body.text || body.Text || '';
+    const messageId = body.headers?.['message-id'] || body.messageId || `rs-${Date.now()}`;
+    const inReplyTo = body.headers?.['in-reply-to'] || null;
+
+    // ── Path 1: reply+tag (outbound follow-up reply) ──
     const match = toField.match(/reply\+([^@\s<>]+)@send\.proofdeed\.com/i);
-    if (!match) return;
+    if (!match) {
+      // ── Path 2: direct inbox email (info@ or gov@) ──
+      const isInbox = /info@proofdeed\.com|gov@proofdeed\.com/i.test(toField);
+      if (!isInbox) return;
+
+      const fromEmail = (fromField.match(/<([^>]+)>/) || [, fromField])[1].trim().toLowerCase();
+      const fromName  = (fromField.match(/^([^<]+)</) || [,''])[1].trim().replace(/^"|"$/g,'') || fromEmail;
+      const toEmail   = toField.toLowerCase().includes('gov') ? 'gov@proofdeed.com' : 'info@proofdeed.com';
+      const ourDomains = ['proofdeed.com', 'send.proofdeed.com'];
+      if (ourDomains.some(d => fromEmail.endsWith(d))) return;
+
+      const fullText = (subject + ' ' + bodyText).toLowerCase();
+      const intent = ['interested','pricing','pilot','demo','schedule','call'].some(k => fullText.includes(k)) ? 'pricing_inquiry'
+                   : ['not working','error','issue','help','support'].some(k => fullText.includes(k))         ? 'support'
+                   : ['partner','integrate','resell','api'].some(k => fullText.includes(k))                   ? 'partnership'
+                   : 'inquiry';
+      const sentiment = ['not interested','unsubscribe','stop','spam'].some(k => fullText.includes(k)) ? 'negative'
+                      : ['great','love','perfect','impressed','interested'].some(k => fullText.includes(k)) ? 'positive'
+                      : 'neutral';
+      const threadId = inReplyTo || messageId;
+
+      // Find or create contact
+      const emailDomain = fromEmail.split('@')[1] || '';
+      const companyGuess = emailDomain.replace(/\.(com|gov|org|net|edu|io)$/,'').replace(/[-_]/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+      const upsert = await pool.query(`
+        INSERT INTO outreach_contacts (name,email,company,pipeline_stage,pain_status,intent,sentiment,status,last_inbound_at,requires_human,created_at)
+        VALUES ($1,$2,$3,'replied','aware',$4,$5,'replied',NOW(),true,NOW())
+        ON CONFLICT (email) DO UPDATE SET last_inbound_at=NOW(),intent=$4,sentiment=$5,
+          pipeline_stage=CASE WHEN outreach_contacts.pipeline_stage IN ('targeted','contacted') THEN 'replied' ELSE outreach_contacts.pipeline_stage END,
+          pain_status=CASE WHEN outreach_contacts.pain_status='unaware' THEN 'aware' ELSE outreach_contacts.pain_status END,
+          status=CASE WHEN outreach_contacts.status NOT IN ('replied','in_talks','closed_won') THEN 'replied' ELSE outreach_contacts.status END
+        RETURNING *
+      `, [fromName, fromEmail, companyGuess, intent, sentiment]);
+      const contact = upsert.rows[0];
+
+      await pool.query(`
+        INSERT INTO inbound_emails (message_id,thread_id,contact_id,from_email,from_name,to_email,subject,body_text,intent,sentiment,requires_human,received_at)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,true,NOW()) ON CONFLICT (message_id) DO NOTHING
+      `, [messageId, threadId, contact.id, fromEmail, fromName, toEmail, subject, bodyText.substring(0,10000), intent, sentiment]);
+
+      await pool.query(`INSERT INTO outreach_events (contact_id,event_type,event_source,metadata,occurred_at) VALUES ($1,'replied','resend_inbound',$2,NOW())`,
+        [contact.id, JSON.stringify({ from: fromEmail, subject, snippet: bodyText.substring(0,200), intent })]);
+
+      console.log(`📥 Inbox email: ${fromEmail} → ${toEmail} | ${intent}`);
+      return;
+    }
 
     const tag = match[1];
     const r = await pool.query('SELECT * FROM outreach_contacts WHERE reply_to_tag=$1', [tag]);
