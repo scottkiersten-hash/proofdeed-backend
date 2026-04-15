@@ -2986,6 +2986,125 @@ cron.schedule('0 8 * * *', async () => {
   }
 }, { timezone: 'America/Los_Angeles' });
 
+/* ---------------- System Health Monitor ---------------- */
+const ADMIN_ALERT_EMAIL = process.env.MAIL_TO || 'scott@proofdeed.com';
+let lastAlertSent = {};
+
+async function sendAlertEmail(subject, body) {
+  const domain = process.env.MAILGUN_DOMAIN;
+  const key = process.env.MAILGUN_API_KEY;
+  if (!domain || !key) return;
+  await fetch(`https://api.mailgun.net/v3/${domain}/messages`, {
+    method: 'POST',
+    headers: {
+      Authorization: 'Basic ' + Buffer.from('api:' + key).toString('base64'),
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: new URLSearchParams({
+      from: process.env.MAIL_FROM || `ProofDeed <noreply@${domain}>`,
+      to: ADMIN_ALERT_EMAIL,
+      subject,
+      text: body,
+    }),
+  });
+}
+
+async function runHealthChecks() {
+  const checks = [];
+  const now = Date.now();
+
+  // 1. Database
+  try {
+    await pool.query('SELECT 1');
+    checks.push({ name: 'Database', ok: true });
+  } catch (e) {
+    checks.push({ name: 'Database', ok: false, error: e.message });
+  }
+
+  // 2. Stripe
+  try {
+    await stripe.balance.retrieve();
+    checks.push({ name: 'Stripe', ok: true });
+  } catch (e) {
+    checks.push({ name: 'Stripe', ok: false, error: e.message });
+  }
+
+  // 3. Resend API
+  try {
+    const r = await fetch('https://api.resend.com/emails', {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}` },
+    });
+    checks.push({ name: 'Resend', ok: r.status !== 500, error: r.status >= 500 ? `HTTP ${r.status}` : null });
+  } catch (e) {
+    checks.push({ name: 'Resend', ok: false, error: e.message });
+  }
+
+  // 4. Mailgun
+  try {
+    const domain = process.env.MAILGUN_DOMAIN;
+    const key = process.env.MAILGUN_API_KEY;
+    if (domain && key) {
+      const r = await fetch(`https://api.mailgun.net/v3/domains/${domain}`, {
+        headers: { Authorization: 'Basic ' + Buffer.from('api:' + key).toString('base64') },
+      });
+      checks.push({ name: 'Mailgun', ok: r.ok, error: r.ok ? null : `HTTP ${r.status}` });
+    } else {
+      checks.push({ name: 'Mailgun', ok: false, error: 'Keys not set' });
+    }
+  } catch (e) {
+    checks.push({ name: 'Mailgun', ok: false, error: e.message });
+  }
+
+  const failures = checks.filter(c => !c.ok);
+
+  // Alert on new failures (don't spam — once per hour per service)
+  for (const f of failures) {
+    const lastSent = lastAlertSent[f.name] || 0;
+    if (now - lastSent > 60 * 60 * 1000) {
+      lastAlertSent[f.name] = now;
+      await sendAlertEmail(
+        `🚨 ProofDeed Alert: ${f.name} is DOWN`,
+        `ProofDeed system alert — ${new Date().toLocaleString()}\n\n${f.name} is not responding.\n\nError: ${f.error}\n\nCheck DigitalOcean logs immediately.\nhttps://cloud.digitalocean.com`
+      ).catch(() => {});
+      console.error(`[HealthMonitor] ALERT sent — ${f.name} down: ${f.error}`);
+    }
+  }
+
+  // Clear alert state when service recovers
+  for (const c of checks.filter(c => c.ok)) {
+    if (lastAlertSent[c.name]) {
+      delete lastAlertSent[c.name];
+      console.log(`[HealthMonitor] ${c.name} recovered.`);
+    }
+  }
+
+  return checks;
+}
+
+// Check every 15 minutes
+cron.schedule('*/15 * * * *', () => runHealthChecks());
+
+// Daily summary at 8am PT
+cron.schedule('0 8 * * *', async () => {
+  const checks = await runHealthChecks();
+  const allOk = checks.every(c => c.ok);
+  const lines = checks.map(c => `${c.ok ? '✅' : '❌'} ${c.name}${c.error ? ': ' + c.error : ''}`).join('\n');
+  await sendAlertEmail(
+    allOk ? '✅ ProofDeed Daily Health Check — All Systems OK' : '⚠️ ProofDeed Daily Health Check — Issues Detected',
+    `ProofDeed Daily System Report — ${new Date().toLocaleDateString()}\n\n${lines}\n\nAdmin: https://proofdeed.com/admin`
+  ).catch(() => {});
+  console.log(`[HealthMonitor] Daily summary sent. All OK: ${allOk}`);
+}, { timezone: 'America/Los_Angeles' });
+
+// Expose health check endpoint for manual trigger
+app.get(['/api/admin/health-check', '/admin/health-check'], authRateLimit, async (req, res) => {
+  if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
+  const checks = await runHealthChecks();
+  const allOk = checks.every(c => c.ok);
+  res.json({ allOk, checks, timestamp: new Date().toISOString() });
+});
+
 /* ---------------- Start Server ---------------- */
 const server = app.listen(PORT, () => {
   console.log("ProofDeed backend running on port " + PORT);
