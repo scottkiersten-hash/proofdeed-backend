@@ -2242,6 +2242,7 @@ async function ensureIndexes() {
       ALTER TABLE outreach_contacts ADD COLUMN IF NOT EXISTS reply_to_tag TEXT UNIQUE;
       ALTER TABLE outreach_contacts ADD COLUMN IF NOT EXISTS resend_message_id TEXT;
       ALTER TABLE outreach_contacts ADD COLUMN IF NOT EXISTS opened_count INTEGER DEFAULT 0;
+      ALTER TABLE outreach_contacts ADD COLUMN IF NOT EXISTS tier TEXT DEFAULT 'primary';
 
       -- Outreach events log
       CREATE TABLE IF NOT EXISTS outreach_events (
@@ -2633,150 +2634,124 @@ app.put(['/api/admin/outreach/contacts/:id', '/admin/outreach/contacts/:id'], au
 
 /* ---------------- Lead Engine ---------------- */
 const LEAD_TARGETS = [
-  { industry: 'government',       title: 'County Recorder',          query: 'County Recorder "contact" OR "email" site:*.gov USA 2024 2025' },
-  { industry: 'government',       title: 'Register of Deeds',        query: '"Register of Deeds" contact email county USA' },
-  { industry: 'title_insurance',  title: 'Chief Risk Officer',       query: '"Chief Risk Officer" "title insurance" OR "title company" USA email' },
-  { industry: 'title_insurance',  title: 'Chief Technology Officer', query: 'CTO "title insurance" company USA executive contact' },
-  { industry: 'title_insurance',  title: 'Chief Compliance Officer', query: '"Chief Compliance Officer" "title insurance" USA contact' },
-  { industry: 'mortgage',         title: 'Chief Digital Officer',    query: '"Chief Digital Officer" mortgage lender USA contact email' },
-  { industry: 'mortgage',         title: 'Chief Risk Officer',       query: '"Chief Risk Officer" mortgage company USA executive' },
-  { industry: 'auto',             title: 'Chief Technology Officer', query: 'CTO "auto auction" OR "vehicle history" OR "remarketing" USA executive' },
-  { industry: 'insurance',        title: 'Chief Digital Officer',    query: '"Chief Digital Officer" insurance company USA "document" OR "fraud"' },
-  { industry: 'banking',          title: 'Chief Digital Officer',    query: '"Chief Digital Officer" bank "document management" OR "fraud prevention" USA' },
-  { industry: 'real_estate',      title: 'Chief Technology Officer', query: 'CTO "real estate" proptech USA "document" OR "fraud" OR "blockchain"' },
-  { industry: 'legal',            title: 'Chief Technology Officer', query: 'CTO "law firm" OR "legal services" USA document management technology' },
+  // ── TIER 1: Primary Buyers — Recorder/Clerk roles (fastest path to revenue)
+  { industry: 'government', role: 'recorder', tier: 'primary',    title: 'County Recorder',              query: '"County Recorder" contact email county USA site:*.gov OR site:*.us 2024 2025' },
+  { industry: 'government', role: 'recorder', tier: 'primary',    title: 'Register of Deeds',            query: '"Register of Deeds" contact email county USA site:*.gov' },
+  { industry: 'government', role: 'recorder', tier: 'primary',    title: 'Clerk of Court',               query: '"Clerk of Court" civil records contact email county USA site:*.gov' },
+  { industry: 'government', role: 'recorder', tier: 'primary',    title: 'Chief Deputy Recorder',        query: '"Chief Deputy Recorder" OR "Deputy County Clerk" contact email county USA' },
+  { industry: 'government', role: 'recorder', tier: 'primary',    title: 'Land Records Manager',         query: '"Land Records Manager" OR "Land Records Supervisor" county USA contact email' },
+  { industry: 'government', role: 'recorder', tier: 'primary',    title: 'Recording Operations Manager', query: '"Recording Operations" manager county government USA contact email' },
+
+  // ── TIER 2: Influencers — Legal/Risk/Audit (help justify the buy)
+  { industry: 'government', role: 'legal',    tier: 'influencer', title: 'County Attorney',              query: '"County Attorney" OR "County Counsel" government USA contact email site:*.gov' },
+  { industry: 'government', role: 'legal',    tier: 'influencer', title: 'City Attorney',                query: '"City Attorney" municipal legal department USA contact email site:*.gov' },
+  { industry: 'government', role: 'risk',     tier: 'influencer', title: 'Risk Management Director',     query: '"Risk Management Director" county OR city government USA contact email' },
+  { industry: 'government', role: 'risk',     tier: 'influencer', title: 'Compliance Officer',           query: '"Compliance Officer" county OR city government USA contact email' },
+  { industry: 'government', role: 'risk',     tier: 'influencer', title: 'Internal Audit Director',      query: '"Internal Audit Director" OR "Chief Auditor" county government USA contact' },
+
+  // ── TIER 3: Approvers — IT/Tech (gatekeepers)
+  { industry: 'government', role: 'it',       tier: 'approver',   title: 'County CIO',                   query: '"County CIO" OR "County IT Director" government USA contact email' },
+  { industry: 'government', role: 'it',       tier: 'approver',   title: 'Director of Digital Services',  query: '"Director of Digital Services" OR "Director of Innovation" county city USA' },
+  { industry: 'government', role: 'it',       tier: 'approver',   title: 'Enterprise Applications Manager', query: '"Enterprise Applications Manager" county government USA contact email' },
+
+  // ── TIER 4: Expansion buyers (after initial traction)
+  { industry: 'government', role: 'procurement', tier: 'expansion', title: 'Procurement Director',       query: '"Procurement Director" OR "Purchasing Manager" county government USA contact' },
+  { industry: 'government', role: 'expansion',   tier: 'expansion', title: 'Housing Authority Director', query: '"Housing Authority" director executive USA contact email 2024 2025' },
+  { industry: 'government', role: 'expansion',   tier: 'expansion', title: 'Tax Assessor',               query: '"Tax Assessor" OR "County Treasurer" foreclosure records USA contact email' },
+  { industry: 'government', role: 'expansion',   tier: 'expansion', title: 'Land Bank Director',         query: '"Land Bank" director OR "Redevelopment Authority" USA contact email' },
+  { industry: 'government', role: 'expansion',   tier: 'expansion', title: 'Public Records Officer',     query: '"Public Records Officer" OR "FOIA Officer" county government USA contact email' },
+  { industry: 'government', role: 'expansion',   tier: 'expansion', title: 'State Records Manager',      query: '"State Records Management" director OR manager USA contact email site:*.gov' },
 ];
 
-const INITIAL_EMAIL = (name, company, industry) => {
+const INITIAL_EMAIL = (name, company, industry, role) => {
   const first = name.split(' ')[0];
 
-  const templates = {
-    government: `Hi ${first},
+  // ── Recorder / Clerk — "Prove document integrity when records are challenged"
+  const recorder = `Hi ${first},
 
-I'm reaching out because county recorders across the country are facing growing pressure around document integrity — contested deeds, forged filings, and chain-of-title disputes that end up in court.
+When a recorded document gets challenged — contested deed, disputed filing, chain-of-title dispute — your office has to prove it. The question isn't whether it's in your system. It's whether you can prove it hasn't been altered.
 
-ProofDeed anchors documents to the Polygon blockchain at the moment of recording, creating a tamper-proof, timestamped record that satisfies court admissibility requirements under FRE Rule 901. No system replacement — it works alongside your existing workflow via a single API call and can go live within days.
+ProofDeed anchors documents to the Polygon blockchain at the moment of recording. Every document gets a tamper-proof, timestamped certificate that satisfies FRE Rule 901 in court. No system replacement. No document storage. Works alongside your existing workflow via API — live in days.
 
-Several county offices are already evaluating this as a low-cost way to get ahead of fraud liability before it becomes a headline.
+Several county offices are using this to get ahead of fraud liability before it becomes a headline.
 
-See it live in 2 minutes: proofdeed.com/demo
+See it in 2 minutes: proofdeed.com/demo
 
-Would you have 20 minutes this week for a quick walkthrough?
-
-Best,
-Scott Kiersten
-Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`,
-
-    title_insurance: `Hi ${first},
-
-Post-closing document disputes are one of the fastest-growing liability risks in title insurance — and the organizations that can prove document integrity at the moment of closing are in the strongest position when claims arise.
-
-ProofDeed creates a blockchain-anchored, court-admissible certificate for every document at the moment it's certified — tamper-proof proof under FRE Rule 901. No system replacement. Single API call. Live in days.
-
-The cost of a single contested closing typically dwarfs the entire annual cost of implementation.
-
-See it live in 2 minutes: proofdeed.com/demo
-
-Would you have 20 minutes this week to see how it works?
+Would a 20-minute call this week make sense?
 
 Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`,
+gov@proofdeed.com | proofdeed.com`;
 
-    mortgage: `Hi ${first},
+  // ── Legal / Risk / Audit — "Reduce exposure when document authenticity is disputed"
+  const legal = `Hi ${first},
 
-Mortgage document fraud — altered loan applications, forged signatures, tampered appraisals — is rising, and lenders that can't prove document integrity at origination are increasingly exposed when loans go into dispute.
+When document authenticity gets disputed in litigation, the question your office faces is: can you prove the document hasn't been altered since it was created? Timestamps in internal systems don't answer that. A court wants independent, tamper-proof proof.
 
-ProofDeed anchors mortgage documents to the Polygon blockchain at the moment they're created, producing a tamper-proof, court-admissible record under FRE Rule 901. No system replacement. Single API call. Live in days.
+ProofDeed creates a blockchain-anchored certificate at the moment a document is recorded — independently verifiable by any court, auditor, or opposing counsel without access to your internal systems. FRE Rule 901 compliant. No system changes required.
 
-See it live in 2 minutes: proofdeed.com/demo
+The cost of a single disputed record averages $50,000 in legal fees. The cost to protect against it is a fraction of that.
 
-Would you have 20 minutes this week to see how it fits into your document workflow?
+See it in 2 minutes: proofdeed.com/demo
 
-Best,
-Scott Kiersten
-Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`,
-
-    auto: `Hi ${first},
-
-Vehicle history fraud — odometer rollbacks, salvage title laundering, forged ownership records — costs the auto industry billions annually, and the gap is widest at the point of record transfer.
-
-ProofDeed anchors vehicle and title documents to the Polygon blockchain at the moment they're certified, creating a tamper-proof chain of custody that holds up in court under FRE Rule 901. No system replacement. Single API call. Live in days.
-
-See it live in 2 minutes: proofdeed.com/demo
-
-Would you have 20 minutes this week for a quick walkthrough?
+Worth a 20-minute conversation?
 
 Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`,
+gov@proofdeed.com | proofdeed.com`;
 
-    insurance: `Hi ${first},
+  // ── IT / CIO / Digital Services — "No system changes, no document storage, low-risk deployment"
+  const it = `Hi ${first},
 
-Claims document fraud — altered policies, backdated coverage requests, tampered loss records — is one of the hardest fraud vectors to prove in litigation, and one of the most expensive.
+I'll keep this short because I know your plate is full.
 
-ProofDeed creates a blockchain-anchored, court-admissible certificate for every document at the moment it's issued — tamper-proof proof of existence and integrity under FRE Rule 901. No system replacement. Single API call. Live in days.
+ProofDeed adds tamper-proof document certification to your existing workflow — no system replacement, no document storage on our end, single API call. Most county offices are live in under a week with no impact on existing infrastructure.
 
-See it live in 2 minutes: proofdeed.com/demo
+It creates a blockchain-anchored record for each document at the moment it's processed — independently verifiable proof of integrity and timestamp that holds up in court under FRE Rule 901.
 
-Would you have 20 minutes this week to see how it works?
+No new user training. No data migration. No long-term lock-in.
 
-Best,
-Scott Kiersten
-Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`,
+See it in 2 minutes: proofdeed.com/demo
 
-    banking: `Hi ${first},
-
-High-value transaction documents — loan agreements, wire instructions, collateral records — are among the most frequently targeted in financial fraud, and the hardest to defend without an immutable audit trail.
-
-ProofDeed anchors documents to the Polygon blockchain at the moment they're created, producing a tamper-proof, court-admissible record under FRE Rule 901. No system replacement. Single API call. Live in days.
-
-See it live in 2 minutes: proofdeed.com/demo
-
-Would you have 20 minutes this week to see how it fits your document workflow?
+Would 20 minutes be worth it to see the integration?
 
 Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`,
+gov@proofdeed.com | proofdeed.com`;
 
-    real_estate: `Hi ${first},
+  // ── Procurement / Budget — "Fixed-cost pilot, no long-term commitment"
+  const procurement = `Hi ${first},
 
-Property transaction fraud — forged deeds, altered purchase agreements, tampered inspection records — is rising, and the organizations that can prove document integrity at every step are best positioned when disputes arise.
+If your office is evaluating document integrity solutions, I want to make this easy.
 
-ProofDeed anchors real estate documents to the Polygon blockchain at the moment they're certified — tamper-proof, court-admissible proof under FRE Rule 901. No system replacement. Single API call. Live in days.
+ProofDeed offers a fixed-cost 45-day Government Pilot at $15,000 — up to 50,000 certifications, full API access, no variable costs, no long-term commitment. If it works, you continue at standard volume pricing. If not, your certified records remain on-chain permanently regardless.
 
-See it live in 2 minutes: proofdeed.com/demo
+It anchors documents to the Polygon blockchain at the moment of processing — tamper-proof, court-admissible proof under FRE Rule 901. Single API integration. No system replacement.
 
-Would you have 20 minutes this week for a quick walkthrough?
+ACH and purchase order accepted.
 
-Best,
-Scott Kiersten
-Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`,
+See it in 2 minutes: proofdeed.com/demo
 
-    legal: `Hi ${first},
-
-Chain-of-custody documentation is foundational to litigation — and the firms that can prove a document's integrity at the moment it was created are in a materially stronger position in court.
-
-ProofDeed anchors documents to the Polygon blockchain at the moment they're certified, producing a tamper-proof, court-admissible record under FRE Rule 901. No system replacement. Single API call. Live in days.
-
-See it live in 2 minutes: proofdeed.com/demo
-
-Would you have 20 minutes this week to see how it works?
+Worth a quick call to discuss the pilot structure?
 
 Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`,
+gov@proofdeed.com | proofdeed.com`;
+
+  const byRole = {
+    recorder:    recorder,
+    legal:       legal,
+    risk:        legal,
+    it:          it,
+    procurement: procurement,
+    expansion:   recorder,
   };
 
-  return templates[industry] || templates['government'];
+  return byRole[role] || recorder;
 };
 
 async function runLeadEngine() {
@@ -2833,7 +2808,7 @@ async function runLeadEngine() {
       if (exists.rows.length > 0) { skipped++; continue; }
 
       const replyTag = crypto.randomBytes(8).toString('hex');
-      const emailBody = INITIAL_EMAIL(lead.name, lead.company, lead.industry || target.industry);
+      const emailBody = INITIAL_EMAIL(lead.name, lead.company, lead.industry || target.industry, target.role);
       const subject = `Blockchain Document Certification for ${lead.company}`;
 
       try {
@@ -2846,9 +2821,9 @@ async function runLeadEngine() {
         });
 
         await pool.query(
-          `INSERT INTO outreach_contacts (name, email, company, title, industry, status, reply_to_tag, resend_message_id, first_sent_at, last_contact_at)
-           VALUES ($1,$2,$3,$4,$5,'sent',$6,$7,NOW(),NOW())`,
-          [lead.name, lead.email.toLowerCase(), lead.company, lead.title, lead.industry || target.industry, replyTag, result.data?.id || null]
+          `INSERT INTO outreach_contacts (name, email, company, title, industry, tier, status, reply_to_tag, resend_message_id, first_sent_at, last_contact_at)
+           VALUES ($1,$2,$3,$4,$5,$6,'sent',$7,$8,NOW(),NOW())`,
+          [lead.name, lead.email.toLowerCase(), lead.company, lead.title, lead.industry || target.industry, target.tier || 'primary', replyTag, result.data?.id || null]
         );
         await pool.query(
           `INSERT INTO outreach_events (contact_id, event_type, event_source, metadata, occurred_at)
