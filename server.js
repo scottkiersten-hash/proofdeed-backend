@@ -2044,7 +2044,7 @@ app.get(["/admin/revenue", "/api/admin/revenue"], authRateLimit, async (req, res
     `);
 
     // Demo cert count
-    const demoCerts = await pool.query(`SELECT COUNT(*) as total FROM certifications WHERE document_data LIKE '%"demo":true%'`);
+    const demoCerts = await pool.query(`SELECT COUNT(*) as total FROM certifications WHERE document_data::text LIKE '%"demo":true%'`);
 
     res.json({
       mrr: Math.round(mrr * 100) / 100,
