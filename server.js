@@ -1890,7 +1890,7 @@ app.get(["/admin/stats", "/api/admin/stats"], authRateLimit, async (req, res) =>
     const testUserIds = await pool.query(
       `SELECT id FROM users WHERE email = ANY($1)`, [TEST_EMAILS]
     );
-    const testIds = testUserIds.rows.map((r: any) => r.id);
+    const testIds = testUserIds.rows.map(r => r.id);
     const certs = testIds.length > 0
       ? await pool.query(
           `SELECT COUNT(*) as total FROM certifications WHERE user_id != ALL($1) OR user_id IS NULL`,
