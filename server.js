@@ -1301,6 +1301,41 @@ app.post(["/contact", "/api/contact"], async (req, res) => {
       }
     }
 
+    if (request_type === "purchase_order" && mailgunDomain && mailgunApiKey) {
+      // Notify admin
+      await fetch("https://api.mailgun.net/v3/" + mailgunDomain + "/messages", {
+        method: "POST",
+        headers: {
+          "Authorization": "Basic " + Buffer.from("api:" + mailgunApiKey).toString("base64"),
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: new URLSearchParams({
+          from: process.env.MAIL_FROM || "ProofDeed <mailgun@" + mailgunDomain + ">",
+          to: "gov@proofdeed.com",
+          subject: "🏛 PO Request: $15K Pilot — " + (resolvedCompany || name),
+          text: "Purchase Order request received.\n\nName: " + name + "\nAgency: " + (resolvedCompany || "N/A") + "\nEmail: " + email + "\nMessage: " + (resolvedNotes || "N/A") + "\n\nAction required: Send invoice to " + email + "\n\nProofDeed Admin\nhttps://proofdeed.com/admin"
+        })
+      }).catch(() => {});
+
+      // Confirm to prospect
+      await fetch("https://api.mailgun.net/v3/" + mailgunDomain + "/messages", {
+        method: "POST",
+        headers: {
+          "Authorization": "Basic " + Buffer.from("api:" + mailgunApiKey).toString("base64"),
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: new URLSearchParams({
+          from: process.env.MAIL_FROM || "ProofDeed <mailgun@" + mailgunDomain + ">",
+          to: email,
+          subject: "ProofDeed — Government Pilot Invoice Request Received",
+          text: "Hi " + name + ",\n\nWe received your request for the ProofDeed Government Pilot Program ($15,000).\n\nWe will send a formal invoice to this email within 1 business day. Net 30 terms are available for government agencies.\n\nOnce payment is confirmed, your API key and onboarding materials will be sent immediately.\n\nIf you have any questions, reply to this email or contact us at gov@proofdeed.com.\n\nProofDeed\nhttps://proofdeed.com"
+        })
+      }).catch(() => {});
+
+      console.log("Purchase order request received from:", email, resolvedCompany);
+      return res.json({ success: true });
+    }
+
     if (mailgunDomain && mailgunApiKey) {
       const isProofEmail = !!proofId;
       const emailSubject = subject || (isProofEmail ? "Your ProofDeed Certificate" : "ProofDeed Contact Confirmation");
@@ -1427,6 +1462,7 @@ app.post(["/create-checkout-session", "/api/create-checkout-session"], async (re
 
     const sessionParams = {
       mode: isOneTime ? "payment" : "subscription",
+      payment_method_types: isOneTime ? ["card", "us_bank_account"] : ["card"],
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: success_url || "https://proofdeed.com/success",
       cancel_url: cancel_url || "https://proofdeed.com",
@@ -1435,10 +1471,12 @@ app.post(["/create-checkout-session", "/api/create-checkout-session"], async (re
     };
 
     if (isOneTime) {
-      // Let Stripe use dashboard payment method settings (includes ACH)
-      sessionParams.automatic_payment_methods = { enabled: true };
-    } else {
-      sessionParams.payment_method_types = ["card"];
+      sessionParams.payment_method_options = {
+        us_bank_account: {
+          financial_connections: { permissions: ["payment_method"] },
+          verification_method: "instant",
+        },
+      };
     }
 
     const session = await stripe.checkout.sessions.create(sessionParams);
