@@ -2243,6 +2243,10 @@ async function ensureIndexes() {
       ALTER TABLE outreach_contacts ADD COLUMN IF NOT EXISTS resend_message_id TEXT;
       ALTER TABLE outreach_contacts ADD COLUMN IF NOT EXISTS opened_count INTEGER DEFAULT 0;
       ALTER TABLE outreach_contacts ADD COLUMN IF NOT EXISTS tier TEXT DEFAULT 'primary';
+      ALTER TABLE outreach_contacts ADD COLUMN IF NOT EXISTS priority_score INTEGER DEFAULT 0;
+      ALTER TABLE outreach_contacts ADD COLUMN IF NOT EXISTS pipeline_stage TEXT DEFAULT 'contacted';
+      ALTER TABLE outreach_contacts ADD COLUMN IF NOT EXISTS pain_status TEXT DEFAULT 'unaware';
+      ALTER TABLE outreach_contacts ADD COLUMN IF NOT EXISTS use_case TEXT;
 
       -- Outreach events log
       CREATE TABLE IF NOT EXISTS outreach_events (
@@ -2531,11 +2535,42 @@ app.post(['/api/webhooks/resend-inbound', '/webhooks/resend-inbound'], async (re
       VALUES ($1,'replied','inbound',$2,NOW())
     `, [contact.id, JSON.stringify({ from: fromField, subject, snippet: textSnippet })]);
 
-    await pool.query(`
-      UPDATE outreach_contacts SET status='replied', last_contact_at=NOW() WHERE id=$1
-    `, [contact.id]);
+    // Detect high intent in reply
+    const replyText = (subject + ' ' + textSnippet).toLowerCase();
+    const highIntentKeywords = ['interested', 'interest', 'learn more', 'tell me more', 'details', 'schedule', 'call', 'demo', 'pricing', 'pilot', 'how does', 'sounds good', 'let\'s talk', 'set up'];
+    const isHighIntent = highIntentKeywords.some(k => replyText.includes(k));
 
-    console.log(`✅ Reply detected from ${fromField} → contact #${contact.id} (${contact.name})`);
+    const newPipelineStage = isHighIntent ? 'pilot_discussed' : 'replied';
+    const newPainStatus = isHighIntent ? 'active' : 'aware';
+
+    await pool.query(`
+      UPDATE outreach_contacts
+      SET status='replied', pipeline_stage=$1, pain_status=$2, last_contact_at=NOW()
+      WHERE id=$3
+    `, [newPipelineStage, newPainStatus, contact.id]);
+
+    console.log(`✅ Reply detected from ${fromField} → contact #${contact.id} (${contact.name}) — intent: ${isHighIntent ? 'HIGH 🔥' : 'standard'}`);
+
+    // Alert on high-intent reply
+    if (isHighIntent) {
+      const mailgunDomain = process.env.MAILGUN_DOMAIN;
+      const mailgunApiKey = process.env.MAILGUN_API_KEY;
+      if (mailgunDomain && mailgunApiKey) {
+        fetch('https://api.mailgun.net/v3/' + mailgunDomain + '/messages', {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Basic ' + Buffer.from('api:' + mailgunApiKey).toString('base64'),
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: new URLSearchParams({
+            from: process.env.MAIL_FROM || 'ProofDeed <mailgun@' + mailgunDomain + '>',
+            to: process.env.MAIL_TO || 'info@proofdeed.com',
+            subject: `🔥 HOT REPLY: ${contact.name} (${contact.company}) — Move to Pilot Discussion`,
+            text: `High-intent reply detected!\n\nContact: ${contact.name}\nCompany: ${contact.company}\nEmail: ${contact.email}\nTitle: ${contact.title || 'N/A'}\nIndustry: ${contact.industry}\nPriority Score: ${contact.priority_score || 'N/A'}\n\nTheir reply subject: ${subject}\nSnippet: ${textSnippet}\n\nAction: Move to Pilot Discussed — reach out within 24 hours.\n\nAdmin: https://proofdeed.com/admin`
+          })
+        }).catch(() => {});
+      }
+    }
   } catch (err) {
     console.error('Inbound webhook error:', err.message);
   }
@@ -2578,30 +2613,34 @@ app.get(['/api/admin/outreach/contacts', '/admin/outreach/contacts'], authRateLi
   try {
     const search = req.query.search ? `%${req.query.search}%` : '%';
     const status = req.query.status || '';
+    const industry = req.query.industry || '';
+    const hotOnly = req.query.hot === '1';
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.min(200, parseInt(req.query.limit) || 50);
     const offset = (page - 1) * limit;
 
-    const where = status ? 'AND status=$3' : '';
-    const params = status ? [search, offset, status] : [search, offset];
-    const limitParam = status ? '$4' : '$3';
+    const conditions = ['(name ILIKE $1 OR email ILIKE $1 OR company ILIKE $1)'];
+    const params = [search];
+    if (status) { params.push(status); conditions.push(`status=$${params.length}`); }
+    if (industry) { params.push(industry); conditions.push(`industry=$${params.length}`); }
+    if (hotOnly) conditions.push(`priority_score >= 7`);
+
+    const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 
     const result = await pool.query(`
       SELECT * FROM outreach_contacts
-      WHERE (name ILIKE $1 OR email ILIKE $1 OR company ILIKE $1)
-      ${where}
+      ${whereClause}
       ORDER BY
+        COALESCE(priority_score, 0) DESC,
         CASE status WHEN 'replied' THEN 0 WHEN 'in_talks' THEN 1 WHEN 'clicked' THEN 2
           WHEN 'opened' THEN 3 WHEN 'delivered' THEN 4 ELSE 5 END,
         last_contact_at DESC NULLS LAST
-      LIMIT ${limitParam} OFFSET $2
-    `, [...params, limit]);
+      LIMIT $${params.length + 1} OFFSET $${params.length + 2}
+    `, [...params, limit, offset]);
 
     const countResult = await pool.query(`
-      SELECT COUNT(*) as total FROM outreach_contacts
-      WHERE (name ILIKE $1 OR email ILIKE $1 OR company ILIKE $1)
-      ${status ? 'AND status=$2' : ''}
-    `, status ? [search, status] : [search]);
+      SELECT COUNT(*) as total FROM outreach_contacts ${whereClause}
+    `, params);
 
     res.json({ contacts: result.rows, total: parseInt(countResult.rows[0].total), page, limit });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -2624,10 +2663,14 @@ app.get(['/api/admin/outreach/contacts/:id/timeline', '/admin/outreach/contacts/
 app.put(['/api/admin/outreach/contacts/:id', '/admin/outreach/contacts/:id'], authRateLimit, async (req, res) => {
   if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
   try {
-    const { status, notes } = req.body;
+    const { status, notes, pipeline_stage, pain_status } = req.body;
     await pool.query(`
-      UPDATE outreach_contacts SET status=COALESCE($1,status), notes=COALESCE($2,notes), last_contact_at=NOW() WHERE id=$3
-    `, [status, notes, req.params.id]);
+      UPDATE outreach_contacts
+      SET status=COALESCE($1,status), notes=COALESCE($2,notes),
+          pipeline_stage=COALESCE($3,pipeline_stage), pain_status=COALESCE($4,pain_status),
+          last_contact_at=NOW()
+      WHERE id=$5
+    `, [status, notes, pipeline_stage, pain_status, req.params.id]);
     res.json({ success: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -3157,6 +3200,36 @@ gov@proofdeed.com | proofdeed.com`;
   return byRole[role] || recorder;
 };
 
+function calcPriorityScore(title, industry, role) {
+  let score = 0;
+  const t = (title || '').toLowerCase();
+  const ind = (industry || '');
+  const r = (role || '');
+
+  // +3 Core buyer role
+  if (['recorder','dealer','compliance','title_ops','claims','lien','audit','deal','litigation','transact'].includes(r)) score += 3;
+
+  // +3 High document volume industry
+  if (['government','title_escrow','legal','auto','construction','pe_ma'].includes(ind)) score += 3;
+
+  // +2 Regulated industry
+  if (['government','regulated','institutional','insurance','accounting'].includes(ind)) score += 2;
+
+  // +3 Risk signal in title
+  if (['risk','compliance','fraud','audit','legal','counsel','investigation','integrity','claims','lien'].some(k => t.includes(k))) score += 3;
+
+  // +1 Director or above
+  if (['director','vp ','vice president','chief','head of','partner','officer','president','counsel','registrar'].some(k => t.includes(k))) score += 1;
+
+  return Math.min(score, 12);
+}
+
+function priorityLabel(score) {
+  if (score >= 7) return 'hot';
+  if (score >= 5) return 'warm';
+  return 'cold';
+}
+
 async function runLeadEngine() {
   if (!process.env.ANTHROPIC_API_KEY || !process.env.RESEND_API_KEY) {
     console.log(`[LeadEngine] Missing API keys — ANTHROPIC: ${!!process.env.ANTHROPIC_API_KEY}, RESEND: ${!!process.env.RESEND_API_KEY}`);
@@ -3223,10 +3296,12 @@ async function runLeadEngine() {
           text: emailBody,
         });
 
+        const pscore = calcPriorityScore(lead.title, lead.industry || target.industry, target.role);
+        const useCase = `${target.title} — ${(lead.industry || target.industry).replace(/_/g,' ')}`;
         await pool.query(
-          `INSERT INTO outreach_contacts (name, email, company, title, industry, tier, status, reply_to_tag, resend_message_id, first_sent_at, last_contact_at)
-           VALUES ($1,$2,$3,$4,$5,$6,'sent',$7,$8,NOW(),NOW())`,
-          [lead.name, lead.email.toLowerCase(), lead.company, lead.title, lead.industry || target.industry, target.tier || 'primary', replyTag, result.data?.id || null]
+          `INSERT INTO outreach_contacts (name, email, company, title, industry, tier, priority_score, pipeline_stage, pain_status, use_case, status, reply_to_tag, resend_message_id, first_sent_at, last_contact_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,'contacted','unaware',$8,'sent',$9,$10,NOW(),NOW())`,
+          [lead.name, lead.email.toLowerCase(), lead.company, lead.title, lead.industry || target.industry, target.tier || 'primary', pscore, useCase, replyTag, result.data?.id || null]
         );
         await pool.query(
           `INSERT INTO outreach_events (contact_id, event_type, event_source, metadata, occurred_at)
@@ -3379,10 +3454,11 @@ gov@proofdeed.com | proofdeed.com`;
 cron.schedule('0 8 * * *', async () => {
   console.log('[Autopilot] Running daily follow-up check...');
   try {
-    // Day 7: no reply, first_sent_at between 7-8 days ago
+    // Day 7: no reply, first_sent_at between 7-8 days ago — skip dead/lost
     const day7 = await pool.query(`
       SELECT * FROM outreach_contacts
       WHERE status NOT IN ('replied','in_talks','closed_won','closed_lost','bounced','complained','unsubscribed')
+      AND pipeline_stage NOT IN ('pilot_discussed','pilot_sent','pilot_approved','closed','qualified')
       AND first_sent_at <= NOW() - INTERVAL '7 days'
       AND first_sent_at > NOW() - INTERVAL '8 days'
     `);
@@ -3396,6 +3472,7 @@ cron.schedule('0 8 * * *', async () => {
     const day14 = await pool.query(`
       SELECT * FROM outreach_contacts
       WHERE status NOT IN ('replied','in_talks','closed_won','closed_lost','bounced','complained','unsubscribed')
+      AND pipeline_stage NOT IN ('pilot_discussed','pilot_sent','pilot_approved','closed','qualified')
       AND first_sent_at <= NOW() - INTERVAL '14 days'
       AND first_sent_at > NOW() - INTERVAL '15 days'
     `);
@@ -3409,6 +3486,7 @@ cron.schedule('0 8 * * *', async () => {
     const day21 = await pool.query(`
       SELECT * FROM outreach_contacts
       WHERE status NOT IN ('replied','in_talks','closed_won','closed_lost','bounced','complained','unsubscribed')
+      AND pipeline_stage NOT IN ('pilot_discussed','pilot_sent','pilot_approved','closed','qualified')
       AND first_sent_at <= NOW() - INTERVAL '21 days'
       AND first_sent_at > NOW() - INTERVAL '22 days'
     `);
