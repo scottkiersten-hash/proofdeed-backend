@@ -2661,6 +2661,73 @@ const LEAD_TARGETS = [
   { industry: 'government', role: 'expansion',   tier: 'expansion', title: 'Land Bank Director',         query: '"Land Bank" director OR "Redevelopment Authority" USA contact email' },
   { industry: 'government', role: 'expansion',   tier: 'expansion', title: 'Public Records Officer',     query: '"Public Records Officer" OR "FOIA Officer" county government USA contact email' },
   { industry: 'government', role: 'expansion',   tier: 'expansion', title: 'State Records Manager',      query: '"State Records Management" director OR manager USA contact email site:*.gov' },
+
+  // ════════════════════════════════════════════════════════
+  // AUTOMOTIVE — proof of ownership + transaction integrity
+  // ════════════════════════════════════════════════════════
+
+  // ── TIER 1: Core Buyers — title, compliance, F&I
+  { industry: 'auto', role: 'dealer',     tier: 'primary',    title: 'F&I Director',                  query: '"Finance and Insurance Director" OR "F&I Director" dealership automotive USA contact email' },
+  { industry: 'auto', role: 'dealer',     tier: 'primary',    title: 'Title Manager',                  query: '"Title Manager" OR "Title Clerk" automotive dealership USA contact email' },
+  { industry: 'auto', role: 'dealer',     tier: 'primary',    title: 'Dealer Compliance Manager',      query: '"Dealer Compliance Manager" OR "Compliance Director" automotive dealership USA contact' },
+  { industry: 'auto', role: 'dealer',     tier: 'primary',    title: 'Used Car Manager',               query: '"Used Car Manager" OR "Pre-Owned Manager" dealership USA contact email' },
+  { industry: 'auto', role: 'dealer',     tier: 'primary',    title: 'General Manager',                query: '"General Manager" automotive dealership "title" OR "compliance" USA contact email' },
+
+  // ── TIER 2: High-Volume Operators
+  { industry: 'auto', role: 'auction',    tier: 'influencer', title: 'Auto Auction Operations Director', query: '"Auto Auction" operations director Manheim ADESA USA contact email executive' },
+  { industry: 'auto', role: 'auction',    tier: 'influencer', title: 'Vehicle Remarketing Manager',    query: '"Vehicle Remarketing Manager" OR "Remarketing Director" automotive USA contact' },
+  { industry: 'auto', role: 'fleet',      tier: 'influencer', title: 'Fleet Management Director',      query: '"Fleet Management Director" OR "Fleet Operations Director" USA contact email' },
+  { industry: 'auto', role: 'fleet',      tier: 'influencer', title: 'Rental Car Operations Manager',  query: '"Rental Car Operations" manager Enterprise Hertz Avis USA contact email' },
+
+  // ── TIER 3: Lenders & Title Risk
+  { industry: 'auto', role: 'lender',     tier: 'approver',   title: 'Auto Lending Director',          query: '"Auto Lending Director" OR "Auto Finance Director" bank "credit union" USA contact' },
+  { industry: 'auto', role: 'lender',     tier: 'approver',   title: 'Collateral Risk Manager',        query: '"Collateral Risk Manager" automotive lender bank USA contact email' },
+  { industry: 'auto', role: 'lender',     tier: 'approver',   title: 'Lien Release Manager',           query: '"Lien Release Manager" auto lender bank USA contact email' },
+  { industry: 'auto', role: 'lender',     tier: 'approver',   title: 'Loan Servicing Director',        query: '"Loan Servicing Director" auto lender USA contact email executive' },
+
+  // ── TIER 4: Digital Platform Players
+  { industry: 'auto', role: 'digital',    tier: 'expansion',  title: 'VP of Operations (Online Auto)', query: '"VP of Operations" Carvana OR Vroom OR CarMax OR "online auto" USA contact email' },
+  { industry: 'auto', role: 'digital',    tier: 'expansion',  title: 'Title & Registration Ops Lead',  query: '"Title and Registration" operations lead "digital dealer" OR "online dealer" USA contact' },
+  { industry: 'auto', role: 'digital',    tier: 'expansion',  title: 'Marketplace Compliance Lead',    query: '"Marketplace Compliance" automotive platform USA contact email executive' },
+
+  // ── TIER 5: Extended Buyers
+  { industry: 'auto', role: 'insurance',  tier: 'expansion',  title: 'Auto Insurance Claims Director', query: '"Insurance Claims Director" auto claims "document" OR "total loss" USA contact email' },
+  { industry: 'auto', role: 'insurance',  tier: 'expansion',  title: 'Salvage & Total Loss Manager',   query: '"Total Loss Manager" OR "Salvage Manager" auto insurance USA contact email' },
+
+  // ════════════════════════════════════════════════════════
+  // INSTITUTIONAL — audit-proof document integrity
+  // ════════════════════════════════════════════════════════
+
+  // ── TIER 1: Core Buyers — compliance + records
+  { industry: 'institutional', role: 'compliance', tier: 'primary',    title: 'Chief Compliance Officer',     query: '"Chief Compliance Officer" "document management" OR "records" USA corporation contact email' },
+  { industry: 'institutional', role: 'compliance', tier: 'primary',    title: 'Director of Records Management', query: '"Director of Records Management" OR "Records Management Director" USA institution contact' },
+  { industry: 'institutional', role: 'compliance', tier: 'primary',    title: 'Document Control Manager',     query: '"Document Control Manager" institution OR corporation USA contact email' },
+  { industry: 'institutional', role: 'compliance', tier: 'primary',    title: 'Head of Governance / GRC',     query: '"Head of Governance" OR "GRC Director" OR "Governance Risk Compliance" USA contact email' },
+  { industry: 'institutional', role: 'compliance', tier: 'primary',    title: 'Internal Audit Director',      query: '"Internal Audit Director" OR "Chief Auditor" corporation USA contact email' },
+  { industry: 'institutional', role: 'compliance', tier: 'primary',    title: 'Legal Operations Director',    query: '"Legal Operations Director" OR "Director of Legal Operations" USA corporation contact' },
+
+  // ── TIER 2: Legal & Risk
+  { industry: 'institutional', role: 'legal',      tier: 'influencer', title: 'General Counsel',              query: '"General Counsel" OR "Deputy General Counsel" corporation USA "document" contact email' },
+  { industry: 'institutional', role: 'legal',      tier: 'influencer', title: 'Litigation Support Manager',   query: '"Litigation Support Manager" corporation OR "law firm" USA contact email' },
+  { industry: 'institutional', role: 'legal',      tier: 'influencer', title: 'Contract Management Director', query: '"Contract Management Director" OR "Director of Contracts" USA corporation contact email' },
+  { industry: 'institutional', role: 'risk',       tier: 'influencer', title: 'Risk Management Director',     query: '"Risk Management Director" institution corporation USA "document" OR "audit" contact email' },
+
+  // ── TIER 3: Operations
+  { industry: 'institutional', role: 'operations', tier: 'approver',   title: 'VP of Operations',             query: '"VP of Operations" large institution corporation USA "document" OR "records" contact email' },
+  { industry: 'institutional', role: 'operations', tier: 'approver',   title: 'Shared Services Director',     query: '"Shared Services Director" corporation USA "document" OR "records management" contact email' },
+  { industry: 'institutional', role: 'operations', tier: 'approver',   title: 'Procurement Operations Manager', query: '"Procurement Operations Manager" large corporation USA contact email' },
+
+  // ── TIER 4: Healthcare
+  { industry: 'institutional', role: 'healthcare', tier: 'expansion',  title: 'HIM Director',                 query: '"Health Information Management Director" OR "HIM Director" hospital USA contact email' },
+  { industry: 'institutional', role: 'healthcare', tier: 'expansion',  title: 'Medical Records Director',     query: '"Medical Records Director" hospital health system USA contact email' },
+  { industry: 'institutional', role: 'healthcare', tier: 'expansion',  title: 'Hospital Compliance Officer',  query: '"Compliance Officer" hospital OR "health system" USA "document" OR "records" contact email' },
+
+  // ── TIER 5: Education
+  { industry: 'institutional', role: 'education',  tier: 'expansion',  title: 'University Registrar',         query: '"University Registrar" OR "Registrar" university USA contact email 2024 2025' },
+  { industry: 'institutional', role: 'education',  tier: 'expansion',  title: 'Records & Archives Director',  query: '"Records and Archives Director" OR "University Archivist" USA contact email' },
+
+  // ── TIER 6: Financial Institutions
+  { industry: 'institutional', role: 'financial',  tier: 'expansion',  title: 'Loan Documentation Manager',   query: '"Loan Documentation Manager" OR "Loan Docs Manager" bank USA contact email' },
 ];
 
 const INITIAL_EMAIL = (name, company, industry, role) => {
@@ -2742,13 +2809,127 @@ Scott Kiersten
 Founder & CEO, ProofDeed
 gov@proofdeed.com | proofdeed.com`;
 
+  // ── Auto Dealer / F&I / Title — "proof of ownership + transaction integrity"
+  const auto_dealer = `Hi ${first},
+
+Every title transfer, lien release, and ownership record your operation processes is a liability the moment it's disputed. A forged title, an altered odometer disclosure, a backdated transfer — if you can't prove the document's integrity at the moment it was created, you're defending yourself without evidence.
+
+ProofDeed anchors each document to the Polygon blockchain at the moment it's processed — creating tamper-proof proof of ownership and transaction integrity that holds up in court under FRE Rule 901. No system replacement. Single API call. Live in days.
+
+One disputed title can cost more than a full year of protection.
+
+See it in 2 minutes: proofdeed.com/demo
+
+Worth a 20-minute call this week?
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`;
+
+  // ── Auto Lender / Collateral / Lien — "lien accuracy + title chain integrity"
+  const auto_lender = `Hi ${first},
+
+Lien accuracy and title chain integrity are the foundation of your collateral position. When a borrower defaults and the title history is challenged — altered records, forged releases, disputed ownership — your ability to recover depends entirely on whether you can prove the documents are authentic.
+
+ProofDeed creates a blockchain-anchored certificate for every loan document and lien record at the moment it's processed — independently verifiable proof under FRE Rule 901. No system replacement. Single API call.
+
+See it in 2 minutes: proofdeed.com/demo
+
+Would 20 minutes be worth it to walk through how it fits your workflow?
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`;
+
+  // ── Auto Auction / Remarketing — "chain of custody for high-volume transfers"
+  const auto_auction = `Hi ${first},
+
+At the volume your operation processes, every vehicle transfer is a potential chain-of-custody dispute. Odometer fraud, salvage title laundering, forged ownership records — the liability lands on whoever processed the last transaction without proof.
+
+ProofDeed anchors vehicle records to the Polygon blockchain at the moment of transfer — tamper-proof chain of custody that's independently verifiable and court-admissible under FRE Rule 901. No system replacement. Single API call.
+
+See it in 2 minutes: proofdeed.com/demo
+
+Worth a quick call this week?
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`;
+
+  // ── Institutional Compliance / Records / GRC — "audit-proof document integrity"
+  const inst_compliance = `Hi ${first},
+
+When an audit, dispute, or regulatory review puts a document's authenticity in question, your organization has to prove it — not just that it exists in your system, but that it hasn't been altered since it was created. Most document management systems can't answer that. Courts and regulators increasingly expect independent proof.
+
+ProofDeed creates a blockchain-anchored certificate for every critical document at the moment it's processed — tamper-proof, independently verifiable proof under FRE Rule 901. No system replacement. No document storage. Single API call.
+
+See it in 2 minutes: proofdeed.com/demo
+
+Worth a 20-minute conversation?
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`;
+
+  // ── Institutional Legal / Risk — "verifiable proof for disputes and regulatory reviews"
+  const inst_legal = `Hi ${first},
+
+When document authenticity is disputed in litigation or a regulatory review, the question is simple: can you prove this document is unchanged from when it was created? Metadata in your DMS won't hold up. A court wants independent, tamper-proof evidence.
+
+ProofDeed creates a blockchain-anchored record for every critical document at the moment it's processed — independently verifiable by any court or regulator without access to your internal systems. FRE Rule 901 compliant. No system changes required.
+
+The cost of a single disputed document in litigation dwarfs the annual cost of protecting against it.
+
+See it in 2 minutes: proofdeed.com/demo
+
+Worth a quick call?
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`;
+
+  // ── Healthcare — "medical records integrity + audit trail"
+  const inst_healthcare = `Hi ${first},
+
+When a patient record, consent form, or clinical document is disputed — in litigation, an audit, or a regulatory review — your organization has to prove it hasn't been altered. Most EHR and records systems log access but can't independently prove document integrity to a court or regulator.
+
+ProofDeed anchors documents to the Polygon blockchain at the moment they're processed — tamper-proof, independently verifiable proof that holds up under FRE Rule 901 and strengthens your audit trail. No system replacement. Single API call.
+
+See it in 2 minutes: proofdeed.com/demo
+
+Would 20 minutes make sense this week?
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`;
+
   const byRole = {
-    recorder:    recorder,
-    legal:       legal,
-    risk:        legal,
-    it:          it,
-    procurement: procurement,
-    expansion:   recorder,
+    // Government
+    recorder:       recorder,
+    legal:          legal,
+    risk:           legal,
+    it:             it,
+    procurement:    procurement,
+    expansion:      recorder,
+    // Automotive
+    dealer:         auto_dealer,
+    lender:         auto_lender,
+    auction:        auto_auction,
+    fleet:          auto_auction,
+    digital:        auto_dealer,
+    insurance:      auto_lender,
+    // Institutional
+    compliance:     inst_compliance,
+    operations:     inst_compliance,
+    education:      inst_compliance,
+    financial:      inst_legal,
+    healthcare:     inst_healthcare,
   };
 
   return byRole[role] || recorder;
