@@ -2888,8 +2888,8 @@ async function runLeadEngine() {
   }
 }
 
-// Run Monday, Wednesday, Friday at 9am PT
-cron.schedule('0 9 * * 1,3,5', () => runLeadEngine(), { timezone: 'America/Los_Angeles' });
+// Run Tuesday, Wednesday, Thursday at 8am PT (11am ET — peak B2B open rates)
+cron.schedule('0 8 * * 2,3,4', () => runLeadEngine(), { timezone: 'America/Los_Angeles' });
 
 /* ---------------- Lead Engine API ----------------  */
 app.get(['/api/admin/lead-engine', '/admin/lead-engine'], authRateLimit, async (req, res) => {
