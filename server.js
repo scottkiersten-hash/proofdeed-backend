@@ -2592,24 +2592,15 @@ const LEAD_TARGETS = [
 
 const INITIAL_EMAIL = (name, company, industry) => {
   const first = name.split(' ')[0];
-  const angles = {
-    government: `county recorders and clerks across the country`,
-    title_insurance: `title companies dealing with post-closing disputes`,
-    mortgage: `mortgage lenders managing high-value document workflows`,
-    auto: `auto industry leaders tracking vehicle history and title records`,
-    insurance: `insurance companies managing policy and claims documentation`,
-    banking: `banks protecting high-value transaction records`,
-    real_estate: `real estate organizations securing property transaction records`,
-    legal: `law firms managing court-admissible document chains of custody`,
-  };
-  const angle = angles[industry] || `organizations managing critical document workflows`;
-  return `Hi ${first},
 
-I'm reaching out because ProofDeed is helping ${angle} protect themselves against document fraud and satisfy court admissibility requirements under FRE Rule 901.
+  const templates = {
+    government: `Hi ${first},
 
-In short: we anchor documents to the Polygon blockchain at the moment they're certified — creating a tamper-proof, timestamped record that holds up in court. No system replacement required. Single API call. Live in days.
+I'm reaching out because county recorders across the country are facing growing pressure around document integrity — contested deeds, forged filings, and chain-of-title disputes that end up in court.
 
-The liability exposure from a single disputed or fraudulent document typically dwarfs the entire cost of implementation — which is why this is usually a straightforward decision once legal and compliance teams see how it works.
+ProofDeed anchors documents to the Polygon blockchain at the moment of recording, creating a tamper-proof, timestamped record that satisfies court admissibility requirements under FRE Rule 901. No system replacement — it works alongside your existing workflow via a single API call and can go live within days.
+
+Several county offices are already evaluating this as a low-cost way to get ahead of fraud liability before it becomes a headline.
 
 See it live in 2 minutes: proofdeed.com/demo
 
@@ -2618,7 +2609,117 @@ Would you have 20 minutes this week for a quick walkthrough?
 Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`;
+gov@proofdeed.com | proofdeed.com`,
+
+    title_insurance: `Hi ${first},
+
+Post-closing document disputes are one of the fastest-growing liability risks in title insurance — and the organizations that can prove document integrity at the moment of closing are in the strongest position when claims arise.
+
+ProofDeed creates a blockchain-anchored, court-admissible certificate for every document at the moment it's certified — tamper-proof proof under FRE Rule 901. No system replacement. Single API call. Live in days.
+
+The cost of a single contested closing typically dwarfs the entire annual cost of implementation.
+
+See it live in 2 minutes: proofdeed.com/demo
+
+Would you have 20 minutes this week to see how it works?
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`,
+
+    mortgage: `Hi ${first},
+
+Mortgage document fraud — altered loan applications, forged signatures, tampered appraisals — is rising, and lenders that can't prove document integrity at origination are increasingly exposed when loans go into dispute.
+
+ProofDeed anchors mortgage documents to the Polygon blockchain at the moment they're created, producing a tamper-proof, court-admissible record under FRE Rule 901. No system replacement. Single API call. Live in days.
+
+See it live in 2 minutes: proofdeed.com/demo
+
+Would you have 20 minutes this week to see how it fits into your document workflow?
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`,
+
+    auto: `Hi ${first},
+
+Vehicle history fraud — odometer rollbacks, salvage title laundering, forged ownership records — costs the auto industry billions annually, and the gap is widest at the point of record transfer.
+
+ProofDeed anchors vehicle and title documents to the Polygon blockchain at the moment they're certified, creating a tamper-proof chain of custody that holds up in court under FRE Rule 901. No system replacement. Single API call. Live in days.
+
+See it live in 2 minutes: proofdeed.com/demo
+
+Would you have 20 minutes this week for a quick walkthrough?
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`,
+
+    insurance: `Hi ${first},
+
+Claims document fraud — altered policies, backdated coverage requests, tampered loss records — is one of the hardest fraud vectors to prove in litigation, and one of the most expensive.
+
+ProofDeed creates a blockchain-anchored, court-admissible certificate for every document at the moment it's issued — tamper-proof proof of existence and integrity under FRE Rule 901. No system replacement. Single API call. Live in days.
+
+See it live in 2 minutes: proofdeed.com/demo
+
+Would you have 20 minutes this week to see how it works?
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`,
+
+    banking: `Hi ${first},
+
+High-value transaction documents — loan agreements, wire instructions, collateral records — are among the most frequently targeted in financial fraud, and the hardest to defend without an immutable audit trail.
+
+ProofDeed anchors documents to the Polygon blockchain at the moment they're created, producing a tamper-proof, court-admissible record under FRE Rule 901. No system replacement. Single API call. Live in days.
+
+See it live in 2 minutes: proofdeed.com/demo
+
+Would you have 20 minutes this week to see how it fits your document workflow?
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`,
+
+    real_estate: `Hi ${first},
+
+Property transaction fraud — forged deeds, altered purchase agreements, tampered inspection records — is rising, and the organizations that can prove document integrity at every step are best positioned when disputes arise.
+
+ProofDeed anchors real estate documents to the Polygon blockchain at the moment they're certified — tamper-proof, court-admissible proof under FRE Rule 901. No system replacement. Single API call. Live in days.
+
+See it live in 2 minutes: proofdeed.com/demo
+
+Would you have 20 minutes this week for a quick walkthrough?
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`,
+
+    legal: `Hi ${first},
+
+Chain-of-custody documentation is foundational to litigation — and the firms that can prove a document's integrity at the moment it was created are in a materially stronger position in court.
+
+ProofDeed anchors documents to the Polygon blockchain at the moment they're certified, producing a tamper-proof, court-admissible record under FRE Rule 901. No system replacement. Single API call. Live in days.
+
+See it live in 2 minutes: proofdeed.com/demo
+
+Would you have 20 minutes this week to see how it works?
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`,
+  };
+
+  return templates[industry] || templates['government'];
 };
 
 async function runLeadEngine() {
