@@ -2056,8 +2056,8 @@ app.get(["/admin/revenue", "/api/admin/revenue"], authRateLimit, async (req, res
       demoCertifications: parseInt(demoCerts.rows[0].total),
     });
   } catch (error) {
-    console.error("Admin revenue error:", error);
-    res.status(500).json({ error: "Failed to load revenue data." });
+    console.error("Admin revenue error:", error.message, error.type, error.code);
+    res.status(500).json({ error: "Failed to load revenue data.", detail: error.message });
   }
 });
 
