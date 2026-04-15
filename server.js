@@ -2728,6 +2728,75 @@ const LEAD_TARGETS = [
 
   // ── TIER 6: Financial Institutions
   { industry: 'institutional', role: 'financial',  tier: 'expansion',  title: 'Loan Documentation Manager',   query: '"Loan Documentation Manager" OR "Loan Docs Manager" bank USA contact email' },
+
+  // ════════════════════════════════════════════════════════
+  // TITLE & ESCROW — make every closing document provable
+  // ════════════════════════════════════════════════════════
+  { industry: 'title_escrow', role: 'title_ops',  tier: 'primary',    title: 'Escrow Officer',               query: '"Escrow Officer" OR "Senior Escrow Officer" title company USA contact email' },
+  { industry: 'title_escrow', role: 'title_ops',  tier: 'primary',    title: 'Closing Agent / Manager',      query: '"Closing Agent" OR "Closing Manager" title company real estate USA contact email' },
+  { industry: 'title_escrow', role: 'title_ops',  tier: 'primary',    title: 'Title Operations Manager',     query: '"Title Operations Manager" OR "Title Manager" "title company" USA contact email' },
+  { industry: 'title_escrow', role: 'title_risk', tier: 'influencer', title: 'Title Underwriter',            query: '"Title Underwriter" "First American" OR "Fidelity National" OR "Stewart Title" OR "Old Republic" USA contact email' },
+  { industry: 'title_escrow', role: 'title_risk', tier: 'influencer', title: 'Claims Counsel (Title)',       query: '"Claims Counsel" title insurance company USA contact email' },
+  { industry: 'title_escrow', role: 'title_risk', tier: 'influencer', title: 'VP of Risk (Title)',           query: '"VP of Risk" OR "Risk Manager" "title insurance" OR "title company" USA contact email' },
+  { industry: 'title_escrow', role: 'title_ops',  tier: 'approver',   title: 'Branch Manager (Title)',       query: '"Branch Manager" "title company" OR "title insurance" USA contact email' },
+
+  // ════════════════════════════════════════════════════════
+  // LEGAL — lock document integrity at creation
+  // ════════════════════════════════════════════════════════
+  { industry: 'legal', role: 'litigation',  tier: 'primary',    title: 'Litigation Support Director',  query: '"Litigation Support Director" OR "Litigation Support Manager" law firm USA contact email' },
+  { industry: 'legal', role: 'litigation',  tier: 'primary',    title: 'E-Discovery Manager',          query: '"E-Discovery Manager" OR "eDiscovery Director" law firm USA contact email' },
+  { industry: 'legal', role: 'transact',    tier: 'primary',    title: 'Real Estate Attorney',         query: '"real estate attorney" partner OR director "law firm" USA "title" OR "closing" contact email' },
+  { industry: 'legal', role: 'legal_ops',   tier: 'influencer', title: 'Legal Operations Director',    query: '"Legal Operations Director" law firm USA contact email' },
+  { industry: 'legal', role: 'transact',    tier: 'influencer', title: 'Corporate Transactional Attorney', query: 'corporate transactional attorney partner "law firm" USA "M&A" OR "document" contact email' },
+
+  // ════════════════════════════════════════════════════════
+  // INSURANCE (non-auto) — prove claim documents are unaltered
+  // ════════════════════════════════════════════════════════
+  { industry: 'insurance', role: 'claims',     tier: 'primary',    title: 'Claims Documentation Manager', query: '"Claims Documentation Manager" OR "Claims Operations Manager" insurance USA contact email' },
+  { industry: 'insurance', role: 'claims',     tier: 'primary',    title: 'SIU Director',                 query: '"Special Investigations Unit Director" OR "SIU Director" insurance USA contact email' },
+  { industry: 'insurance', role: 'underwrite', tier: 'influencer', title: 'Underwriting Documentation Lead', query: '"Underwriting Documentation" manager OR director insurance USA contact email' },
+  { industry: 'insurance', role: 'claims',     tier: 'influencer', title: 'VP of Claims',                 query: '"VP of Claims" OR "Director of Claims" insurance company USA contact email' },
+  { industry: 'insurance', role: 'compliance', tier: 'approver',   title: 'Insurance Compliance Director', query: '"Compliance Director" OR "Chief Compliance Officer" insurance company USA contact email' },
+
+  // ════════════════════════════════════════════════════════
+  // CONSTRUCTION & LIEN — lien and waiver integrity
+  // ════════════════════════════════════════════════════════
+  { industry: 'construction', role: 'lien',    tier: 'primary',    title: 'Lien Management Director',     query: '"Lien Management Director" OR "Lien Manager" construction USA contact email' },
+  { industry: 'construction', role: 'lien',    tier: 'primary',    title: 'Contract Administrator',       query: '"Contract Administrator" construction "lien" OR "waiver" USA contact email' },
+  { industry: 'construction', role: 'legal',   tier: 'influencer', title: 'Construction Counsel',         query: '"Construction Counsel" OR "Construction Attorney" law firm USA contact email' },
+  { industry: 'construction', role: 'ops',     tier: 'influencer', title: 'Project Documentation Manager', query: '"Project Documentation Manager" construction USA contact email' },
+  { industry: 'construction', role: 'finance', tier: 'approver',   title: 'CFO (Construction Firm)',      query: 'CFO "construction company" OR "general contractor" USA "lien" OR "contract" contact email' },
+
+  // ════════════════════════════════════════════════════════
+  // SUPPLY CHAIN / LOGISTICS — verifiable shipment proof
+  // ════════════════════════════════════════════════════════
+  { industry: 'supply_chain', role: 'trade_docs', tier: 'primary',    title: 'Trade Documentation Manager', query: '"Trade Documentation Manager" OR "Shipping Documentation" manager logistics USA contact email' },
+  { industry: 'supply_chain', role: 'compliance', tier: 'primary',    title: 'Trade Compliance Director',   query: '"Trade Compliance Director" OR "Global Trade Compliance" manager USA contact email' },
+  { industry: 'supply_chain', role: 'legal',      tier: 'influencer', title: 'Supply Chain Counsel',        query: '"Supply Chain Counsel" OR "Logistics Counsel" corporation USA contact email' },
+  { industry: 'supply_chain', role: 'ops',        tier: 'influencer', title: 'VP of Logistics Operations',  query: '"VP of Logistics" OR "Director of Supply Chain" USA "documentation" OR "compliance" contact email' },
+
+  // ════════════════════════════════════════════════════════
+  // REGULATED INDUSTRIES — audit-proof regulatory records
+  // ════════════════════════════════════════════════════════
+  { industry: 'regulated', role: 'compliance', tier: 'primary',    title: 'Regulatory Compliance Director (Energy)', query: '"Regulatory Compliance Director" energy OR utility USA "document" OR "records" contact email' },
+  { industry: 'regulated', role: 'compliance', tier: 'primary',    title: 'Regulatory Affairs Director (Pharma)',    query: '"Regulatory Affairs Director" pharmaceutical OR biotech USA "document" OR "records" contact email' },
+  { industry: 'regulated', role: 'compliance', tier: 'primary',    title: 'Environmental Compliance Manager',       query: '"Environmental Compliance Manager" OR "EHS Compliance" director USA contact email' },
+  { industry: 'regulated', role: 'records',    tier: 'influencer', title: 'Records & Information Manager',         query: '"Records and Information Manager" energy OR pharma OR utility USA contact email' },
+
+  // ════════════════════════════════════════════════════════
+  // ACCOUNTING / AUDIT — evidence assurance layer
+  // ════════════════════════════════════════════════════════
+  { industry: 'accounting', role: 'audit', tier: 'primary',    title: 'Audit Partner / Director',       query: 'audit partner OR director "Deloitte" OR "PwC" OR "EY" OR "KPMG" OR "BDO" USA contact email' },
+  { industry: 'accounting', role: 'audit', tier: 'primary',    title: 'Assurance Services Director',    query: '"Assurance Services Director" OR "Assurance Partner" accounting firm USA contact email' },
+  { industry: 'accounting', role: 'audit', tier: 'influencer', title: 'Forensic Accounting Director',   query: '"Forensic Accounting" director OR partner "accounting firm" USA contact email' },
+
+  // ════════════════════════════════════════════════════════
+  // PRIVATE EQUITY / M&A — lock deal documents at every stage
+  // ════════════════════════════════════════════════════════
+  { industry: 'pe_ma', role: 'deal',  tier: 'primary',    title: 'Due Diligence Director',         query: '"Due Diligence Director" OR "Head of Due Diligence" "private equity" USA contact email' },
+  { industry: 'pe_ma', role: 'deal',  tier: 'primary',    title: 'VP of Transactions',             query: '"VP of Transactions" OR "Deal Director" "private equity" USA contact email' },
+  { industry: 'pe_ma', role: 'legal', tier: 'influencer', title: 'M&A Counsel',                    query: '"M&A Counsel" OR "Mergers and Acquisitions Attorney" USA contact email' },
+  { industry: 'pe_ma', role: 'ops',   tier: 'influencer', title: 'Portfolio Operations Director',  query: '"Portfolio Operations Director" "private equity" USA contact email' },
 ];
 
 const INITIAL_EMAIL = (name, company, industry, role) => {
@@ -2909,6 +2978,136 @@ Scott Kiersten
 Founder & CEO, ProofDeed
 gov@proofdeed.com | proofdeed.com`;
 
+  // ── Title & Escrow — "make every closing document provable and tamper-proof"
+  const title_escrow = `Hi ${first},
+
+Every real estate closing generates a stack of documents that can be disputed years later — deeds, settlement statements, title commitments, wire instructions. Title fraud and post-closing disputes are rising, and the organizations that can prove document integrity at the moment of closing are in the strongest position when they do.
+
+ProofDeed anchors every closing document to the Polygon blockchain at the moment it's processed — tamper-proof, timestamped proof that's court-admissible under FRE Rule 901. No system replacement. Single API call. Live in days.
+
+The cost of a single disputed closing dwarfs the annual cost of protection.
+
+See it in 2 minutes: proofdeed.com/demo
+
+Worth a 20-minute call this week?
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`;
+
+  // ── Legal / Law Firms — "lock document integrity at creation so it holds up in court"
+  const legal_firm = `Hi ${first},
+
+The most damaging thing that can happen to a document in litigation is for opposing counsel to allege it was altered after creation. If you can't prove the document is unchanged from the moment it was drafted, you're defending the document instead of the case.
+
+ProofDeed anchors documents to the Polygon blockchain at the moment they're created — tamper-proof proof of existence and integrity that's independently verifiable and court-admissible under FRE Rule 901. No system changes. No document storage.
+
+See it in 2 minutes: proofdeed.com/demo
+
+Would 20 minutes make sense to walk through how it works?
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`;
+
+  // ── Insurance (non-auto) — "prove claim documents haven't been altered"
+  const insurance_gen = `Hi ${first},
+
+When a claim goes into dispute or a fraud investigation, the question your team faces is: can you prove the claim documents are unchanged from when they were submitted? Altered policies, backdated records, tampered loss documentation — if you can't prove integrity independently, you're vulnerable.
+
+ProofDeed creates a blockchain-anchored certificate for every claim document at the moment it's processed — tamper-proof, independently verifiable proof under FRE Rule 901. No system replacement. Single API call.
+
+See it in 2 minutes: proofdeed.com/demo
+
+Worth a quick call to see how it fits your workflow?
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`;
+
+  // ── Construction & Lien — "ensure lien and waiver documents can't be challenged later"
+  const construction = `Hi ${first},
+
+Mechanic's liens, lien waivers, and release documents are among the most frequently disputed in construction litigation. A conditional waiver that looks like an unconditional one. A lien release with an altered amount. When the dispute hits, whoever processed the document has to prove it.
+
+ProofDeed anchors lien and contract documents to the Polygon blockchain at the moment they're signed — tamper-proof proof of the exact document at the exact time, court-admissible under FRE Rule 901. No system replacement. Single API call.
+
+See it in 2 minutes: proofdeed.com/demo
+
+Would 20 minutes be worth it?
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`;
+
+  // ── Supply Chain / Logistics — "verifiable proof of shipment documentation"
+  const supply_chain = `Hi ${first},
+
+Bill of lading disputes, altered delivery records, tampered customs documentation — when a shipment claim goes into dispute, the documentation is the evidence. If you can't prove the document's integrity at the moment it was created, you're arguing about the paper instead of the shipment.
+
+ProofDeed anchors trade and logistics documents to the Polygon blockchain at the moment they're processed — tamper-proof, independently verifiable proof under FRE Rule 901. No system replacement. Single API call.
+
+See it in 2 minutes: proofdeed.com/demo
+
+Worth a quick call?
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`;
+
+  // ── Regulated Industries — "audit-proof regulatory records"
+  const regulated = `Hi ${first},
+
+When a regulator or auditor challenges a compliance document — an environmental filing, a pharma submission, an energy report — the question isn't just whether you have it. It's whether you can prove it hasn't been altered since it was filed.
+
+ProofDeed creates a blockchain-anchored certificate for every regulatory document at the moment it's submitted — independently verifiable proof of integrity and timestamp under FRE Rule 901. No system replacement. No document storage. Single API call.
+
+See it in 2 minutes: proofdeed.com/demo
+
+Would 20 minutes make sense this week?
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`;
+
+  // ── Accounting / Audit — "evidence assurance layer"
+  const accounting = `Hi ${first},
+
+Audit work depends on document integrity — but auditors verify what clients provide, not whether the underlying documents have been altered before they arrive. When an audit is challenged or a fraud surfaces, the question is whether the documents your team reviewed were the originals.
+
+ProofDeed creates a blockchain-anchored record at the moment a document is created — independently verifiable proof that it hasn't been altered since. Not a replacement for your process — an evidence assurance layer underneath it.
+
+See it in 2 minutes: proofdeed.com/demo
+
+Worth a 20-minute conversation?
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`;
+
+  // ── Private Equity / M&A — "lock deal documents at every stage"
+  const pe_ma = `Hi ${first},
+
+In M&A and PE deals, documents change hands across dozens of parties over months. By the time a dispute surfaces — a rep and warranty claim, a contested disclosure, a post-close disagreement — the question is which version of the document was signed and when. If you can't prove it independently, you're litigating the paper trail instead of the deal.
+
+ProofDeed anchors deal documents to the Polygon blockchain at each stage — tamper-proof proof of the exact document at the exact time, court-admissible under FRE Rule 901. No system replacement. Single API call.
+
+See it in 2 minutes: proofdeed.com/demo
+
+Worth a quick call?
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`;
+
   const byRole = {
     // Government
     recorder:       recorder,
@@ -2930,6 +3129,29 @@ gov@proofdeed.com | proofdeed.com`;
     education:      inst_compliance,
     financial:      inst_legal,
     healthcare:     inst_healthcare,
+    // Title & Escrow
+    title_ops:      title_escrow,
+    title_risk:     title_escrow,
+    // Legal
+    litigation:     legal_firm,
+    transact:       legal_firm,
+    legal_ops:      legal_firm,
+    // Insurance
+    claims:         insurance_gen,
+    underwrite:     insurance_gen,
+    // Construction
+    lien:           construction,
+    // Supply Chain
+    trade_docs:     supply_chain,
+    // Regulated
+    records:        regulated,
+    // Accounting
+    audit:          accounting,
+    // PE / M&A
+    deal:           pe_ma,
+    // Shared fallbacks
+    ops:            inst_compliance,
+    finance:        inst_legal,
   };
 
   return byRole[role] || recorder;
