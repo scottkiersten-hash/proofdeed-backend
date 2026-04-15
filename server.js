@@ -2791,6 +2791,13 @@ async function runLeadEngine() {
   const target = LEAD_TARGETS[currentIdx % LEAD_TARGETS.length];
   const nextIdx = (currentIdx + 1) % LEAD_TARGETS.length;
 
+  // Save next index immediately so crashes don't repeat the same target
+  await pool.query(
+    `INSERT INTO lead_engine_state (key, value, updated_at) VALUES ('rotation_index',$1,NOW())
+     ON CONFLICT (key) DO UPDATE SET value=$1, updated_at=NOW()`,
+    [String(nextIdx)]
+  ).catch(() => {});
+
   console.log(`[LeadEngine] Running — ${target.title} / ${target.industry}`);
 
   try {
