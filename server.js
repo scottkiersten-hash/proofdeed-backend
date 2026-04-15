@@ -2881,8 +2881,8 @@ async function runLeadEngine() {
   }
 }
 
-// Run every Monday at 9am PT
-cron.schedule('0 9 * * 1', () => runLeadEngine(), { timezone: 'America/Los_Angeles' });
+// Run Monday, Wednesday, Friday at 9am PT
+cron.schedule('0 9 * * 1,3,5', () => runLeadEngine(), { timezone: 'America/Los_Angeles' });
 
 /* ---------------- Lead Engine API ----------------  */
 app.get(['/api/admin/lead-engine', '/admin/lead-engine'], authRateLimit, async (req, res) => {
