@@ -2247,6 +2247,36 @@ async function ensureIndexes() {
       ALTER TABLE outreach_contacts ADD COLUMN IF NOT EXISTS pipeline_stage TEXT DEFAULT 'contacted';
       ALTER TABLE outreach_contacts ADD COLUMN IF NOT EXISTS pain_status TEXT DEFAULT 'unaware';
       ALTER TABLE outreach_contacts ADD COLUMN IF NOT EXISTS use_case TEXT;
+      ALTER TABLE outreach_contacts ADD COLUMN IF NOT EXISTS intent TEXT DEFAULT 'unknown';
+      ALTER TABLE outreach_contacts ADD COLUMN IF NOT EXISTS sentiment TEXT DEFAULT 'neutral';
+      ALTER TABLE outreach_contacts ADD COLUMN IF NOT EXISTS last_inbound_at TIMESTAMPTZ;
+      ALTER TABLE outreach_contacts ADD COLUMN IF NOT EXISTS requires_human BOOLEAN DEFAULT true;
+      ALTER TABLE outreach_contacts ADD COLUMN IF NOT EXISTS auto_replied BOOLEAN DEFAULT false;
+
+      -- Inbound email inbox (agent-ready)
+      CREATE TABLE IF NOT EXISTS inbound_emails (
+        id              SERIAL PRIMARY KEY,
+        message_id      TEXT UNIQUE,
+        thread_id       TEXT,
+        contact_id      INTEGER REFERENCES outreach_contacts(id) ON DELETE SET NULL,
+        from_email      TEXT NOT NULL,
+        from_name       TEXT,
+        to_email        TEXT,
+        subject         TEXT,
+        body_text       TEXT,
+        body_html       TEXT,
+        intent          TEXT DEFAULT 'unknown',
+        sentiment       TEXT DEFAULT 'neutral',
+        suggested_reply TEXT,
+        auto_replied    BOOLEAN DEFAULT false,
+        requires_human  BOOLEAN DEFAULT true,
+        is_read         BOOLEAN DEFAULT false,
+        received_at     TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_inbound_emails_contact ON inbound_emails(contact_id);
+      CREATE INDEX IF NOT EXISTS idx_inbound_emails_from ON inbound_emails(from_email);
+      CREATE INDEX IF NOT EXISTS idx_inbound_emails_thread ON inbound_emails(thread_id);
+      CREATE INDEX IF NOT EXISTS idx_inbound_emails_received ON inbound_emails(received_at DESC);
 
       -- Outreach events log
       CREATE TABLE IF NOT EXISTS outreach_events (
@@ -2576,6 +2606,120 @@ app.post(['/api/webhooks/resend-inbound', '/webhooks/resend-inbound'], async (re
   }
 });
 
+// ---------- Mailgun INBOUND webhook (info@ / gov@ catch-all) ----------
+app.post(['/api/webhooks/mailgun-inbound', '/webhooks/mailgun-inbound'], async (req, res) => {
+  res.status(200).json({ received: true }); // always ack immediately
+
+  try {
+    const body = req.body || {};
+
+    const fromRaw   = body.from    || body.From    || body.sender || '';
+    const toRaw     = body.to      || body.To      || body.recipient || '';
+    const subject   = body.subject || body.Subject || '(no subject)';
+    const bodyText  = body['body-plain']  || body.text || body.Text || '';
+    const bodyHtml  = body['body-html']   || body.html || body.Html || '';
+    const messageId = body['Message-Id']  || body['message-id'] || body.messageId || `mg-${Date.now()}`;
+    const inReplyTo = body['In-Reply-To'] || body['in-reply-to'] || null;
+
+    // Parse "Name <email>" format
+    const fromEmail = (fromRaw.match(/<([^>]+)>/) || [, fromRaw])[1].trim().toLowerCase();
+    const fromName  = (fromRaw.match(/^([^<]+)</) || [,''])[1].trim().replace(/^"|"$/g,'') || fromEmail;
+    const toEmail   = (toRaw.match(/<([^>]+)>/)   || [, toRaw])[1].trim().toLowerCase();
+
+    // Skip if it's our own sends bouncing back
+    const ourDomains = ['proofdeed.com', 'send.proofdeed.com'];
+    if (ourDomains.some(d => fromEmail.endsWith(d))) return;
+
+    // Basic intent classification (keyword-based — AI slot for later)
+    const fullText = (subject + ' ' + bodyText).toLowerCase();
+    const highIntentKeywords = ['interested','learn more','tell me more','details','schedule','call','demo','pricing','pilot','sounds good','set up','how does','let\'s talk'];
+    const supportKeywords    = ['not working','broken','error','issue','problem','help','support','bug','fix'];
+    const partnerKeywords    = ['partner','partnership','integrate','api','resell','white label','collaborate'];
+    const intent = highIntentKeywords.some(k => fullText.includes(k)) ? 'pricing_inquiry'
+                 : supportKeywords.some(k => fullText.includes(k))    ? 'support'
+                 : partnerKeywords.some(k => fullText.includes(k))    ? 'partnership'
+                 : 'inquiry';
+
+    const positiveWords = ['great','excellent','love','perfect','awesome','impressive','interested'];
+    const negativeWords = ['not interested','unsubscribe','remove','stop','no thanks','spam'];
+    const sentiment = negativeWords.some(k => fullText.includes(k)) ? 'negative'
+                    : positiveWords.some(k => fullText.includes(k)) ? 'positive'
+                    : 'neutral';
+
+    // Use In-Reply-To as thread_id, else message_id starts a new thread
+    const threadId = inReplyTo || messageId;
+
+    // Find or create contact
+    let contact = (await pool.query('SELECT * FROM outreach_contacts WHERE email=$1', [fromEmail])).rows[0];
+    if (!contact) {
+      // Parse company from email domain
+      const emailDomain = fromEmail.split('@')[1] || '';
+      const companyGuess = emailDomain.replace(/\.(com|gov|org|net|edu|io)$/, '').replace(/[-_]/g, ' ')
+        .replace(/\b\w/g, c => c.toUpperCase());
+
+      const ins = await pool.query(`
+        INSERT INTO outreach_contacts
+          (name, email, company, pipeline_stage, pain_status, intent, sentiment, status, last_inbound_at, requires_human, created_at)
+        VALUES ($1,$2,$3,'replied','aware',$4,$5,'replied',NOW(),true,NOW())
+        ON CONFLICT (email) DO UPDATE
+          SET last_inbound_at=NOW(), intent=$4, sentiment=$5, pipeline_stage='replied', pain_status='aware'
+        RETURNING *
+      `, [fromName, fromEmail, companyGuess, intent, sentiment]);
+      contact = ins.rows[0];
+    } else {
+      // Update existing contact with new intel
+      await pool.query(`
+        UPDATE outreach_contacts
+        SET last_inbound_at=NOW(), intent=$1, sentiment=$2,
+            pipeline_stage = CASE WHEN pipeline_stage IN ('targeted','contacted') THEN 'replied' ELSE pipeline_stage END,
+            pain_status    = CASE WHEN pain_status = 'unaware' THEN 'aware' ELSE pain_status END,
+            status         = CASE WHEN status NOT IN ('replied','in_talks','closed_won') THEN 'replied' ELSE status END
+        WHERE id=$3
+      `, [intent, sentiment, contact.id]);
+    }
+
+    // Store the email
+    await pool.query(`
+      INSERT INTO inbound_emails
+        (message_id, thread_id, contact_id, from_email, from_name, to_email, subject, body_text, body_html, intent, sentiment, requires_human, received_at)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,true,NOW())
+      ON CONFLICT (message_id) DO NOTHING
+    `, [messageId, threadId, contact.id, fromEmail, fromName, toEmail, subject,
+        bodyText.substring(0, 10000), bodyHtml.substring(0, 50000), intent, sentiment]);
+
+    // Log event on contact timeline
+    await pool.query(`
+      INSERT INTO outreach_events (contact_id, event_type, event_source, metadata, occurred_at)
+      VALUES ($1,'replied','mailgun_inbound',$2,NOW())
+    `, [contact.id, JSON.stringify({ from: fromEmail, subject, snippet: bodyText.substring(0, 300), intent, sentiment })]);
+
+    console.log(`📥 Inbound email: ${fromEmail} → ${toEmail} | intent: ${intent} | sentiment: ${sentiment}`);
+
+    // Admin notification for anything that needs attention
+    const mailgunDomain = process.env.MAILGUN_DOMAIN;
+    const mailgunApiKey = process.env.MAILGUN_API_KEY;
+    if (mailgunDomain && mailgunApiKey && sentiment !== 'negative') {
+      const isHot = intent === 'pricing_inquiry' || intent === 'partnership';
+      fetch('https://api.mailgun.net/v3/' + mailgunDomain + '/messages', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Basic ' + Buffer.from('api:' + mailgunApiKey).toString('base64'),
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: new URLSearchParams({
+          from: process.env.MAIL_FROM || `ProofDeed CRM <mailgun@${mailgunDomain}>`,
+          to: process.env.MAIL_TO || 'info@proofdeed.com',
+          subject: `${isHot ? '🔥' : '📥'} New email: ${fromName} — ${subject}`,
+          text: `New inbound email in CRM\n\nFrom: ${fromName} <${fromEmail}>\nTo: ${toEmail}\nSubject: ${subject}\nIntent: ${intent}\nSentiment: ${sentiment}\n\n---\n${bodyText.substring(0, 800)}\n\n---\nView in CRM: https://proofdeed.com/admin`
+        })
+      }).catch(() => {});
+    }
+
+  } catch (err) {
+    console.error('Mailgun inbound webhook error:', err.message);
+  }
+});
+
 // ---------- Admin: Outreach Stats ----------
 app.get(['/api/admin/outreach/stats', '/admin/outreach/stats'], authRateLimit, async (req, res) => {
   if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
@@ -2671,6 +2815,128 @@ app.put(['/api/admin/outreach/contacts/:id', '/admin/outreach/contacts/:id'], au
           last_contact_at=NOW()
       WHERE id=$5
     `, [status, notes, pipeline_stage, pain_status, req.params.id]);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ---------- Admin: Inbox (inbound emails) ----------
+app.get(['/api/admin/inbox', '/admin/inbox'], authRateLimit, async (req, res) => {
+  if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
+  try {
+    const page  = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, parseInt(req.query.limit) || 25);
+    const offset = (page - 1) * limit;
+    const unreadOnly = req.query.unread === '1';
+    const intentFilter = req.query.intent || '';
+
+    const conditions = [];
+    const params = [];
+    if (unreadOnly) conditions.push('i.is_read = false');
+    if (intentFilter) { params.push(intentFilter); conditions.push(`i.intent = $${params.length}`); }
+    const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    const result = await pool.query(`
+      SELECT i.*,
+        c.name  AS contact_name,
+        c.company AS contact_company,
+        c.pipeline_stage,
+        c.priority_score
+      FROM inbound_emails i
+      LEFT JOIN outreach_contacts c ON c.id = i.contact_id
+      ${whereClause}
+      ORDER BY i.received_at DESC
+      LIMIT $${params.length + 1} OFFSET $${params.length + 2}
+    `, [...params, limit, offset]);
+
+    const countResult = await pool.query(
+      `SELECT COUNT(*) as total FROM inbound_emails i ${whereClause}`, params
+    );
+    const unreadCount = await pool.query(`SELECT COUNT(*) as total FROM inbound_emails WHERE is_read=false`);
+
+    res.json({
+      emails: result.rows,
+      total: parseInt(countResult.rows[0].total),
+      unread: parseInt(unreadCount.rows[0].total),
+      page, limit
+    });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ---------- Admin: Mark email read ----------
+app.put(['/api/admin/inbox/:id/read', '/admin/inbox/:id/read'], authRateLimit, async (req, res) => {
+  if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
+  try {
+    await pool.query('UPDATE inbound_emails SET is_read=true WHERE id=$1', [req.params.id]);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ---------- Admin: Get email thread ----------
+app.get(['/api/admin/inbox/thread/:threadId', '/admin/inbox/thread/:threadId'], authRateLimit, async (req, res) => {
+  if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
+  try {
+    const emails = await pool.query(
+      `SELECT i.*, c.name AS contact_name, c.company AS contact_company
+       FROM inbound_emails i LEFT JOIN outreach_contacts c ON c.id = i.contact_id
+       WHERE i.thread_id = $1 ORDER BY i.received_at ASC`,
+      [req.params.threadId]
+    );
+    res.json({ emails: emails.rows });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ---------- Admin: Reply to inbound email ----------
+app.post(['/api/admin/inbox/:id/reply', '/admin/inbox/:id/reply'], authRateLimit, async (req, res) => {
+  if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
+  try {
+    const email = (await pool.query('SELECT * FROM inbound_emails WHERE id=$1', [req.params.id])).rows[0];
+    if (!email) return res.status(404).json({ error: 'Email not found.' });
+
+    const { body, subject } = req.body;
+    if (!body) return res.status(400).json({ error: 'Reply body required.' });
+
+    const mailgunDomain = process.env.MAILGUN_DOMAIN;
+    const mailgunApiKey = process.env.MAILGUN_API_KEY;
+    if (!mailgunDomain || !mailgunApiKey) return res.status(500).json({ error: 'Mailgun not configured.' });
+
+    const replySubject = subject || (email.subject.startsWith('Re:') ? email.subject : `Re: ${email.subject}`);
+
+    const mgRes = await fetch('https://api.mailgun.net/v3/' + mailgunDomain + '/messages', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Basic ' + Buffer.from('api:' + mailgunApiKey).toString('base64'),
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: new URLSearchParams({
+        from: process.env.MAIL_FROM || `ProofDeed <info@${mailgunDomain}>`,
+        to: email.from_email,
+        subject: replySubject,
+        text: body,
+        'h:In-Reply-To': email.message_id,
+        'h:References': email.message_id,
+      })
+    });
+
+    if (!mgRes.ok) {
+      const errText = await mgRes.text();
+      return res.status(500).json({ error: 'Mailgun send failed: ' + errText });
+    }
+
+    // Mark email read, log event on contact
+    await pool.query('UPDATE inbound_emails SET is_read=true WHERE id=$1', [email.id]);
+    if (email.contact_id) {
+      await pool.query(`
+        INSERT INTO outreach_events (contact_id, event_type, event_source, metadata, occurred_at)
+        VALUES ($1,'sent','admin_reply',$2,NOW())
+      `, [email.contact_id, JSON.stringify({ to: email.from_email, subject: replySubject, snippet: body.substring(0, 200) })]);
+      await pool.query(`
+        UPDATE outreach_contacts SET last_contact_at=NOW(),
+          pipeline_stage = CASE WHEN pipeline_stage = 'replied' THEN 'qualified' ELSE pipeline_stage END
+        WHERE id=$1
+      `, [email.contact_id]);
+    }
+
+    console.log(`✅ Admin replied to ${email.from_email} re: "${replySubject}"`);
     res.json({ success: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
