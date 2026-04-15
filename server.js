@@ -1425,7 +1425,7 @@ app.post(["/create-checkout-session", "/api/create-checkout-session"], async (re
     const priceId = isOneTime ? oneTimePlans[plan] : subscriptionPlans[plan];
     if (!priceId) return res.status(400).json({ error: "Invalid plan: " + plan });
 
-    const session = await stripe.checkout.sessions.create({
+    const sessionParams = {
       mode: isOneTime ? "payment" : "subscription",
       payment_method_types: isOneTime ? ["card", "us_bank_account"] : ["card"],
       line_items: [{ price: priceId, quantity: 1 }],
@@ -1433,7 +1433,18 @@ app.post(["/create-checkout-session", "/api/create-checkout-session"], async (re
       cancel_url: cancel_url || "https://proofdeed.com",
       client_reference_id: referral ? referral : undefined,
       metadata: { plan },
-    });
+    };
+
+    if (isOneTime) {
+      sessionParams.payment_method_options = {
+        us_bank_account: {
+          financial_connections: { permissions: ["payment_method"] },
+          verification_method: "instant",
+        },
+      };
+    }
+
+    const session = await stripe.checkout.sessions.create(sessionParams);
 
     res.json({ url: session.url });
 
