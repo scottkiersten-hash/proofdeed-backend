@@ -3661,13 +3661,13 @@ function priorityLabel(score) {
   return 'cold';
 }
 
-async function runLeadEngine() {
+async function runLeadEngine(targetsPerRun = 3) {
   if (!process.env.ANTHROPIC_API_KEY || !process.env.RESEND_API_KEY) {
     console.log(`[LeadEngine] Missing API keys — ANTHROPIC: ${!!process.env.ANTHROPIC_API_KEY}, RESEND: ${!!process.env.RESEND_API_KEY}`);
     return;
   }
 
-  const TARGETS_PER_RUN = 3; // process 3 targets per run → up to 30 emails
+  const TARGETS_PER_RUN = targetsPerRun;
   const ALL_TARGETS = [...LEAD_TARGETS, ...AFFILIATE_TARGETS];
 
   // Get current rotation index
@@ -3801,8 +3801,9 @@ app.get(['/api/admin/lead-engine', '/admin/lead-engine'], authRateLimit, async (
 
 app.post(['/api/admin/lead-engine/run', '/admin/lead-engine/run'], authRateLimit, async (req, res) => {
   if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
-  res.json({ success: true, message: 'Lead engine started — check CRM in ~60 seconds.' });
-  runLeadEngine(); // fire and forget
+  const count = parseInt(req.body?.count) || 3;
+  res.json({ success: true, message: `Lead engine started (${count} targets) — check CRM in ~${count * 60}s.` });
+  runLeadEngine(count); // fire and forget
 });
 
 /* ---------------- Outreach Autopilot (daily 8am UTC) ---------------- */
