@@ -3160,6 +3160,119 @@ const LEAD_TARGETS = [
   { industry: 'pe_ma', role: 'ops',   tier: 'influencer', title: 'Portfolio Operations Director',  query: '"Portfolio Operations Director" "private equity" USA contact email' },
 ];
 
+// ─────────────────────────────────────────────────────────────────────────────
+// AFFILIATE TARGETS — partner recruitment across 5 segments
+// ─────────────────────────────────────────────────────────────────────────────
+const AFFILIATE_TARGETS = [
+  // 1. Safety Net — Insurance & Real Estate
+  { industry: 'affiliate_insurance', role: 'aff_insurance', tier: 'affiliate', title: 'Independent Insurance Broker',   query: '"independent insurance broker" USA contact email site:linkedin.com OR site:*.com' },
+  { industry: 'affiliate_insurance', role: 'aff_insurance', tier: 'affiliate', title: 'Real Estate Broker Owner',        query: '"real estate broker" owner independent brokerage USA contact email' },
+  { industry: 'affiliate_insurance', role: 'aff_insurance', tier: 'affiliate', title: 'Property Manager',               query: '"property management company" owner director USA contact email' },
+  { industry: 'affiliate_insurance', role: 'aff_insurance', tier: 'affiliate', title: 'Title Insurance Agent',          query: '"title insurance agent" independent USA contact email' },
+  { industry: 'affiliate_insurance', role: 'aff_insurance', tier: 'affiliate', title: 'E&O Insurance Specialist',       query: '"errors and omissions insurance" broker specialist real estate USA contact email' },
+
+  // 2. Low-Trust Marketplaces
+  { industry: 'affiliate_marketplace', role: 'aff_marketplace', tier: 'affiliate', title: 'Domain Marketplace Founder',    query: '"domain broker" OR "domain marketplace" founder owner USA contact email' },
+  { industry: 'affiliate_marketplace', role: 'aff_marketplace', tier: 'affiliate', title: 'Collectibles Platform Owner',   query: '"collectibles marketplace" OR "high-end collectibles" platform owner founder USA contact email' },
+  { industry: 'affiliate_marketplace', role: 'aff_marketplace', tier: 'affiliate', title: 'Freelance Platform Founder',    query: '"freelance marketplace" founder CEO USA contact email' },
+  { industry: 'affiliate_marketplace', role: 'aff_marketplace', tier: 'affiliate', title: 'NFT/Digital Asset Platform CEO',query: '"digital asset" OR "NFT marketplace" CEO founder USA contact email' },
+  { industry: 'affiliate_marketplace', role: 'aff_marketplace', tier: 'affiliate', title: 'Business Broker',              query: '"business broker" independent USA contact email site:bizbuysell.com OR site:*.com' },
+
+  // 3. Legal Tech Content
+  { industry: 'affiliate_legaltech', role: 'aff_legaltech', tier: 'affiliate', title: 'Legal Blogger / Attorney Author',  query: '"legal blog" attorney author OR founder USA contact email' },
+  { industry: 'affiliate_legaltech', role: 'aff_legaltech', tier: 'affiliate', title: 'Notary Public Influencer',         query: '"notary public" youtube OR podcast OR blog creator USA contact email' },
+  { industry: 'affiliate_legaltech', role: 'aff_legaltech', tier: 'affiliate', title: 'LegalTech YouTuber',              query: 'legaltech youtube creator attorney USA contact email' },
+  { industry: 'affiliate_legaltech', role: 'aff_legaltech', tier: 'affiliate', title: 'Paralegal Educator',              query: '"paralegal" educator trainer online course USA contact email' },
+  { industry: 'affiliate_legaltech', role: 'aff_legaltech', tier: 'affiliate', title: 'Bar Association Newsletter Editor',query: '"bar association" newsletter editor OR communications director USA contact email' },
+
+  // 4. B2B SaaS Bundling
+  { industry: 'affiliate_saas', role: 'aff_saas', tier: 'affiliate', title: 'Proposal Software Founder',        query: '"proposal software" founder CEO USA contact email site:proposify.com OR site:*.com' },
+  { industry: 'affiliate_saas', role: 'aff_saas', tier: 'affiliate', title: 'Contract Management SaaS CEO',     query: '"contract management" software CEO founder USA contact email' },
+  { industry: 'affiliate_saas', role: 'aff_saas', tier: 'affiliate', title: 'HR Onboarding Platform Founder',   query: '"HR onboarding" software platform founder CEO USA contact email' },
+  { industry: 'affiliate_saas', role: 'aff_saas', tier: 'affiliate', title: 'eSignature Tool Founder',          query: '"esignature" OR "e-signature" software founder CEO USA contact email' },
+  { industry: 'affiliate_saas', role: 'aff_saas', tier: 'affiliate', title: 'Document Automation CEO',          query: '"document automation" software CEO founder USA contact email' },
+
+  // 5. Legacy & Estate Planning
+  { industry: 'affiliate_estate', role: 'aff_estate', tier: 'affiliate', title: 'Estate Planning Attorney',     query: '"estate planning attorney" independent USA contact email' },
+  { industry: 'affiliate_estate', role: 'aff_estate', tier: 'affiliate', title: 'Wealth Manager / Advisor',     query: '"wealth manager" OR "wealth advisor" independent RIA USA contact email' },
+  { industry: 'affiliate_estate', role: 'aff_estate', tier: 'affiliate', title: 'Funeral Director / Owner',     query: '"funeral home" owner director USA contact email' },
+  { industry: 'affiliate_estate', role: 'aff_estate', tier: 'affiliate', title: 'Trust Officer',                query: '"trust officer" bank OR company USA contact email' },
+  { industry: 'affiliate_estate', role: 'aff_estate', tier: 'affiliate', title: 'Succession Planning Consultant',query: '"succession planning" consultant advisor USA contact email' },
+];
+
+const AFFILIATE_EMAIL = (name, company, role) => {
+  const first = name.split(' ')[0];
+
+  if (role === 'aff_insurance') return `Hi ${first},
+
+I work with independent brokers and agents who want to offer clients something that actually differentiates them — not another rate comparison, but real document protection.
+
+ProofDeed uses blockchain to create tamper-proof, timestamped proof of any document — deeds, closing disclosures, inspection reports. When a client questions what was signed or when, there's an immutable record.
+
+I'm looking for a small group of agents and brokers to join our affiliate program. You'd get a co-branded landing page, a referral commission on every client who signs up, and a simple way to position yourself as the agent who protects clients after closing.
+
+Would a quick call make sense? I can walk you through the commission structure and the "Closing Gift" framing that's working well for other agents.
+
+Scott Kiersten
+Founder, ProofDeed
+proofdeed.com`;
+
+  if (role === 'aff_marketplace') return `Hi ${first},
+
+Fraud and disputes are an operational cost for every marketplace. ProofDeed solves the verification problem — sellers can certify any document (provenance, authenticity, title) on the blockchain, and buyers see a "Verified by ProofDeed" badge they can trust.
+
+I'm offering marketplace owners a revenue share on every verification fee generated through their platform. You solve a trust problem for your sellers, reduce dispute volume, and earn a passive commission.
+
+Would it be worth a 20-minute call to see if this fits ${company}?
+
+Scott Kiersten
+Founder, ProofDeed
+proofdeed.com`;
+
+  if (role === 'aff_legaltech') return `Hi ${first},
+
+Your audience trusts your recommendations on tools that actually protect clients. ProofDeed is one of those — blockchain-certified document proof that holds up when documents are disputed, questioned, or need to prove their timeline.
+
+I'd like to offer you a high-commission affiliate arrangement and a "Case Study Kit" — pre-written content showing real scenarios where timestamped proof made the difference. Something your audience can act on immediately.
+
+Happy to send the kit and commission details if you're open to it.
+
+Scott Kiersten
+Founder, ProofDeed
+proofdeed.com`;
+
+  if (role === 'aff_saas') return `Hi ${first},
+
+${company} helps users create and manage documents — ProofDeed closes the loop by certifying them on the blockchain the moment they're finalized. It's the missing "Secure this document" button at the end of your workflow.
+
+I'm looking for integration partners. The model is simple: an affiliate widget or API integration, and you earn a revenue share on every certification your users run through ProofDeed.
+
+Worth a quick call to explore if there's a fit?
+
+Scott Kiersten
+Founder, ProofDeed
+proofdeed.com`;
+
+  if (role === 'aff_estate') return `Hi ${first},
+
+Estate and succession planning creates the documents that matter most — and the ones most often disputed years later. ProofDeed gives your clients a blockchain-verified record of every critical document: wills, trust amendments, deeds, asset transfers.
+
+I'm building a referral network of estate professionals. You'd introduce ProofDeed to clients as part of your planning process and earn a commission on every account. We can co-brand a "Digital Legacy" page for your practice.
+
+Would a brief call make sense to walk through the program?
+
+Scott Kiersten
+Founder, ProofDeed
+proofdeed.com`;
+
+  return `Hi ${first},
+
+I'm Scott, founder of ProofDeed — blockchain document certification. I'd love to explore whether there's a fit for a referral partnership with ${company}.
+
+Scott Kiersten
+proofdeed.com`;
+};
+
 const INITIAL_EMAIL = (name, company, industry, role) => {
   const first = name.split(' ')[0];
 
@@ -3555,11 +3668,12 @@ async function runLeadEngine() {
   }
 
   const TARGETS_PER_RUN = 3; // process 3 targets per run → up to 30 emails
+  const ALL_TARGETS = [...LEAD_TARGETS, ...AFFILIATE_TARGETS];
 
   // Get current rotation index
   const idxRow = await pool.query(`SELECT value FROM lead_engine_state WHERE key='rotation_index'`).catch(() => ({ rows: [] }));
   const currentIdx = idxRow.rows[0] ? parseInt(idxRow.rows[0].value) : 0;
-  const nextIdx = (currentIdx + TARGETS_PER_RUN) % LEAD_TARGETS.length;
+  const nextIdx = (currentIdx + TARGETS_PER_RUN) % ALL_TARGETS.length;
 
   // Save next index immediately so crashes don't repeat the same targets
   await pool.query(
@@ -3576,7 +3690,7 @@ async function runLeadEngine() {
   let totalSent = 0, totalSkipped = 0;
 
   for (let i = 0; i < TARGETS_PER_RUN; i++) {
-    const target = LEAD_TARGETS[(currentIdx + i) % LEAD_TARGETS.length];
+    const target = ALL_TARGETS[(currentIdx + i) % ALL_TARGETS.length];
     console.log(`[LeadEngine] Target ${i + 1}/${TARGETS_PER_RUN} — ${target.title} / ${target.industry}`);
 
     try {
@@ -3604,8 +3718,13 @@ async function runLeadEngine() {
         if (exists.rows.length > 0) { skipped++; continue; }
 
         const replyTag = crypto.randomBytes(8).toString('hex');
-        const emailBody = INITIAL_EMAIL(lead.name, lead.company, lead.industry || target.industry, target.role);
-        const subject = `Blockchain Document Certification for ${lead.company}`;
+        const isAffiliate = target.tier === 'affiliate';
+        const emailBody = isAffiliate
+          ? AFFILIATE_EMAIL(lead.name, lead.company, target.role)
+          : INITIAL_EMAIL(lead.name, lead.company, lead.industry || target.industry, target.role);
+        const subject = isAffiliate
+          ? `Referral Partnership Opportunity — ProofDeed`
+          : `Blockchain Document Certification for ${lead.company}`;
 
         try {
           const result = await resend.emails.send({
