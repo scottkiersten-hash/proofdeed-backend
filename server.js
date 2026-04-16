@@ -3584,32 +3584,17 @@ async function runLeadEngine() {
         model: 'claude-opus-4-6',
         max_tokens: 2500,
         tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-        messages: [
-          {
-            role: 'user',
-            content: `Use web search to find 10 real people currently working as ${target.title} at ${target.industry.replace(/_/g,' ')} organizations in the USA. Search company websites, press releases, and news to find real names and emails. When done, output ONLY a JSON array — no intro text, no explanation, just the array:\n[{"name":"Full Name","title":"Exact Title","company":"Company Name","email":"email@company.com","industry":"${target.industry}","source":"url"}]\nIf you cannot find 10, return however many you found. Never return empty array.`
-          },
-          {
-            role: 'assistant',
-            content: '['
-          }
-        ]
+        messages: [{
+          role: 'user',
+          content: `Use web search to find 10 real people currently working as ${target.title} at ${target.industry.replace(/_/g,' ')} organizations in the USA. Search company websites, press releases, and news.\n\nYour entire response must be ONLY a raw JSON array. No words before or after. Start your response with [ and end with ]. Example format:\n[{"name":"Jane Smith","title":"County Recorder","company":"Clark County","email":"jsmith@clarkcounty.gov","industry":"${target.industry}","source":"https://example.com"}]`
+        }]
       });
 
       const rawText = response.content.filter((b) => b.type === 'text').map((b) => b.text).join('');
-      // Prepend the '[' we primed, then extract JSON
-      const fullText = '[' + rawText;
-      const match = fullText.match(/\[[\s\S]*?\]/);
       let leads = [];
-      try {
-        leads = JSON.parse(match ? match[0] : fullText);
-        if (!Array.isArray(leads)) leads = [];
-      } catch {
-        // try extracting any JSON array anywhere in response
-        const fallback = rawText.match(/\[[\s\S]*\]/);
-        if (fallback) { try { leads = JSON.parse(fallback[0]); } catch { leads = []; } }
-      }
-      if (!leads.length) { console.log(`[LeadEngine] No leads parsed for ${target.title}`); continue; }
+      const match = rawText.match(/\[[\s\S]*\]/);
+      if (match) { try { leads = JSON.parse(match[0]); if (!Array.isArray(leads)) leads = []; } catch { leads = []; } }
+      if (!leads.length) { console.log(`[LeadEngine] No leads parsed for ${target.title} — raw: ${rawText.substring(0,200)}`); continue; }
       console.log(`[LeadEngine] Found ${leads.length} leads for ${target.title}`);
 
       let sent = 0, skipped = 0;
