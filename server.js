@@ -2546,8 +2546,10 @@ app.post(['/api/webhooks/resend-inbound', '/webhooks/resend-inbound'], async (re
   try {
     if (process.env.RESEND_INBOUND_SECRET && req.query.secret !== process.env.RESEND_INBOUND_SECRET) return;
 
-    const body = req.body || {};
-    const toField  = Array.isArray(body.to) ? body.to.join(',') : (body.to || body.To || '');
+    const raw = req.body || {};
+    // Resend inbound wraps in event.type + event.data for email.received
+    const body = (raw.type === 'email.received' && raw.data) ? raw.data : raw;
+    const toField   = Array.isArray(body.to) ? body.to.join(',') : (body.to || body.To || '');
     const fromField = body.from || body.From || '';
     const subject   = body.subject || body.Subject || '(no subject)';
     const bodyText  = body.text || body.Text || '';
