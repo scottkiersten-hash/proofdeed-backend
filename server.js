@@ -3554,109 +3554,107 @@ async function runLeadEngine() {
     return;
   }
 
+  const TARGETS_PER_RUN = 3; // process 3 targets per run → up to 30 emails
+
   // Get current rotation index
   const idxRow = await pool.query(`SELECT value FROM lead_engine_state WHERE key='rotation_index'`).catch(() => ({ rows: [] }));
   const currentIdx = idxRow.rows[0] ? parseInt(idxRow.rows[0].value) : 0;
-  const target = LEAD_TARGETS[currentIdx % LEAD_TARGETS.length];
-  const nextIdx = (currentIdx + 1) % LEAD_TARGETS.length;
+  const nextIdx = (currentIdx + TARGETS_PER_RUN) % LEAD_TARGETS.length;
 
-  // Save next index immediately so crashes don't repeat the same target
+  // Save next index immediately so crashes don't repeat the same targets
   await pool.query(
     `INSERT INTO lead_engine_state (key, value, updated_at) VALUES ('rotation_index',$1,NOW())
      ON CONFLICT (key) DO UPDATE SET value=$1, updated_at=NOW()`,
     [String(nextIdx)]
   ).catch(() => {});
 
-  console.log(`[LeadEngine] Running — ${target.title} / ${target.industry}`);
+  const Anthropic = (await import('@anthropic-ai/sdk')).default;
+  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const { Resend } = await import('resend');
+  const resend = new Resend(process.env.RESEND_API_KEY);
 
-  try {
-    const Anthropic = (await import('@anthropic-ai/sdk')).default;
-    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  let totalSent = 0, totalSkipped = 0;
 
-    const response = await anthropic.messages.create({
-      model: 'claude-opus-4-6',
-      max_tokens: 2000,
-      tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-      messages: [{
-        role: 'user',
-        content: `Search the web and find 6 real ${target.title} executives at ${target.industry.replace(/_/g,' ')} organizations in the USA. Check company websites, press releases, conference speaker lists, and news articles to find real people currently in this role. For each person, find their full name, exact title, company name, and most likely work email address (check the company website for email format, otherwise guess firstname.lastname@companydomain.com). Return ONLY a valid JSON array with no other text before or after it, like this: [{"name":"Full Name","title":"Exact Title","company":"Company Name","email":"email@company.com","industry":"${target.industry}","source":"url"}]`
-      }]
-    });
+  for (let i = 0; i < TARGETS_PER_RUN; i++) {
+    const target = LEAD_TARGETS[(currentIdx + i) % LEAD_TARGETS.length];
+    console.log(`[LeadEngine] Target ${i + 1}/${TARGETS_PER_RUN} — ${target.title} / ${target.industry}`);
 
-    // Extract JSON from response
-    const text = response.content.filter((b) => b.type === 'text').map((b) => b.text).join('');
-    console.log('[LeadEngine] Response preview:', text.substring(0, 300));
-    const match = text.match(/\[[\s\S]*\]/);
-    if (!match) { console.log('[LeadEngine] No JSON found in response — full text:', text.substring(0, 500)); return; }
-    const leads = JSON.parse(match[0]);
-    console.log(`[LeadEngine] Found ${leads.length} leads from Claude`);
+    try {
+      const response = await anthropic.messages.create({
+        model: 'claude-opus-4-6',
+        max_tokens: 2500,
+        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+        messages: [{
+          role: 'user',
+          content: `Search the web and find 10 real ${target.title} executives at ${target.industry.replace(/_/g,' ')} organizations in the USA. Check company websites, press releases, conference speaker lists, LinkedIn, and news articles to find real people currently in this role. For each person, find their full name, exact title, company name, and most likely work email address (check the company website for email format, otherwise guess firstname.lastname@companydomain.com). Return ONLY a valid JSON array with no other text before or after it: [{"name":"Full Name","title":"Exact Title","company":"Company Name","email":"email@company.com","industry":"${target.industry}","source":"url"}]`
+        }]
+      });
 
-    const { Resend } = await import('resend');
-    const resend = new Resend(process.env.RESEND_API_KEY);
+      const text = response.content.filter((b) => b.type === 'text').map((b) => b.text).join('');
+      const match = text.match(/\[[\s\S]*\]/);
+      if (!match) { console.log(`[LeadEngine] No JSON for target ${target.title}`); continue; }
+      const leads = JSON.parse(match[0]);
+      console.log(`[LeadEngine] Found ${leads.length} leads for ${target.title}`);
 
-    let sent = 0, skipped = 0;
-    for (const lead of leads) {
-      if (!lead.email || !lead.name || !lead.company) { skipped++; continue; }
-      // Deduplicate
-      const exists = await pool.query('SELECT id FROM outreach_contacts WHERE email=$1', [lead.email.toLowerCase()]);
-      if (exists.rows.length > 0) { skipped++; continue; }
+      let sent = 0, skipped = 0;
+      for (const lead of leads) {
+        if (!lead.email || !lead.name || !lead.company) { skipped++; continue; }
+        const exists = await pool.query('SELECT id FROM outreach_contacts WHERE email=$1', [lead.email.toLowerCase()]);
+        if (exists.rows.length > 0) { skipped++; continue; }
 
-      const replyTag = crypto.randomBytes(8).toString('hex');
-      const emailBody = INITIAL_EMAIL(lead.name, lead.company, lead.industry || target.industry, target.role);
-      const subject = `Blockchain Document Certification for ${lead.company}`;
+        const replyTag = crypto.randomBytes(8).toString('hex');
+        const emailBody = INITIAL_EMAIL(lead.name, lead.company, lead.industry || target.industry, target.role);
+        const subject = `Blockchain Document Certification for ${lead.company}`;
 
-      try {
-        const result = await resend.emails.send({
-          from: 'Scott Kiersten <gov@send.proofdeed.com>',
-          reply_to: `reply+${replyTag}@send.proofdeed.com`,
-          to: lead.email,
-          subject,
-          text: emailBody,
-        });
+        try {
+          const result = await resend.emails.send({
+            from: 'Scott Kiersten <gov@send.proofdeed.com>',
+            reply_to: `reply+${replyTag}@send.proofdeed.com`,
+            to: lead.email,
+            subject,
+            text: emailBody,
+          });
 
-        const pscore = calcPriorityScore(lead.title, lead.industry || target.industry, target.role);
-        const useCase = `${target.title} — ${(lead.industry || target.industry).replace(/_/g,' ')}`;
-        await pool.query(
-          `INSERT INTO outreach_contacts (name, email, company, title, industry, tier, priority_score, pipeline_stage, pain_status, use_case, status, reply_to_tag, resend_message_id, first_sent_at, last_contact_at)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,'contacted','unaware',$8,'sent',$9,$10,NOW(),NOW())`,
-          [lead.name, lead.email.toLowerCase(), lead.company, lead.title, lead.industry || target.industry, target.tier || 'primary', pscore, useCase, replyTag, result.data?.id || null]
-        );
-        await pool.query(
-          `INSERT INTO outreach_events (contact_id, event_type, event_source, metadata, occurred_at)
-           SELECT id, 'sent', 'lead_engine', $1, NOW() FROM outreach_contacts WHERE email=$2`,
-          [JSON.stringify({ subject, source: lead.source }), lead.email.toLowerCase()]
-        );
+          const pscore = calcPriorityScore(lead.title, lead.industry || target.industry, target.role);
+          const useCase = `${target.title} — ${(lead.industry || target.industry).replace(/_/g,' ')}`;
+          await pool.query(
+            `INSERT INTO outreach_contacts (name, email, company, title, industry, tier, priority_score, pipeline_stage, pain_status, use_case, status, reply_to_tag, resend_message_id, first_sent_at, last_contact_at)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,'contacted','unaware',$8,'sent',$9,$10,NOW(),NOW())`,
+            [lead.name, lead.email.toLowerCase(), lead.company, lead.title, lead.industry || target.industry, target.tier || 'primary', pscore, useCase, replyTag, result.data?.id || null]
+          );
+          await pool.query(
+            `INSERT INTO outreach_events (contact_id, event_type, event_source, metadata, occurred_at)
+             SELECT id, 'sent', 'lead_engine', $1, NOW() FROM outreach_contacts WHERE email=$2`,
+            [JSON.stringify({ subject, source: lead.source }), lead.email.toLowerCase()]
+          );
 
-        sent++;
-        console.log(`[LeadEngine] Sent → ${lead.name} (${lead.company})`);
-        await new Promise(r => setTimeout(r, 3000));
-      } catch (e) {
-        console.error(`[LeadEngine] Send fail ${lead.email}:`, e.message);
-        skipped++;
+          sent++; totalSent++;
+          console.log(`[LeadEngine] Sent → ${lead.name} (${lead.company})`);
+          await new Promise(r => setTimeout(r, 2000));
+        } catch (e) {
+          console.error(`[LeadEngine] Send fail ${lead.email}:`, e.message);
+          skipped++; totalSkipped++;
+        }
       }
+      console.log(`[LeadEngine] Target done — sent: ${sent}, skipped: ${skipped}`);
+      await new Promise(r => setTimeout(r, 5000)); // pause between targets
+    } catch (err) {
+      console.error(`[LeadEngine] Error on target ${target.title}:`, err.message);
     }
-
-    // Update rotation index
-    await pool.query(
-      `INSERT INTO lead_engine_state (key, value, updated_at) VALUES ('rotation_index',$1,NOW())
-       ON CONFLICT (key) DO UPDATE SET value=$1, updated_at=NOW()`,
-      [String(nextIdx)]
-    );
-    await pool.query(
-      `INSERT INTO lead_engine_state (key, value, updated_at) VALUES ('last_run',$1,NOW())
-       ON CONFLICT (key) DO UPDATE SET value=$1, updated_at=NOW()`,
-      [new Date().toISOString()]
-    );
-    await pool.query(
-      `INSERT INTO lead_engine_state (key, value, updated_at) VALUES ('last_result',$1,NOW())
-       ON CONFLICT (key) DO UPDATE SET value=$1, updated_at=NOW()`,
-      [JSON.stringify({ target: `${target.title} / ${target.industry}`, sent, skipped, total: leads.length })]
-    );
-
-    console.log(`[LeadEngine] Done. Sent: ${sent}, Skipped: ${skipped}, Next: ${LEAD_TARGETS[nextIdx].title}/${LEAD_TARGETS[nextIdx].industry}`);
-  } catch (err) {
-    console.error('[LeadEngine] Error:', err.message);
   }
+
+  await pool.query(
+    `INSERT INTO lead_engine_state (key, value, updated_at) VALUES ('last_run',$1,NOW())
+     ON CONFLICT (key) DO UPDATE SET value=$1, updated_at=NOW()`,
+    [new Date().toISOString()]
+  );
+  await pool.query(
+    `INSERT INTO lead_engine_state (key, value, updated_at) VALUES ('last_result',$1,NOW())
+     ON CONFLICT (key) DO UPDATE SET value=$1, updated_at=NOW()`,
+    [JSON.stringify({ targets: TARGETS_PER_RUN, sent: totalSent, skipped: totalSkipped })]
+  );
+
+  console.log(`[LeadEngine] All done. Total sent: ${totalSent}, skipped: ${totalSkipped}, next index: ${nextIdx}`);
 }
 
 // Run Tuesday, Wednesday, Thursday at 8am PT (11am ET — peak B2B open rates)
