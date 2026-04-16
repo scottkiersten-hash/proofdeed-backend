@@ -2610,9 +2610,7 @@ app.post(['/api/webhooks/resend-inbound', '/webhooks/resend-inbound'], async (re
     const contact = r.rows[0];
     if (!contact) return;
 
-    const fromField = body.from || body.From || '';
-    const subject = body.subject || body.Subject || '';
-    const textSnippet = (body.text || body.Text || '').substring(0, 500);
+    const textSnippet = bodyText.substring(0, 500);
 
     await pool.query(`
       INSERT INTO outreach_events (contact_id, event_type, event_source, metadata, occurred_at)
