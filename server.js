@@ -3055,6 +3055,12 @@ const LEAD_TARGETS = [
   { industry: 'auto', role: 'insurance',  tier: 'expansion',  title: 'Auto Insurance Claims Director', query: '"Insurance Claims Director" auto claims "document" OR "total loss" USA contact email' },
   { industry: 'auto', role: 'insurance',  tier: 'expansion',  title: 'Salvage & Total Loss Manager',   query: '"Total Loss Manager" OR "Salvage Manager" auto insurance USA contact email' },
 
+  // ── TIER 6: VIN-Integrity / OEM Supply Chain (new)
+  { industry: 'auto', role: 'auto_supply', tier: 'primary',   title: 'VP of Supply Chain / Logistics', query: '"VP of Supply Chain" OR "VP of Logistics" automotive OEM manufacturer USA contact email' },
+  { industry: 'auto', role: 'auto_cdo',   tier: 'primary',    title: 'Chief Digital Officer (Auto OEM)', query: '"Chief Digital Officer" automotive OR "auto manufacturer" OR OEM USA contact email' },
+  { industry: 'auto', role: 'auto_remarketing', tier: 'primary', title: 'Head of Remarketing / Fleet Ops', query: '"Head of Remarketing" OR "Director of Remarketing" automotive OEM OR "fleet operations" USA contact email' },
+  { industry: 'auto', role: 'auto_iso',   tier: 'primary',    title: 'Director of Quality / ISO Compliance', query: '"Director of Quality" OR "Quality Compliance Director" automotive "ISO" OR "IATF" USA contact email' },
+
   // ════════════════════════════════════════════════════════
   // INSTITUTIONAL — audit-proof document integrity
   // ════════════════════════════════════════════════════════
@@ -3086,9 +3092,18 @@ const LEAD_TARGETS = [
   // ── TIER 5: Education
   { industry: 'institutional', role: 'education',  tier: 'expansion',  title: 'University Registrar',         query: '"University Registrar" OR "Registrar" university USA contact email 2024 2025' },
   { industry: 'institutional', role: 'education',  tier: 'expansion',  title: 'Records & Archives Director',  query: '"Records and Archives Director" OR "University Archivist" USA contact email' },
+  { industry: 'institutional', role: 'inst_ciso',  tier: 'primary',    title: 'CISO (Higher Ed / Healthcare)', query: '"Chief Information Security Officer" OR "CISO" university OR hospital OR "health system" USA contact email' },
+  { industry: 'institutional', role: 'inst_registrar', tier: 'primary', title: 'University Registrar (Credential Integrity)', query: '"University Registrar" OR "Registrar" diploma OR transcript OR credential integrity USA contact email' },
+  { industry: 'institutional', role: 'inst_him',   tier: 'primary',    title: 'CISO / HIM Director (Medical Records)', query: '"Health Information" director OR "Medical Records" CISO hospital "health system" USA contact email' },
 
   // ── TIER 6: Financial Institutions
   { industry: 'institutional', role: 'financial',  tier: 'expansion',  title: 'Loan Documentation Manager',   query: '"Loan Documentation Manager" OR "Loan Docs Manager" bank USA contact email' },
+
+  // ── TIER 7: PE / Finance / Insurance Trust-as-a-Service (new)
+  { industry: 'institutional', role: 'inst_coo',   tier: 'primary',    title: 'COO (PE / Asset Manager)',      query: '"Chief Operating Officer" "private equity" OR "asset management" OR "hedge fund" USA contact email' },
+  { industry: 'institutional', role: 'inst_ir',    tier: 'primary',    title: 'Head of Investor Relations (PE)', query: '"Head of Investor Relations" OR "Director of Investor Relations" "private equity" OR "fund" USA contact email' },
+  { industry: 'institutional', role: 'inst_gcc',   tier: 'primary',    title: 'General Counsel / CCO (Fund)',  query: '"General Counsel" OR "Chief Compliance Officer" "private equity" OR "hedge fund" OR "investment fund" USA SEC contact email' },
+  { industry: 'institutional', role: 'inst_dd',    tier: 'primary',    title: 'Director of Due Diligence',     query: '"Director of Due Diligence" OR "Head of Due Diligence" "private equity" OR "investment firm" USA contact email' },
 
   // ════════════════════════════════════════════════════════
   // TITLE & ESCROW — make every closing document provable
@@ -3606,6 +3621,138 @@ Scott Kiersten
 Founder & CEO, ProofDeed
 gov@proofdeed.com | proofdeed.com`;
 
+  // ── PE / Institutional COO — back-office document workflow integrity
+  const inst_coo = `Hi ${first},
+
+In private equity and asset management, the back office handles the documents that define the deal — subscription agreements, side letters, PPMs, capital call notices. A single altered digit in any of these can cost millions and trigger regulatory exposure.
+
+ProofDeed creates a blockchain-anchored fingerprint of every document at the moment it's executed — tamper-proof, independently verifiable proof under FRE Rule 901. If any document is ever disputed, the integrity is provable in seconds.
+
+No system replacement. Single API call into your existing document workflow.
+
+See it in 2 minutes: proofdeed.com/demo
+
+Worth a 20-minute conversation?
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`;
+
+  // ── Head of Investor Relations — LP document security
+  const inst_ir = `Hi ${first},
+
+The documents you send to LPs — subscription agreements, side letters, capital account statements — carry legal weight and fiduciary responsibility. If an LP ever claims they received a different version than what you have on file, proving document integrity without an immutable record is difficult.
+
+ProofDeed anchors every investor document to the blockchain at the moment it's sent — tamper-proof proof that what your LP received is exactly what was executed, verifiable independently. Builds immediate trust with investors and protects the firm.
+
+See it in 2 minutes: proofdeed.com/demo
+
+Would a brief call make sense?
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`;
+
+  // ── General Counsel / CCO — SEC audit trail
+  const inst_gcc = `Hi ${first},
+
+SEC examiners and regulators increasingly ask whether audit trails are immutable — not just whether you have records, but whether those records can be proven unaltered since creation. When a compliance document is questioned in an examination, "we have it on file" is not the same as "we can prove it hasn't changed."
+
+ProofDeed creates a blockchain-anchored certificate for every compliance document at the moment it's filed — independently verifiable proof of integrity and timestamp, court-admissible under FRE Rule 901.
+
+See it in 2 minutes: proofdeed.com/demo
+
+Worth 20 minutes this week?
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`;
+
+  // ── Director of Due Diligence — verify documents provided by targets
+  const inst_dd = `Hi ${first},
+
+In due diligence, you're reviewing documents provided by the target — financials, contracts, IP filings, compliance records. You have no way to verify those documents are the originals and haven't been altered before they reached you. When a rep and warranty claim surfaces post-close, that's exactly the question.
+
+ProofDeed lets counterparties anchor documents to the blockchain at the moment they're created — so when you receive them in diligence, you can verify independently that they're unaltered originals. Turns document integrity from an assumption into a proof.
+
+See it in 2 minutes: proofdeed.com/demo
+
+Worth a quick call?
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`;
+
+  // ── Auto OEM Supply Chain — VIN-linked document integrity
+  const auto_supply = `Hi ${first},
+
+From parts supplier Certificates of Conformity to VIN-linked build sheets, automotive supply chain documentation is the paper trail that proves a vehicle's history hasn't been altered. Title washing, odometer fraud, and falsified maintenance records all start with a document that can't be proven original.
+
+ProofDeed creates a blockchain-anchored digital fingerprint of every document at the moment it's created — tamper-proof proof tied to the VIN, court-admissible under FRE Rule 901. If a document is ever altered downstream, the fingerprint doesn't match.
+
+No system replacement. Single API call into your existing document workflow.
+
+See it in 2 minutes: proofdeed.com/demo
+
+Worth a quick conversation?
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`;
+
+  // ── Auto CDO — Digital Twin integrity
+  const auto_cdo = `Hi ${first},
+
+The Digital Twin is only as reliable as the documents behind it. If a maintenance log, inspection record, or build sheet can be altered without detection, the twin reflects a history that may not be real — and the liability follows the OEM.
+
+ProofDeed anchors every document in the vehicle's lifecycle to the blockchain at the moment it's created. The digital fingerprint is permanent, VIN-linked, and independently verifiable. If anything changes downstream, it's immediately provable.
+
+See it in 2 minutes: proofdeed.com/demo
+
+Worth 20 minutes to explore?
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`;
+
+  // ── Auto Remarketing / Fleet — title and service record integrity
+  const auto_remarketing = `Hi ${first},
+
+When you're moving thousands of vehicles through remarketing channels, the title and service record documentation is what determines resale value — and liability exposure. A single document dispute on a fleet vehicle can unwind an entire transaction.
+
+ProofDeed creates a tamper-proof, blockchain-anchored record for every title and service document at the moment it's processed. Buyers get verified history. You get protection if a record is ever challenged.
+
+See it in 2 minutes: proofdeed.com/demo
+
+Would a brief call make sense?
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`;
+
+  // ── Auto ISO / Quality Director — parts and safety documentation
+  const auto_iso = `Hi ${first},
+
+ISO/IATF audits require you to prove that safety and quality documentation is untampered — that the Certificate of Conformity your supplier submitted is the same one in your records today. When an audit or recall hits, that proof is what protects the organization.
+
+ProofDeed anchors quality and compliance documents to the blockchain at the moment they're submitted — independently verifiable, court-admissible proof of integrity under FRE Rule 901. One API call alongside your existing QMS.
+
+See it in 2 minutes: proofdeed.com/demo
+
+Worth 20 minutes?
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`;
+
   // ── County Recorder Anti-Fraud / Clouded Title
   const anti_fraud_recorder = `Hi ${first},
 
@@ -3729,6 +3876,20 @@ gov@proofdeed.com | proofdeed.com`;
     audit:          accounting,
     // PE / M&A
     deal:           pe_ma,
+    // Higher Ed / Healthcare
+    inst_ciso:         inst_gcc,      // Third-party verifier angle resonates with CISOs
+    inst_registrar:    inst_ir,       // Document integrity for diplomas/transcripts
+    inst_him:          inst_gcc, // Third-party verifier angle for medical record integrity
+    // PE / Institutional Trust-as-a-Service
+    inst_coo:          inst_coo,
+    inst_ir:           inst_ir,
+    inst_gcc:          inst_gcc,
+    inst_dd:           inst_dd,
+    // Auto OEM / VIN integrity
+    auto_supply:       auto_supply,
+    auto_cdo:          auto_cdo,
+    auto_remarketing:  auto_remarketing,
+    auto_iso:          auto_iso,
     // Anti-fraud / Title Integrity
     anti_fraud:     anti_fraud_recorder,
     ron:            ron_director,
