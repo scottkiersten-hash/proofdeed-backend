@@ -3340,6 +3340,28 @@ const LEAD_TARGETS = [
   { industry: 'pe_ma', role: 'ops',   tier: 'influencer', title: 'Portfolio Operations Director',  query: '"Portfolio Operations Director" "private equity" USA contact email' },
 
   // ════════════════════════════════════════════════════════
+  // LIFE SCIENCES & PHARMA — ALCOA+ data integrity compliance
+  // ════════════════════════════════════════════════════════
+  { industry: 'pharma', role: 'pharma_qa',      tier: 'primary',    title: 'Head of Quality Assurance (Pharma)', query: '"Head of Quality Assurance" OR "VP of Quality" pharmaceutical OR "life sciences" OR biotech USA contact email' },
+  { industry: 'pharma', role: 'pharma_qa',      tier: 'primary',    title: 'Quality Control Director (Pharma)',  query: '"Quality Control Director" OR "QC Director" pharmaceutical OR "life sciences" USA contact email' },
+  { industry: 'pharma', role: 'pharma_cco',     tier: 'primary',    title: 'Chief Compliance Officer (Pharma)',  query: '"Chief Compliance Officer" pharmaceutical OR biotech OR "life sciences" FDA USA contact email' },
+  { industry: 'pharma', role: 'pharma_cco',     tier: 'primary',    title: 'Regulatory Affairs Director (FDA)', query: '"Regulatory Affairs Director" OR "VP Regulatory Affairs" pharmaceutical FDA USA contact email' },
+  { industry: 'pharma', role: 'pharma_supply',  tier: 'primary',    title: 'VP of Supply Chain Integrity',      query: '"VP of Supply Chain" OR "Director of Supply Chain Integrity" pharmaceutical OR "track and trace" USA contact email' },
+  { industry: 'pharma', role: 'pharma_supply',  tier: 'primary',    title: 'Serialization & Track-Trace Manager', query: '"Serialization Manager" OR "Track and Trace" pharmaceutical supply chain USA contact email' },
+  { industry: 'pharma', role: 'pharma_clinical',tier: 'primary',    title: 'VP Clinical Data Integrity',        query: '"Clinical Data Integrity" OR "VP Clinical Operations" pharmaceutical clinical trial USA contact email' },
+  { industry: 'pharma', role: 'pharma_clinical',tier: 'primary',    title: 'Director of Clinical Data Management', query: '"Clinical Data Management" director OR VP pharmaceutical USA contact email' },
+
+  // ════════════════════════════════════════════════════════
+  // AVIATION & AEROSPACE (MRO) — airworthiness documentation
+  // ════════════════════════════════════════════════════════
+  { industry: 'aviation', role: 'aviation_dom',  tier: 'primary',   title: 'Director of Maintenance (DOM)',      query: '"Director of Maintenance" airline OR MRO OR aviation USA contact email' },
+  { industry: 'aviation', role: 'aviation_dom',  tier: 'primary',   title: 'VP of Aviation Safety',              query: '"VP of Aviation Safety" OR "Director of Aviation Safety" airline USA contact email' },
+  { industry: 'aviation', role: 'aviation_cto',  tier: 'primary',   title: 'CTO of MRO Organization',            query: '"Chief Technology Officer" MRO OR "Maintenance Repair Overhaul" aviation USA contact email' },
+  { industry: 'aviation', role: 'aviation_cto',  tier: 'primary',   title: 'Head of Digital Transformation (MRO)', query: '"Digital Transformation" MRO OR aviation maintenance USA director OR head contact email' },
+  { industry: 'aviation', role: 'aviation_parts',tier: 'primary',   title: 'Parts Quality Director (Anti-Counterfeit)', query: '"Parts Quality" OR "counterfeit parts" director aviation aerospace USA contact email' },
+  { industry: 'aviation', role: 'aviation_parts',tier: 'primary',   title: 'Director of Engineering Records',    query: '"Engineering Records" director OR manager aviation OR aerospace OR MRO USA contact email' },
+
+  // ════════════════════════════════════════════════════════
   // ANTI-FRAUD / TITLE INTEGRITY — highest pain, direct buyers
   // ════════════════════════════════════════════════════════
   // County Recorder — clouded titles, deed fraud
@@ -3856,6 +3878,128 @@ Scott Kiersten
 Founder & CEO, ProofDeed
 gov@proofdeed.com | proofdeed.com`;
 
+  // ── Pharma QA/QC — ALCOA+ data integrity, CoA tamper detection
+  const pharma_qa = `Hi ${first},
+
+FDA and EMA are tightening enforcement of ALCOA+ data integrity standards — and the most common failure point isn't missing records, it's records that can't be proven unaltered. A Certificate of Analysis, a batch manufacturing record, a deviation report — if you can't prove the document hasn't been modified since creation, the entire batch is at risk.
+
+ProofDeed certifies every quality document at the field level — batch number, test results, analyst signature, approval date — each individually hashed on the Polygon blockchain at the moment of creation. If a single value is changed after the fact, it's immediately detectable. Third-party proof that satisfies 21 CFR Part 11 and ALCOA+ without replacing your QMS.
+
+One API call. No system replacement. Live in a day.
+
+See it in 2 minutes: proofdeed.com/demo
+
+Worth 20 minutes with your QA team?
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`;
+
+  // ── Pharma CCO / Regulatory Affairs — FDA audit trail
+  const pharma_cco = `Hi ${first},
+
+When the FDA or EMA audits your data integrity, the question isn't just whether records exist — it's whether those records can be proven unaltered since creation. ALCOA+ requires that every data point be attributable, legible, contemporaneous, original, and accurate. "We have it in our system" doesn't satisfy the original requirement.
+
+ProofDeed creates a blockchain-anchored certificate for every regulatory document at the moment it's filed — tamper-proof, independently verifiable proof under 21 CFR Part 11 and FRE Rule 901. Third-party verified, not dependent on your internal IT.
+
+One API call into your existing document workflow. No system replacement.
+
+See it in 2 minutes: proofdeed.com/demo
+
+Worth a brief conversation this week?
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`;
+
+  // ── Pharma Supply Chain — serialization + track and trace
+  const pharma_supply = `Hi ${first},
+
+The Certificate of Analysis travels from factory to pharmacy through multiple hands. If a CoA is altered at any point in the chain — test results adjusted, batch numbers changed — the tampered document looks identical to the original. Serialization systems track the package. They don't prove the document inside it is unaltered.
+
+ProofDeed certifies every CoA and supply chain document at the field level at the moment of creation — independently verifiable proof that what arrived at the pharmacy is exactly what left the factory. One webhook into your existing serialization workflow.
+
+See it in 2 minutes: proofdeed.com/demo
+
+Would a quick call make sense?
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`;
+
+  // ── Pharma Clinical — trial data integrity
+  const pharma_clinical = `Hi ${first},
+
+Post-market scrutiny of clinical trial data increasingly focuses on whether patient data was "cleaned" or modified after collection. If a regulator or opposing counsel alleges data manipulation, the question is whether you can prove every data point is unchanged from the moment it was recorded.
+
+ProofDeed certifies clinical data at the field level — patient ID, measurement, date, site — each individually hashed on the blockchain at the moment of entry. Any modification after the fact is immediately detectable and independently provable. Satisfies 21 CFR Part 11 without replacing your EDC system.
+
+See it in 2 minutes: proofdeed.com/demo
+
+Worth 20 minutes to walk through the integration?
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`;
+
+  // ── Aviation DOM / Safety — maintenance log integrity
+  const aviation_dom = `Hi ${first},
+
+In aviation, a plane is only as airworthy as its paperwork. When an incident investigation or airworthiness authority challenges a maintenance log — whether an inspection was actually signed off on that date, whether a part was genuinely certified — the documentation is the evidence. If it can't be proven unaltered, the liability is open.
+
+ProofDeed certifies every maintenance log entry at the field level — tail number, inspection type, technician ID, sign-off date, part number — each individually hashed on the Polygon blockchain at the moment it's recorded. If a single field is ever modified, it's immediately detectable. Court-admissible under FRE Rule 901.
+
+One webhook into your MRO management system. No system replacement.
+
+See it in 2 minutes: proofdeed.com/demo
+
+Worth a brief conversation?
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`;
+
+  // ── Aviation CTO / Digital Transformation — MRO records digitization
+  const aviation_cto = `Hi ${first},
+
+As MRO operations move from paper to digital, the core question regulators and airlines ask is: how do you prove a digitized record is identical to the original, and that it hasn't been altered since? Paper had a physical chain of custody. Digital records need cryptographic proof.
+
+ProofDeed provides that proof layer. Every maintenance record, parts certificate, and airworthiness document is hashed on the Polygon blockchain at the moment it's created or digitized — independently verifiable by any airline, regulator, or auditor without access to your systems.
+
+One API call into your existing document workflow.
+
+See it in 2 minutes: proofdeed.com/demo
+
+Worth 20 minutes?
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`;
+
+  // ── Aviation Parts — anti-counterfeit birth certificates
+  const aviation_parts = `Hi ${first},
+
+Bogus parts are the single biggest undetected risk in aviation maintenance. A counterfeit part looks identical to a certified one — until it fails. The FAA estimates 2% of installed parts in service are unapproved. The only way to close that gap is to make the paper trail unforgeable.
+
+ProofDeed creates a blockchain-anchored "birth certificate" for every certified part at the moment it leaves the manufacturer — part number, serial number, manufacturer, test certification, date — each field individually hashed. Any document presented later can be verified against the original in seconds. Counterfeit parts can't pass verification.
+
+One API call for manufacturers. One verification link for MRO teams.
+
+See it in 2 minutes: proofdeed.com/demo
+
+Worth a quick conversation?
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`;
+
   // ── Auto OEM Supply Chain — VIN-linked document integrity
   const auto_supply = `Hi ${first},
 
@@ -4054,6 +4198,15 @@ gov@proofdeed.com | proofdeed.com`;
     inst_ir:           inst_ir,
     inst_gcc:          inst_gcc,
     inst_dd:           inst_dd,
+    // Pharma / Life Sciences
+    pharma_qa:         pharma_qa,
+    pharma_cco:        pharma_cco,
+    pharma_supply:     pharma_supply,
+    pharma_clinical:   pharma_clinical,
+    // Aviation / MRO
+    aviation_dom:      aviation_dom,
+    aviation_cto:      aviation_cto,
+    aviation_parts:    aviation_parts,
     // Auto OEM / VIN integrity
     auto_supply:       auto_supply,
     auto_cdo:          auto_cdo,
