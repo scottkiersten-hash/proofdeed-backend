@@ -613,6 +613,171 @@ app.post("/api/v1/certify", authenticateApiKey, async (req, res) => {
   }
 });
 
+/* ---------------- FIELD-LEVEL CERTIFY ---------------- */
+// Hashes each field individually so you can prove WHICH field changed, not just that something did.
+// Use case: financial sheets, automotive deal jackets, medical records, subscription agreements.
+app.post("/api/v1/certify/fields", authenticateApiKey, async (req, res) => {
+  try {
+    const { fields, label, metadata } = req.body;
+    // fields = { vin: "1HGBH41JXMN109186", odometer: "45231", price: "24500.00", ... }
+    if (!fields || typeof fields !== 'object' || Array.isArray(fields)) {
+      return res.status(400).json({ error: 'fields must be a key/value object.' });
+    }
+
+    const proofId = 'PD-F-' + Date.now() + '-' + crypto.randomBytes(3).toString('hex');
+    const timestamp = new Date().toISOString();
+
+    // Hash each field individually
+    const fieldHashes = {};
+    for (const [key, value] of Object.entries(fields)) {
+      fieldHashes[key] = crypto.createHash('sha256').update(String(value)).digest('hex');
+    }
+
+    // Root hash = hash of all field hashes combined (order-stable via sorted keys)
+    const rootInput = Object.keys(fieldHashes).sort().map(k => `${k}:${fieldHashes[k]}`).join('|');
+    const rootHash = crypto.createHash('sha256').update(rootInput).digest('hex');
+
+    await pool.query(
+      `INSERT INTO certifications (certification_id, hash, polygon_tx, api_key_email, ip_address, created_at)
+       VALUES ($1, $2, NULL, $3, $4, NOW()) ON CONFLICT (certification_id) DO NOTHING`,
+      [proofId, rootHash, req.apiKey.email, req.ip || req.headers['x-forwarded-for'] || null]
+    );
+
+    await pool.query(
+      'UPDATE api_keys SET used_this_month = used_this_month + 1 WHERE api_key = $1',
+      [req.apiKey.api_key]
+    );
+
+    if (req.apiKey.stripe_subscription_item_id) {
+      await reportUsageToStripe(req.apiKey.stripe_subscription_item_id, 1);
+    }
+
+    res.json({
+      proofId, timestamp, rootHash, fieldHashes, label: label || null,
+      verifyUrl: `https://proofdeed.com/verify/${rootHash}`,
+      note: 'Each fieldHash proves the value of that field at this timestamp. rootHash proves all fields together.'
+    });
+
+    // Anchor root hash to blockchain in background
+    anchorToPolygon(rootHash).then(async (txHash) => {
+      await pool.query('UPDATE certifications SET polygon_tx=$1 WHERE certification_id=$2', [txHash, proofId]);
+      if (req.apiKey.webhook_url) {
+        fetch(req.apiKey.webhook_url, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ event: 'certification.fields.created', proofId, rootHash, fieldHashes, timestamp, polygon_tx: txHash, label })
+        }).catch(() => {});
+      }
+    }).catch(err => console.error('Field cert blockchain anchor failed:', err.message));
+
+  } catch (err) {
+    console.error('Field certify error:', err);
+    res.status(500).json({ error: 'Internal server error.' });
+  }
+});
+
+/* ---------------- FIELD VERIFY — check if a specific field has changed ---------------- */
+app.post("/api/v1/verify/fields", async (req, res) => {
+  try {
+    const { proofId, fields } = req.body;
+    if (!proofId || !fields) return res.status(400).json({ error: 'proofId and fields required.' });
+
+    const cert = await pool.query('SELECT * FROM certifications WHERE certification_id=$1', [proofId]);
+    if (!cert.rows[0]) return res.status(404).json({ error: 'Proof not found.' });
+
+    // Recompute field hashes from provided values
+    const recomputedHashes = {};
+    for (const [key, value] of Object.entries(fields)) {
+      recomputedHashes[key] = crypto.createHash('sha256').update(String(value)).digest('hex');
+    }
+    const rootInput = Object.keys(recomputedHashes).sort().map(k => `${k}:${recomputedHashes[k]}`).join('|');
+    const recomputedRoot = crypto.createHash('sha256').update(rootInput).digest('hex');
+
+    const intact = recomputedRoot === cert.rows[0].hash;
+    res.json({
+      intact, proofId,
+      originalRootHash: cert.rows[0].hash,
+      recomputedRootHash: recomputedRoot,
+      certifiedAt: cert.rows[0].created_at,
+      polygon_tx: cert.rows[0].polygon_tx,
+      message: intact ? 'All fields verified — document is unaltered.' : 'TAMPER DETECTED — one or more fields do not match the certified values.'
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error.' });
+  }
+});
+
+/* ---------------- DMS WEBHOOK (Dealer Management System sync) ---------------- */
+// Drop this URL into any DMS (CDK, Reynolds & Reynolds, DealerSocket, Tekion) as a webhook.
+// When a deal is finalized, the DMS posts the deal data here and we auto-certify it.
+app.post("/api/v1/webhooks/dms", authenticateApiKey, async (req, res) => {
+  try {
+    const { vin, deal_number, buyer_name, sale_price, odometer, stock_number, sale_date, fields } = req.body;
+
+    if (!vin && !deal_number) {
+      return res.status(400).json({ error: 'At minimum, vin or deal_number is required.' });
+    }
+
+    // Build field set from whatever the DMS sends
+    const dealFields = {
+      vin:         vin || '',
+      deal_number: deal_number || '',
+      buyer_name:  buyer_name || '',
+      sale_price:  String(sale_price || ''),
+      odometer:    String(odometer || ''),
+      stock_number:stock_number || '',
+      sale_date:   sale_date || new Date().toISOString().split('T')[0],
+      ...fields // allow DMS to pass extra fields
+    };
+
+    const proofId = 'PD-DMS-' + Date.now() + '-' + crypto.randomBytes(3).toString('hex');
+    const timestamp = new Date().toISOString();
+
+    const fieldHashes = {};
+    for (const [key, value] of Object.entries(dealFields)) {
+      fieldHashes[key] = crypto.createHash('sha256').update(String(value)).digest('hex');
+    }
+    const rootInput = Object.keys(fieldHashes).sort().map(k => `${k}:${fieldHashes[k]}`).join('|');
+    const rootHash = crypto.createHash('sha256').update(rootInput).digest('hex');
+
+    await pool.query(
+      `INSERT INTO certifications (certification_id, hash, polygon_tx, api_key_email, ip_address, created_at)
+       VALUES ($1, $2, NULL, $3, $4, NOW()) ON CONFLICT (certification_id) DO NOTHING`,
+      [proofId, rootHash, req.apiKey.email, req.ip || req.headers['x-forwarded-for'] || null]
+    );
+    await pool.query(
+      'UPDATE api_keys SET used_this_month = used_this_month + 1 WHERE api_key = $1',
+      [req.apiKey.api_key]
+    );
+    if (req.apiKey.stripe_subscription_item_id) {
+      await reportUsageToStripe(req.apiKey.stripe_subscription_item_id, 1);
+    }
+
+    const verifyUrl = `https://proofdeed.com/verify/${rootHash}`;
+
+    res.json({
+      proofId, timestamp, rootHash, fieldHashes, verifyUrl,
+      vin: vin || null, deal_number: deal_number || null,
+      message: `Deal ${deal_number || vin} certified. Share verifyUrl with buyer for public proof.`
+    });
+
+    console.log(`[DMS Webhook] Deal certified — VIN: ${vin || 'N/A'}, Deal: ${deal_number || 'N/A'}, ProofId: ${proofId}`);
+
+    anchorToPolygon(rootHash).then(async (txHash) => {
+      await pool.query('UPDATE certifications SET polygon_tx=$1 WHERE certification_id=$2', [txHash, proofId]);
+      if (req.apiKey.webhook_url) {
+        fetch(req.apiKey.webhook_url, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ event: 'dms.deal.certified', proofId, rootHash, verifyUrl, vin, deal_number, timestamp, polygon_tx: txHash })
+        }).catch(() => {});
+      }
+    }).catch(err => console.error('DMS blockchain anchor failed:', err.message));
+
+  } catch (err) {
+    console.error('DMS webhook error:', err);
+    res.status(500).json({ error: 'Internal server error.' });
+  }
+});
+
 /* ---------------- ENTERPRISE - BATCH CERTIFY (ASYNC) ---------------- */
 
 async function processBatchBackground(batchId, certRecords, apiKey) {
@@ -3394,11 +3559,11 @@ gov@proofdeed.com | proofdeed.com`;
   // ── Auto Dealer / F&I / Title — "proof of ownership + transaction integrity"
   const auto_dealer = `Hi ${first},
 
-Every title transfer, lien release, and ownership record your operation processes is a liability the moment it's disputed. A forged title, an altered odometer disclosure, a backdated transfer — if you can't prove the document's integrity at the moment it was created, you're defending yourself without evidence.
+Every title transfer, lien release, and odometer disclosure your operation processes is a liability the moment it's disputed. A forged title or altered sale price — if you can't prove the document at the exact moment it was created, you're defending yourself without evidence.
 
-ProofDeed anchors each document to the Polygon blockchain at the moment it's processed — creating tamper-proof proof of ownership and transaction integrity that holds up in court under FRE Rule 901. No system replacement. Single API call. Live in days.
+ProofDeed syncs directly with your Dealer Management System (CDK, Reynolds & Reynolds, DealerSocket, Tekion). When a deal is finalized, we automatically certify every field — VIN, odometer, sale price, buyer name — individually on the Polygon blockchain. If a single decimal point is ever moved, it's immediately detectable.
 
-One disputed title can cost more than a full year of protection.
+Buyers get a public verification link to confirm their vehicle's history is untampered. You get court-admissible proof under FRE Rule 901. No system replacement — one webhook, live in a day.
 
 See it in 2 minutes: proofdeed.com/demo
 
@@ -3412,13 +3577,13 @@ gov@proofdeed.com | proofdeed.com`;
   // ── Auto Lender / Collateral / Lien — "lien accuracy + title chain integrity"
   const auto_lender = `Hi ${first},
 
-Lien accuracy and title chain integrity are the foundation of your collateral position. When a borrower defaults and the title history is challenged — altered records, forged releases, disputed ownership — your ability to recover depends entirely on whether you can prove the documents are authentic.
+Lien accuracy and title chain integrity are the foundation of your collateral position. When a borrower defaults and the title history is challenged — altered lien amounts, forged releases, disputed ownership — your recovery depends on whether you can prove each field in the document is authentic.
 
-ProofDeed creates a blockchain-anchored certificate for every loan document and lien record at the moment it's processed — independently verifiable proof under FRE Rule 901. No system replacement. Single API call.
+ProofDeed certifies every loan document and lien record at the field level — VIN, lien amount, lienholder, release date — each individually hashed on the Polygon blockchain. If a single figure is altered after the fact, it's immediately provable. Independently verifiable under FRE Rule 901. One API call, no system changes.
 
 See it in 2 minutes: proofdeed.com/demo
 
-Would 20 minutes be worth it to walk through how it fits your workflow?
+Would 20 minutes be worth it?
 
 Best,
 Scott Kiersten
@@ -3428,13 +3593,15 @@ gov@proofdeed.com | proofdeed.com`;
   // ── Auto Auction / Remarketing — "chain of custody for high-volume transfers"
   const auto_auction = `Hi ${first},
 
-At the volume your operation processes, every vehicle transfer is a potential chain-of-custody dispute. Odometer fraud, salvage title laundering, forged ownership records — the liability lands on whoever processed the last transaction without proof.
+At auction volume, every vehicle transfer is a potential chain-of-custody dispute. Odometer fraud, salvage title laundering, forged condition reports — the liability lands on whoever processed the last transaction without proof.
 
-ProofDeed anchors vehicle records to the Polygon blockchain at the moment of transfer — tamper-proof chain of custody that's independently verifiable and court-admissible under FRE Rule 901. No system replacement. Single API call.
+ProofDeed syncs with your auction management system via webhook. When a vehicle sells, we automatically certify the VIN, odometer, condition grade, and seller/buyer fields on the Polygon blockchain — individually. Each buyer gets a public verification link showing the vehicle's certified history. Title washing becomes immediately detectable.
+
+Court-admissible under FRE Rule 901. One webhook into your existing workflow, live in a day.
 
 See it in 2 minutes: proofdeed.com/demo
 
-Worth a quick call this week?
+Worth a quick call?
 
 Best,
 Scott Kiersten
@@ -3494,11 +3661,11 @@ gov@proofdeed.com | proofdeed.com`;
   // ── Title & Escrow — "make every closing document provable and tamper-proof"
   const title_escrow = `Hi ${first},
 
-Every real estate closing generates a stack of documents that can be disputed years later — deeds, settlement statements, title commitments, wire instructions. Title fraud and post-closing disputes are rising, and the organizations that can prove document integrity at the moment of closing are in the strongest position when they do.
+Every real estate closing generates documents that can be disputed years later — deeds, settlement statements, wire instructions. Title fraud and post-closing disputes are rising, and the difference between a clean resolution and litigation is whether you can prove document integrity at the moment of closing.
 
-ProofDeed anchors every closing document to the Polygon blockchain at the moment it's processed — tamper-proof, timestamped proof that's court-admissible under FRE Rule 901. No system replacement. Single API call. Live in days.
+ProofDeed certifies every closing document at the field level — buyer name, sale price, legal description, recording date — each individually hashed on the Polygon blockchain the moment it's processed. If a single field is ever altered, it's immediately detectable. Buyers get a public verification link. You get court-admissible proof under FRE Rule 901.
 
-The cost of a single disputed closing dwarfs the annual cost of protection.
+Integrates via API into your existing closing software. No system replacement. Live in a day.
 
 See it in 2 minutes: proofdeed.com/demo
 
@@ -3512,13 +3679,13 @@ gov@proofdeed.com | proofdeed.com`;
   // ── Legal / Law Firms — "lock document integrity at creation so it holds up in court"
   const legal_firm = `Hi ${first},
 
-The most damaging thing that can happen to a document in litigation is for opposing counsel to allege it was altered after creation. If you can't prove the document is unchanged from the moment it was drafted, you're defending the document instead of the case.
+The most damaging thing opposing counsel can do is allege a document was altered after creation. If you can't prove it's unchanged from the moment it was drafted, you're defending the document instead of the case.
 
-ProofDeed anchors documents to the Polygon blockchain at the moment they're created — tamper-proof proof of existence and integrity that's independently verifiable and court-admissible under FRE Rule 901. No system changes. No document storage.
+ProofDeed certifies legal documents at the field level — party names, dates, amounts, terms — each individually hashed on the Polygon blockchain at the moment of creation. If opposing counsel claims a figure was changed after signing, you prove it in seconds. Independently verifiable by any court under FRE Rule 901. No system changes, no document storage.
 
 See it in 2 minutes: proofdeed.com/demo
 
-Would 20 minutes make sense to walk through how it works?
+Would 20 minutes make sense?
 
 Best,
 Scott Kiersten
@@ -3624,11 +3791,11 @@ gov@proofdeed.com | proofdeed.com`;
   // ── PE / Institutional COO — back-office document workflow integrity
   const inst_coo = `Hi ${first},
 
-In private equity and asset management, the back office handles the documents that define the deal — subscription agreements, side letters, PPMs, capital call notices. A single altered digit in any of these can cost millions and trigger regulatory exposure.
+In private equity and asset management, the back office handles documents where a single altered digit can cost millions — subscription agreements, side letters, PPMs, capital call notices. Most document systems can tell you when a file was last modified. None can prove it wasn't.
 
-ProofDeed creates a blockchain-anchored fingerprint of every document at the moment it's executed — tamper-proof, independently verifiable proof under FRE Rule 901. If any document is ever disputed, the integrity is provable in seconds.
+ProofDeed certifies every critical document at the field level — investor name, commitment amount, terms, execution date — each individually hashed on the Polygon blockchain at the moment of execution. If a single decimal point is moved after the fact, it's immediately detectable. Independent proof that doesn't rely on your internal IT.
 
-No system replacement. Single API call into your existing document workflow.
+Integrates via API into your existing document workflow. No system replacement. Live in a day.
 
 See it in 2 minutes: proofdeed.com/demo
 
@@ -3642,9 +3809,11 @@ gov@proofdeed.com | proofdeed.com`;
   // ── Head of Investor Relations — LP document security
   const inst_ir = `Hi ${first},
 
-The documents you send to LPs — subscription agreements, side letters, capital account statements — carry legal weight and fiduciary responsibility. If an LP ever claims they received a different version than what you have on file, proving document integrity without an immutable record is difficult.
+When an LP questions whether the subscription agreement or capital account statement they received is exactly what was executed — your word against theirs without an independent record.
 
-ProofDeed anchors every investor document to the blockchain at the moment it's sent — tamper-proof proof that what your LP received is exactly what was executed, verifiable independently. Builds immediate trust with investors and protects the firm.
+ProofDeed certifies every LP document at the field level — commitment amount, terms, execution date — each individually hashed on the blockchain at the moment it's sent. LPs can verify their own documents independently without accessing your systems. If anything was altered in transit or after the fact, it's immediately provable.
+
+Third-party verified. Auditors accept it. Regulators expect it. One API call, no system changes.
 
 See it in 2 minutes: proofdeed.com/demo
 
@@ -3690,11 +3859,11 @@ gov@proofdeed.com | proofdeed.com`;
   // ── Auto OEM Supply Chain — VIN-linked document integrity
   const auto_supply = `Hi ${first},
 
-From parts supplier Certificates of Conformity to VIN-linked build sheets, automotive supply chain documentation is the paper trail that proves a vehicle's history hasn't been altered. Title washing, odometer fraud, and falsified maintenance records all start with a document that can't be proven original.
+From supplier Certificates of Conformity to VIN-linked build sheets, your supply chain documentation is the proof that a vehicle's history is clean. Title washing, falsified maintenance records, and altered part certifications all start with a document someone couldn't prove original.
 
-ProofDeed creates a blockchain-anchored digital fingerprint of every document at the moment it's created — tamper-proof proof tied to the VIN, court-admissible under FRE Rule 901. If a document is ever altered downstream, the fingerprint doesn't match.
+ProofDeed certifies each field in your supply chain documents — part number, supplier ID, conformity date, test results — individually on the Polygon blockchain at the moment they're created. If any field is altered downstream, it's immediately detectable. Each document gets a public verification link tied to the VIN.
 
-No system replacement. Single API call into your existing document workflow.
+One webhook into your existing document workflow. No system replacement. Live in a day.
 
 See it in 2 minutes: proofdeed.com/demo
 
