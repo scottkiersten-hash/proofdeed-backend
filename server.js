@@ -3408,6 +3408,57 @@ const LEAD_TARGETS = [
   // Tax Assessor — ownership data accuracy
   { industry: 'government', role: 'tax',      tier: 'primary',    title: 'County Tax Assessor',            query: '"County Tax Assessor" OR "County Assessor" contact email county USA site:*.gov' },
   { industry: 'government', role: 'tax',      tier: 'primary',    title: 'Property Appraiser Director',    query: '"Property Appraiser" director OR chief county USA contact email site:*.gov' },
+  // ════════════════════════════════════════════════════════
+  // UAE — Dubai Paperless Strategy 2026 + VARA compliance
+  // Real Estate Developers (Big 10) + Automotive Conglomerates
+  // ════════════════════════════════════════════════════════
+
+  // Emaar Properties
+  { industry: 'uae_realestate', role: 'uae_redev', tier: 'primary', title: 'CDO — Emaar Properties',               query: '"Emaar Properties" "Chief Digital Officer" OR "CDO" site:linkedin.com OR site:emaar.ae contact email' },
+  { industry: 'uae_realestate', role: 'uae_reops', tier: 'primary', title: 'Head of Sales Operations — Emaar',      query: '"Emaar Properties" "Head of Sales Operations" OR "Sales Operations Director" site:linkedin.com contact email' },
+
+  // DAMAC Properties
+  { industry: 'uae_realestate', role: 'uae_redev', tier: 'primary', title: 'CTO — DAMAC Properties',                query: '"DAMAC Properties" "Chief Technology Officer" OR "CTO" site:linkedin.com OR site:damacproperties.com contact email' },
+  { industry: 'uae_realestate', role: 'uae_recx',  tier: 'primary', title: 'Director of Customer Relations — DAMAC', query: '"DAMAC Properties" "Director of Customer Relations" OR "Customer Relations Director" site:linkedin.com contact email' },
+
+  // Nakheel
+  { industry: 'uae_realestate', role: 'uae_redev', tier: 'primary', title: 'Head of Digital Transformation — Nakheel', query: '"Nakheel" "Head of Digital Transformation" OR "Digital Transformation Director" site:linkedin.com OR site:nakheel.com contact email' },
+  { industry: 'uae_realestate', role: 'uae_legal', tier: 'primary', title: 'VP Legal & Compliance — Nakheel',         query: '"Nakheel" "VP Legal" OR "Legal Compliance" OR "Head of Compliance" site:linkedin.com contact email' },
+
+  // Dubai Holding
+  { industry: 'uae_realestate', role: 'uae_redev', tier: 'primary', title: 'Chief Innovation Officer — Dubai Holding', query: '"Dubai Holding" "Chief Innovation Officer" OR "Head of Innovation" site:linkedin.com OR site:dubaiholding.com contact email' },
+  { industry: 'uae_realestate', role: 'uae_reops', tier: 'primary', title: 'Head of Asset Management — Dubai Holding', query: '"Dubai Holding" "Head of Asset Management" OR "Asset Management Director" site:linkedin.com contact email' },
+
+  // Meraas
+  { industry: 'uae_realestate', role: 'uae_redev', tier: 'primary', title: 'Director of IT Infrastructure — Meraas',  query: '"Meraas" "IT Infrastructure" OR "Director of IT" site:linkedin.com OR site:meraas.com contact email' },
+  { industry: 'uae_realestate', role: 'uae_reops', tier: 'primary', title: 'Head of Property Handover — Meraas',       query: '"Meraas" "Head of Property Handover" OR "Property Handover Manager" site:linkedin.com contact email' },
+
+  // Sobha Realty
+  { industry: 'uae_realestate', role: 'uae_redev', tier: 'primary', title: 'COO — Sobha Realty',                      query: '"Sobha Realty" "Chief Operations Officer" OR "COO" site:linkedin.com OR site:sobharealty.com contact email' },
+  { industry: 'uae_realestate', role: 'uae_reops', tier: 'primary', title: 'Head of Quality Control — Sobha Realty',  query: '"Sobha Realty" "Head of Quality Control" OR "Quality Control Director" site:linkedin.com contact email' },
+
+  // Deyaar
+  { industry: 'uae_realestate', role: 'uae_redev', tier: 'primary', title: 'IT Director — Deyaar',                    query: '"Deyaar" "IT Director" OR "Head of IT" site:linkedin.com OR site:deyaar.ae contact email' },
+  { industry: 'uae_realestate', role: 'uae_reops', tier: 'primary', title: 'Head of Community Management — Deyaar',   query: '"Deyaar" "Head of Community Management" OR "Community Management Director" site:linkedin.com contact email' },
+
+  // Ellington Properties
+  { industry: 'uae_realestate', role: 'uae_redev', tier: 'primary', title: 'Head of Technology — Ellington',          query: '"Ellington Properties" "Head of Technology" OR "Technology Director" site:linkedin.com OR site:ellingtonproperties.com contact email' },
+  { industry: 'uae_realestate', role: 'uae_recx',  tier: 'primary', title: 'Director of Post-Sales — Ellington',      query: '"Ellington Properties" "Director of Post-Sales" OR "Post Sales Manager" site:linkedin.com contact email' },
+
+  // Meydan Group
+  { industry: 'uae_realestate', role: 'uae_redev', tier: 'primary', title: 'CIO — Meydan Group',                      query: '"Meydan Group" "Chief Information Officer" OR "CIO" site:linkedin.com OR site:meydan.ae contact email' },
+  { industry: 'uae_realestate', role: 'uae_reops', tier: 'primary', title: 'Head of Real Estate — Meydan Group',       query: '"Meydan Group" "Head of Real Estate" OR "Real Estate Director" site:linkedin.com contact email' },
+
+  // Binghatti
+  { industry: 'uae_realestate', role: 'uae_redev', tier: 'primary', title: 'CEO / MD — Binghatti',                    query: '"Binghatti" "CEO" OR "Managing Director" site:linkedin.com OR site:binghatti.com contact email' },
+  { industry: 'uae_realestate', role: 'uae_redev', tier: 'primary', title: 'Head of Digital Strategy — Binghatti',    query: '"Binghatti" "Head of Digital Strategy" OR "Digital Strategy Director" site:linkedin.com contact email' },
+
+  // ── UAE Automotive Conglomerates
+  { industry: 'uae_auto', role: 'uae_autodev', tier: 'primary', title: 'Head of Strategy & Transformation — Al-Futtaim', query: '"Al-Futtaim" OR "Al Futtaim" "Head of Strategy" OR "Transformation" automotive site:linkedin.com OR site:alfuttaim.com contact email' },
+  { industry: 'uae_auto', role: 'uae_autodev', tier: 'primary', title: 'Director of Digital Experience — Al Tayer',       query: '"Al Tayer Motors" "Director of Digital Experience" OR "Digital Experience" site:linkedin.com contact email' },
+  { industry: 'uae_auto', role: 'uae_autodev', tier: 'primary', title: 'CIO — AW Rostamani',                               query: '"AW Rostamani" "Chief Information Officer" OR "CIO" site:linkedin.com OR site:awrostamani.com contact email' },
+  { industry: 'uae_auto', role: 'uae_autodev', tier: 'primary', title: 'Head of Business Development — Gargash Group',    query: '"Gargash Group" OR "Gargash Enterprises" "Head of Business Development" site:linkedin.com contact email' },
+  { industry: 'uae_auto', role: 'uae_autodev', tier: 'primary', title: 'Director of Operations — Al Habtoor Motors',      query: '"Al Habtoor Motors" "Director of Operations" OR "Operations Director" site:linkedin.com contact email' },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -3521,6 +3572,124 @@ I'm Scott, founder of ProofDeed — blockchain document certification. I'd love 
 
 Scott Kiersten
 proofdeed.com`;
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// UAE EMAIL — Dubai Paperless Strategy 2026 + VARA compliance hook
+// Used for UAE real estate developers and automotive conglomerates.
+// Strategy: frame around Dubai's government mandate — compliance pressure
+// is already there; ProofDeed is the implementation layer.
+// ─────────────────────────────────────────────────────────────────────────────
+const UAE_EMAIL = (name, company, role) => {
+  const first = name.split(' ')[0];
+
+  // Real estate developer — Digital Transformation / CDO / CTO / CIO / Innovation
+  const uae_redev = `Hi ${first},
+
+As the UAE accelerates toward its 2026 Paperless Government mandate, the risk sitting at the center of every major developer's operation is the same: digital property documents — title deeds, sale agreements, NOCs, handover certificates — are easy to duplicate, alter, and forge once they leave your system.
+
+The Dubai Land Department is already issuing blockchain-backed title deeds. The gap is in the private developer workflow: the documents your team creates, transfers, and stores before they ever reach DLD.
+
+ProofDeed provides a single API call that anchors each document field to the Polygon blockchain at the moment of creation — sale price, unit number, buyer name, execution date — so any downstream alteration is immediately detectable. No system replacement. Compatible with your existing DMS and CRM.
+
+Relevant to ${company}'s current digital transformation priorities:
+→ Aligns with Dubai Paperless Strategy 2026 and VARA's data integrity standards
+→ Provides cryptographic proof of document origination for DLD submissions
+→ Reduces title dispute resolution time from weeks to minutes
+
+See it in 2 minutes: proofdeed.com/demo
+
+Worth a quick call?
+
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`;
+
+  // Real estate — Operations / Sales / Asset Management / Handover
+  const uae_reops = `Hi ${first},
+
+Property handover disputes and title transfer delays cost UAE developers significant time and legal exposure — and the root cause is almost always the same: a document that can't be independently verified as unaltered.
+
+With the UAE's 2026 Paperless Mandate requiring all government-adjacent transactions to be fully digital, the operational risk is only increasing. A digital document with no cryptographic proof of integrity is a liability.
+
+ProofDeed provides field-level blockchain certification for every document in your handover and sales workflow — NOC, SPA, title deed, payment schedules — anchored at creation so ${company}'s team, your buyers, and the DLD all see the same verified original.
+
+One API call. No workflow disruption. Works alongside your existing property management system.
+
+See it in 2 minutes: proofdeed.com/demo
+
+Worth 20 minutes?
+
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`;
+
+  // Real estate — Legal & Compliance
+  const uae_legal = `Hi ${first},
+
+VARA's expanding framework for virtual and digital assets in the UAE now requires demonstrable data integrity for any digital document used in regulated transactions. For a developer of ${company}'s scale, the exposure isn't just regulatory — it's the cost of a single contested title deed in arbitration.
+
+ProofDeed provides immutable, cryptographic proof that every property document is unaltered from the moment of creation — sale price, buyer identity, execution timestamp, unit details — each field individually anchored to the blockchain. Independent third-party verifiability without relying on your internal system logs.
+
+Relevant to your compliance posture:
+→ Aligns with VARA data integrity standards
+→ Supports DLD blockchain title deed ecosystem
+→ Defensible audit trail for DIFC and ADGM arbitration
+
+See it in 2 minutes: proofdeed.com/demo
+
+Worth a conversation with your team?
+
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`;
+
+  // Real estate — Customer Experience / Post-Sales / CX
+  const uae_recx = `Hi ${first},
+
+The most common post-sale complaint at UAE property developers isn't price or quality — it's "that's not what my documents say." Buyers dispute handover conditions, payment schedules, and SPA terms because there's no cryptographic proof of what was agreed at signing.
+
+ProofDeed anchors every customer-facing document — SPA, payment plan, handover certificate, NOC — to the blockchain at the moment it's issued. When a buyer questions a term, ${company}'s team can produce an independently verifiable proof in seconds, not weeks of email chains.
+
+Reduces post-sale disputes. Builds buyer confidence. Aligns with Dubai's 2026 digital mandate.
+
+See it in 2 minutes: proofdeed.com/demo
+
+Worth a quick call?
+
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`;
+
+  // UAE Automotive conglomerates — import docs, title, CoO, franchise agreements
+  const uae_autodev = `Hi ${first},
+
+UAE automotive conglomerates manage some of the most document-intensive operations in the region — import permits, customs declarations, Certificates of Origin, vehicle title transfers, and franchise agreements all flowing across multiple parties with no cryptographic proof of integrity between handoffs.
+
+With the UAE's broader push toward digital compliance (Dubai Paperless 2026, VARA standards), the question for operations of ${company}'s scale is no longer "should we digitize?" — it's "how do we prove our digital records are unaltered?"
+
+ProofDeed provides field-level blockchain certification for every import and title document at the moment of origination. VIN, chassis number, country of origin, sale price — each individually hashed and anchored. Any post-facto alteration is immediately detectable by any party in the chain, including the Roads and Transport Authority (RTA).
+
+One API. No system replacement. Works alongside your existing DMS and ERP.
+
+See it in 2 minutes: proofdeed.com/demo
+
+Worth a conversation?
+
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`;
+
+  const byRole = {
+    uae_redev,
+    uae_reops,
+    uae_legal,
+    uae_recx,
+    uae_autodev,
+  };
+
+  return byRole[role] || uae_redev;
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -4714,6 +4883,12 @@ gov@proofdeed.com | proofdeed.com`;
     aviation_cdo:           aviation_cto,
     aviation_sms:           aviation_dom,
     aviation_records:       aviation_parts,
+    // UAE — routed through UAE_EMAIL at send time; these provide fallback text
+    uae_redev:      recorder,
+    uae_reops:      recorder,
+    uae_legal:      inst_compliance,
+    uae_recx:       recorder,
+    uae_autodev:    auto_supply,
     // Shared fallbacks
     ops:            inst_compliance,
     finance:        inst_legal,
@@ -4732,10 +4907,10 @@ function calcPriorityScore(title, industry, role) {
   if (['recorder','dealer','compliance','title_ops','claims','lien','audit','deal','litigation','transact'].includes(r)) score += 3;
 
   // +3 High document volume industry
-  if (['government','title_escrow','legal','auto','construction','pe_ma','pharma','aviation'].includes(ind)) score += 3;
+  if (['government','title_escrow','legal','auto','construction','pe_ma','pharma','aviation','uae_realestate','uae_auto'].includes(ind)) score += 3;
 
   // +2 Regulated industry
-  if (['government','regulated','institutional','insurance','accounting','pharma','aviation'].includes(ind)) score += 2;
+  if (['government','regulated','institutional','insurance','accounting','pharma','aviation','uae_realestate','uae_auto'].includes(ind)) score += 2;
 
   // +3 Risk signal in title
   if (['risk','compliance','fraud','audit','legal','counsel','investigation','integrity','claims','lien'].some(k => t.includes(k))) score += 3;
@@ -4818,18 +4993,23 @@ async function runLeadEngine(targetsPerRun = 3) {
 
           const replyTag = crypto.randomBytes(8).toString('hex');
           const isAffiliate = target.tier === 'affiliate';
+          const isUAE = ['uae_realestate','uae_auto'].includes(target.industry);
           const sandboxRoles = new Set(['auto_remarketing2','auto_warranty','auto_dds','auto_coo','auto_blockchain','inst_ethics','inst_fund','inst_ma','inst_aml','inst_digital_assets','pharma_gxp','pharma_trial','pharma_serial','pharma_lims','pharma_coldchain','aviation_airworthy','aviation_logistics','aviation_cdo','aviation_sms','aviation_records']);
           const isSandbox = sandboxRoles.has(target.role);
           const emailBody = isAffiliate
             ? AFFILIATE_EMAIL(lead.name, lead.company, target.role)
-            : isSandbox
-              ? SANDBOX_EMAIL(lead.name, lead.company, target.role)
-              : INITIAL_EMAIL(lead.name, lead.company, lead.industry || target.industry, target.role);
+            : isUAE
+              ? UAE_EMAIL(lead.name, lead.company, target.role)
+              : isSandbox
+                ? SANDBOX_EMAIL(lead.name, lead.company, target.role)
+                : INITIAL_EMAIL(lead.name, lead.company, lead.industry || target.industry, target.role);
           const subject = isAffiliate
             ? `Referral Partnership Opportunity — ProofDeed`
-            : isSandbox
-              ? `Pilot Opportunity: Cryptographic ${(lead.industry || target.industry).replace(/_/g,' ')} Document Integrity`
-              : `Blockchain Document Certification for ${lead.company}`;
+            : isUAE
+              ? `Aligning ${lead.company} with Dubai's 2026 Paperless Mandate`
+              : isSandbox
+                ? `Pilot Opportunity: Cryptographic ${(lead.industry || target.industry).replace(/_/g,' ')} Document Integrity`
+                : `Blockchain Document Certification for ${lead.company}`;
 
           try {
             const result = await resend.emails.send({
