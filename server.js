@@ -3225,6 +3225,12 @@ const LEAD_TARGETS = [
   { industry: 'auto', role: 'auto_cdo',   tier: 'primary',    title: 'Chief Digital Officer (Auto OEM)', query: '"Chief Digital Officer" automotive OR "auto manufacturer" OR OEM USA contact email' },
   { industry: 'auto', role: 'auto_remarketing', tier: 'primary', title: 'Head of Remarketing / Fleet Ops', query: '"Head of Remarketing" OR "Director of Remarketing" automotive OEM OR "fleet operations" USA contact email' },
   { industry: 'auto', role: 'auto_iso',   tier: 'primary',    title: 'Director of Quality / ISO Compliance', query: '"Director of Quality" OR "Quality Compliance Director" automotive "ISO" OR "IATF" USA contact email' },
+  // Sandbox Design Partner targets — deeper automotive title & supply chain roles
+  { industry: 'auto', role: 'auto_remarketing2', tier: 'primary', title: 'Head of Remarketing Operations', query: '"Head of Remarketing Operations" OR "VP Remarketing" "fleet" OR "title" automotive "title washing" OR "clean title" USA contact email' },
+  { industry: 'auto', role: 'auto_warranty',  tier: 'primary',  title: 'Director of Warranty & Quality Compliance', query: '"Director of Warranty" OR "Warranty Compliance Director" automotive manufacturer USA contact email' },
+  { industry: 'auto', role: 'auto_dds',       tier: 'primary',  title: 'VP of Digital Dealer Solutions', query: '"VP of Digital Dealer Solutions" OR "VP Dealer Digital" automotive OEM OR dealer software USA contact email' },
+  { industry: 'auto', role: 'auto_coo',       tier: 'primary',  title: 'Supply Chain Transparency Manager', query: '"Supply Chain Transparency" OR "Certificate of Origin" manager director automotive OEM USA contact email' },
+  { industry: 'auto', role: 'auto_blockchain',tier: 'primary',  title: 'Principal Blockchain Architect (Auto)', query: '"Blockchain Architect" OR "Vehicle Digital Identity" automotive OEM USA contact email site:linkedin.com' },
 
   // ════════════════════════════════════════════════════════
   // INSTITUTIONAL — audit-proof document integrity
@@ -3338,6 +3344,12 @@ const LEAD_TARGETS = [
   { industry: 'pe_ma', role: 'deal',  tier: 'primary',    title: 'VP of Transactions',             query: '"VP of Transactions" OR "Deal Director" "private equity" USA contact email' },
   { industry: 'pe_ma', role: 'legal', tier: 'influencer', title: 'M&A Counsel',                    query: '"M&A Counsel" OR "Mergers and Acquisitions Attorney" USA contact email' },
   { industry: 'pe_ma', role: 'ops',   tier: 'influencer', title: 'Portfolio Operations Director',  query: '"Portfolio Operations Director" "private equity" USA contact email' },
+  // Sandbox Design Partner targets — deeper institutional / finance roles
+  { industry: 'institutional', role: 'inst_ethics', tier: 'primary', title: 'Chief Data Ethics Officer',               query: '"Chief Data Ethics Officer" OR "Head of Data Ethics" "financial modeling" OR "data integrity" USA contact email' },
+  { industry: 'institutional', role: 'inst_fund',   tier: 'primary', title: 'Head of Fund Administration',             query: '"Head of Fund Administration" OR "Director Fund Administration" "private equity" OR "hedge fund" LP reporting USA contact email' },
+  { industry: 'pe_ma',         role: 'inst_ma',     tier: 'primary', title: 'Managing Director of M&A Due Diligence',  query: '"Managing Director" "Due Diligence" OR "data room" OR "M&A" "private equity" USA contact email' },
+  { industry: 'institutional', role: 'inst_aml',    tier: 'primary', title: 'Chief Compliance & AML Officer',          query: '"AML Officer" OR "Anti-Money Laundering" "Chief Compliance" "source of funds" USA contact email' },
+  { industry: 'institutional', role: 'inst_digital_assets', tier: 'primary', title: 'Head of Digital Assets Regulatory', query: '"Digital Assets" regulatory OR compliance "traditional assets" OR "cryptographic" head OR director USA contact email' },
 
   // ════════════════════════════════════════════════════════
   // LIFE SCIENCES & PHARMA — ALCOA+ data integrity compliance
@@ -3350,6 +3362,12 @@ const LEAD_TARGETS = [
   { industry: 'pharma', role: 'pharma_supply',  tier: 'primary',    title: 'Serialization & Track-Trace Manager', query: '"Serialization Manager" OR "Track and Trace" pharmaceutical supply chain USA contact email' },
   { industry: 'pharma', role: 'pharma_clinical',tier: 'primary',    title: 'VP Clinical Data Integrity',        query: '"Clinical Data Integrity" OR "VP Clinical Operations" pharmaceutical clinical trial USA contact email' },
   { industry: 'pharma', role: 'pharma_clinical',tier: 'primary',    title: 'Director of Clinical Data Management', query: '"Clinical Data Management" director OR VP pharmaceutical USA contact email' },
+  // Sandbox Design Partner targets — deeper GXP / lab / logistics roles
+  { industry: 'pharma', role: 'pharma_gxp',    tier: 'primary',    title: 'VP of Quality Systems (GXP)',        query: '"VP of Quality Systems" OR "VP Quality" GXP OR "Good Practice" pharmaceutical OR "life sciences" USA contact email' },
+  { industry: 'pharma', role: 'pharma_trial',  tier: 'primary',    title: 'Head of Clinical Trial Data Management', query: '"Clinical Trial Data Management" OR "Head of Clinical Data" "raw data" pharmaceutical USA contact email' },
+  { industry: 'pharma', role: 'pharma_serial', tier: 'primary',    title: 'Director of Product Serialization',  query: '"Director of Product Serialization" OR "Product Serialization" "digital fingerprint" OR "drug package" pharmaceutical USA contact email' },
+  { industry: 'pharma', role: 'pharma_lims',   tier: 'primary',    title: 'LIMS Administrator',                 query: '"LIMS Administrator" OR "Laboratory Information Management System" pharmaceutical OR "life sciences" USA contact email' },
+  { industry: 'pharma', role: 'pharma_coldchain', tier: 'primary', title: 'CTO of Pharma Logistics (Cold Chain)', query: '"Chief Technology Officer" OR "CTO" "pharma logistics" OR "cold chain" OR "shipping integrity" pharmaceutical USA contact email' },
 
   // ════════════════════════════════════════════════════════
   // AVIATION & AEROSPACE (MRO) — airworthiness documentation
@@ -3360,6 +3378,12 @@ const LEAD_TARGETS = [
   { industry: 'aviation', role: 'aviation_cto',  tier: 'primary',   title: 'Head of Digital Transformation (MRO)', query: '"Digital Transformation" MRO OR aviation maintenance USA director OR head contact email' },
   { industry: 'aviation', role: 'aviation_parts',tier: 'primary',   title: 'Parts Quality Director (Anti-Counterfeit)', query: '"Parts Quality" OR "counterfeit parts" director aviation aerospace USA contact email' },
   { industry: 'aviation', role: 'aviation_parts',tier: 'primary',   title: 'Director of Engineering Records',    query: '"Engineering Records" director OR manager aviation OR aerospace OR MRO USA contact email' },
+  // Sandbox Design Partner targets — deeper airworthiness / SMS / records roles
+  { industry: 'aviation', role: 'aviation_airworthy', tier: 'primary', title: 'Director of Airworthiness',            query: '"Director of Airworthiness" OR "Airworthiness Manager" airline OR aviation USA contact email' },
+  { industry: 'aviation', role: 'aviation_logistics', tier: 'primary', title: 'VP of Component Support & Logistics',  query: '"VP of Component Support" OR "Component Logistics" OR "rotatable parts" aviation MRO USA contact email' },
+  { industry: 'aviation', role: 'aviation_cdo',       tier: 'primary', title: 'Chief Digital Officer (MRO)',           query: '"Chief Digital Officer" MRO OR "electronic technical logs" OR "eTechLog" aviation USA contact email' },
+  { industry: 'aviation', role: 'aviation_sms',       tier: 'primary', title: 'Aviation Safety Management System Lead', query: '"Safety Management System" OR "SMS" lead OR director aviation "incident report" OR "safety data" USA contact email' },
+  { industry: 'aviation', role: 'aviation_records',   tier: 'primary', title: 'Head of Fleet Technical Records',      query: '"Fleet Technical Records" OR "Technical Records Manager" OR "Form 8130" aviation USA contact email' },
 
   // ════════════════════════════════════════════════════════
   // ANTI-FRAUD / TITLE INTEGRITY — highest pain, direct buyers
@@ -3497,6 +3521,456 @@ I'm Scott, founder of ProofDeed — blockchain document certification. I'd love 
 
 Scott Kiersten
 proofdeed.com`;
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SANDBOX / DESIGN PARTNER EMAIL — "Help us define the standard"
+// Used for specialized roles where credibility beats a cold pitch.
+// Strategy: position them as the expert whose input shapes our API.
+// ─────────────────────────────────────────────────────────────────────────────
+const SANDBOX_EMAIL = (name, company, role) => {
+  const first = name.split(' ')[0];
+
+  const variants = {
+
+    // ── Automotive — title washing / Certificate of Origin / VIN integrity
+    auto_remarketing2: {
+      subject: `Pilot Opportunity: Cryptographic Vehicle Title Integrity`,
+      body: `Hi ${first},
+
+Title washing — where a salvage or lemon title gets laundered through a state transfer — costs dealers and fleet operators billions annually and ends careers when it surfaces post-sale.
+
+We're finalizing the ProofDeed API for vehicle title and resale documentation. We're looking for one Head of Remarketing Operations to act as a Design Partner for our developer sandbox.
+
+The goal: ensure our field-level hashing logic maps perfectly to your resale workflow — sale price, odometer, title status, and VIN history — each anchored to the blockchain at transfer. Cryptographic proof that the record you received is identical to the one that left the OEM.
+
+In exchange for 20 minutes of feedback on our API documentation, you'll get:
+→ Early access to our title-fraud detection layer (no cost during sandbox)
+→ Direct input into how we model "clean title" for fleet remarketing
+
+Is this worth 20 minutes?
+
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`,
+    },
+
+    auto_warranty: {
+      subject: `Pilot Opportunity: Cryptographic Warranty & Parts Record Verification`,
+      body: `Hi ${first},
+
+Falsified service records and fraudulent warranty claims are a documented cost center across every major OEM — and the current workaround (dealer audits, random spot checks) doesn't scale.
+
+We're building the ProofDeed API for automotive warranty and quality documentation. We're looking for one Director of Warranty & Quality Compliance to act as a Design Partner for our developer sandbox.
+
+The goal: ensure our hashing logic maps cleanly to your parts and service record workflow — repair order number, technician ID, parts used, approval timestamp — each individually anchored at creation so any post-facto alteration is immediately detectable.
+
+In exchange for 20 minutes on our API spec, you get:
+→ Early access to the parts authenticity layer we're building for IATF 16949 environments
+→ Direct influence over how we model "field-level tamper detection" for warranty records
+
+Worth a quick conversation?
+
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`,
+    },
+
+    auto_dds: {
+      subject: `Pilot Opportunity: Cryptographic Document Layer for Dealer Trade-In & Finance Stacks`,
+      body: `Hi ${first},
+
+Every DMS — CDK, Reynolds & Reynolds, DealerSocket, Tekion — generates trade-in and financing documents that pass through multiple hands before closing. The current system has no native way to prove a document wasn't altered between creation and signature.
+
+We're finalizing a DMS webhook that certifies each field (VIN, sale price, odometer, buyer name) at the moment of origination. We're looking for one VP of Digital Dealer Solutions to act as a Design Partner for our developer sandbox.
+
+The goal: ensure our integration maps cleanly to your dealer software stack and the F&I workflow your dealers rely on.
+
+In exchange for 20 minutes, you get:
+→ The webhook spec + sandbox credentials so your team can evaluate it directly
+→ Input into how we model "DMS-native" document locking for trade-ins and floor plan docs
+
+Is this on your radar?
+
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`,
+    },
+
+    auto_coo: {
+      subject: `Pilot Opportunity: Cryptographic Certificate of Origin Verification`,
+      body: `Hi ${first},
+
+Certificates of Origin for automotive components are only as reliable as the last person who touched them. Once a CoO leaves the OEM, there's no cryptographic proof it hasn't been altered to misrepresent the component's source — which creates real exposure under country-of-origin compliance requirements.
+
+We're building the ProofDeed API for supply chain document integrity. We're looking for one Supply Chain Transparency Manager to act as a Design Partner for our developer sandbox.
+
+The goal: map our field-level hashing to your CoO workflow — manufacturer, part number, country of origin, certifying officer — so downstream verifiers can confirm the document is unaltered without calling anyone.
+
+In exchange for 20 minutes, you get:
+→ Early access to our supply chain verification layer
+→ Input into how we model "component origin proof" at scale
+
+Worth a conversation?
+
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`,
+    },
+
+    auto_blockchain: {
+      subject: `Pilot Opportunity: Collaborating on Vehicle Digital Identity Standards`,
+      body: `Hi ${first},
+
+Most OEMs are now building some version of a "Vehicle Digital Identity" — a cryptographic record that follows the VIN from factory to end-of-life. The hard problem isn't storage; it's proving that the records accumulated along the way are unaltered originals.
+
+We've built a field-level hashing layer that anchors individual data points (not just document hashes) to the Polygon blockchain at creation. We're looking for one Principal Blockchain Architect in automotive to act as a Design Partner as we finalize our API spec.
+
+The goal: ensure our hashing schema is compatible with how your team models vehicle identity — and share what we've learned about field-level vs. document-level anchoring at OEM scale.
+
+In exchange for 20 minutes, you get sandbox access and early visibility into our roadmap.
+
+Worth a call?
+
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`,
+    },
+
+    // ── Institutional / Finance / PE
+    inst_ethics: {
+      subject: `Pilot Opportunity: Cryptographic Data Provenance for Financial Modeling`,
+      body: `Hi ${first},
+
+The hardest question in data ethics isn't "was the data biased?" — it's "can you prove the dataset used in this model is identical to the one that was approved?" Once data moves through pipelines, version drift is invisible without a cryptographic anchor at ingestion.
+
+We're finalizing the ProofDeed API for financial data provenance. We're looking for one Chief Data Ethics Officer to act as a Design Partner for our developer sandbox.
+
+The goal: understand how your team currently attests to data integrity in model inputs — and ensure our hashing layer maps to how you define "unaltered" in a financial modeling context.
+
+In exchange for 20 minutes, you get:
+→ Sandbox access to our field-level provenance API
+→ Direct input into our data ethics use case documentation
+
+Is this worth 20 minutes?
+
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`,
+    },
+
+    inst_fund: {
+      subject: `Pilot Opportunity: Cryptographic LP Document Integrity`,
+      body: `Hi ${first},
+
+Subscription documents and LP reports pass through fund administrators, GPs, LPs, and legal — each handoff a moment where "was this altered?" becomes unanswerable without native proof. LP disputes over document versions are slow, expensive, and reputationally damaging.
+
+We're building the ProofDeed API for fund administration document integrity. We're looking for one Head of Fund Administration to act as a Design Partner for our developer sandbox.
+
+The goal: map our field-level hashing to your subscription and reporting workflow so LPs can independently verify the document they received is identical to what was sent — without a phone call.
+
+In exchange for 20 minutes:
+→ Sandbox access + API spec tailored to fund administration documents
+→ Input into how we model "LP document proof" at scale
+
+Worth exploring?
+
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`,
+    },
+
+    inst_ma: {
+      subject: `Pilot Opportunity: Cryptographic Data Room Document Integrity`,
+      body: `Hi ${first},
+
+Your team spends weeks in data rooms verifying that what you're seeing is what the seller actually produced. But there's no native way to prove a document hasn't been altered since it was originally uploaded — which means you're relying on trust at the moment you can least afford to.
+
+We're finalizing the ProofDeed API for M&A document integrity. We're looking for one Managing Director of Due Diligence to act as a Design Partner for our developer sandbox.
+
+The goal: understand your current data room workflow and ensure our field-level anchoring maps to how you define "original document" during diligence — financials, material contracts, IP schedules, representations.
+
+In exchange for 20 minutes:
+→ Sandbox access to our verification API (plug-in to any existing VDR)
+→ Input into how we pitch this to deal teams
+
+Worth a conversation?
+
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`,
+    },
+
+    inst_aml: {
+      subject: `Pilot Opportunity: Cryptographic Proof of Source-of-Funds Documentation`,
+      body: `Hi ${first},
+
+AML compliance depends entirely on the integrity of source-of-funds documentation — but once a wire confirmation, bank statement, or ownership certificate is submitted, there's no cryptographic way to prove it wasn't altered before it hit your review queue.
+
+We're building the ProofDeed API for immutable AML document proof. We're looking for one Chief Compliance & AML Officer to act as a Design Partner for our developer sandbox.
+
+The goal: ensure our field-level hashing maps to your source-of-funds review workflow — document type, submission timestamp, reviewer chain — so you have cryptographic proof of what was submitted, not just what was stored.
+
+In exchange for 20 minutes:
+→ Sandbox access + compliance documentation for 31 CFR / FinCEN audit scenarios
+→ Input into how we model "immutable submission proof" for AML workflows
+
+Is this on your radar?
+
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`,
+    },
+
+    inst_digital_assets: {
+      subject: `Pilot Opportunity: Bridging Traditional Document Integrity with Cryptographic Proof`,
+      body: `Hi ${first},
+
+The core challenge in digital assets regulation isn't the assets — it's proving that the traditional documentation supporting them (ownership records, transfer agreements, KYC packages) hasn't been altered between creation and submission to regulators.
+
+We're finalizing the ProofDeed API for cross-asset document provenance. We're looking for one Head of Digital Assets Regulatory to act as a Design Partner for our developer sandbox.
+
+The goal: understand how your team currently bridges traditional asset documentation and cryptographic attestation — and ensure our anchoring layer maps cleanly to your regulatory submission workflow.
+
+In exchange for 20 minutes:
+→ Sandbox access to our blockchain anchoring API
+→ Input into how we model "regulatory-grade" document proof for digital asset compliance
+
+Worth exploring?
+
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`,
+    },
+
+    // ── Pharma / Life Sciences — deep GXP / lab / logistics
+    pharma_gxp: {
+      subject: `Pilot Opportunity: Cryptographic GXP Document Integrity (ALCOA+ Alignment)`,
+      body: `Hi ${first},
+
+FDA 483 observations and warning letters increasingly cite "data integrity failures" — not missing records, but records that can't be proven unaltered since creation. ALCOA+ requires Attributable, Legible, Contemporaneous, Original, Accurate — and the "Original" requirement is the one no current QMS can cryptographically prove.
+
+We're finalizing the ProofDeed API for GXP document integrity. We're looking for one VP of Quality Systems to act as a Design Partner for our developer sandbox.
+
+The goal: ensure our field-level hashing logic maps correctly to your GxP document workflow — batch records, deviations, SOPs, audit trails — each field individually anchored at creation per 21 CFR Part 11.
+
+In exchange for 20 minutes:
+→ Sandbox access + our 21 CFR Part 11 / ALCOA+ compliance documentation
+→ Direct input into how we define "original document proof" across GLP, GMP, and GCP contexts
+
+Worth 20 minutes with your QA team?
+
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`,
+    },
+
+    pharma_trial: {
+      subject: `Pilot Opportunity: Cryptographic Raw Data Integrity for Clinical Trials`,
+      body: `Hi ${first},
+
+The most sensitive moment in clinical data management is the line between "raw data" and "cleaned data" — and regulators want proof that raw data was never altered inappropriately before cleaning. Right now, that proof is a process attestation, not a cryptographic one.
+
+We're building the ProofDeed API for clinical trial data provenance. We're looking for one Head of Clinical Trial Data Management to act as a Design Partner for our developer sandbox.
+
+The goal: understand how your team currently attests to raw data integrity — and ensure our field-level anchoring maps to your EDC/CDMS workflow so you have cryptographic proof of what was collected at the source.
+
+In exchange for 20 minutes:
+→ Sandbox access tailored to clinical data collection workflows
+→ Input into how we model "pre-cleaning data lock" for ICH E6 (GCP) environments
+
+Is this worth a conversation?
+
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`,
+    },
+
+    pharma_serial: {
+      subject: `Pilot Opportunity: Cryptographic Digital Fingerprint for Drug Serialization`,
+      body: `Hi ${first},
+
+DSCSA Track & Trace gives every drug package a serialized identifier — but the identifier only proves what the package is, not that the documentation accompanying it is unaltered. Counterfeit products with valid serial numbers are the next wave.
+
+We're finalizing the ProofDeed API for pharmaceutical product serialization integrity. We're looking for one Director of Product Serialization to act as a Design Partner for our developer sandbox.
+
+The goal: ensure our hashing layer maps to your serialization workflow — lot number, GTIN, expiration, manufacturer site — so downstream verifiers can confirm the documentation matches the physical package.
+
+In exchange for 20 minutes:
+→ Sandbox access + DSCSA / GS1 alignment documentation
+→ Input into how we model "document-to-package binding" at serialization scale
+
+Worth exploring?
+
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`,
+    },
+
+    pharma_lims: {
+      subject: `Pilot Opportunity: Cryptographic Audit Trail for LIMS Document Workflows`,
+      body: `Hi ${first},
+
+Every LIMS generates audit trails — but those audit trails live inside the system and can't be independently verified by a regulator, customer, or auditor without trusting the system itself. When a 483 cites "audit trail questions," you're defending a log, not a proof.
+
+We're building the ProofDeed API to add a blockchain-anchored audit layer on top of existing LIMS workflows. We're looking for one LIMS Administrator to act as a Design Partner for our developer sandbox.
+
+The goal: understand how your LIMS currently generates and exports audit records — and where our anchoring API can slot in without replacing your existing system.
+
+In exchange for 20 minutes:
+→ Sandbox access + integration notes for common LIMS platforms (LabVantage, STARLIMS, LabWare)
+→ Input into how we design our LIMS connector
+
+Is this worth a quick call?
+
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`,
+    },
+
+    pharma_coldchain: {
+      subject: `Pilot Opportunity: Cryptographic Integrity for Cold-Chain Shipping Logs`,
+      body: `Hi ${first},
+
+Cold-chain integrity failures — where a temperature excursion happens but the shipping log is "corrected" before it reaches QA — are a known fraud vector in pharmaceutical logistics. Once the log leaves the sensor system, there's no native proof it wasn't altered.
+
+We're finalizing the ProofDeed API for pharma logistics document integrity. We're looking for one CTO in pharmaceutical logistics to act as a Design Partner for our developer sandbox.
+
+The goal: ensure our field-level anchoring maps to your cold-chain logging workflow — sensor readings, shipment ID, excursion timestamps, chain-of-custody — so QA receives cryptographic proof that the record is exactly what the sensor generated.
+
+In exchange for 20 minutes:
+→ Sandbox access + IoT-to-blockchain anchoring documentation
+→ Input into how we model "sensor-to-record integrity" for GDP compliance
+
+Worth exploring?
+
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`,
+    },
+
+    // ── Aviation / MRO — airworthiness / SMS / records
+    aviation_airworthy: {
+      subject: `Pilot Opportunity: Cryptographic Airworthiness Paper Trail Integrity`,
+      body: `Hi ${first},
+
+An airworthiness release is the final signature in a paper trail that spans MRO shops, parts suppliers, and airline maintenance teams. If any document in that chain was altered — work order, parts tag, Form 8130-3 — your signature is on a fraudulent release. And the current paper trail offers no cryptographic proof.
+
+We're finalizing the ProofDeed API for airworthiness documentation. We're looking for one Director of Airworthiness to act as a Design Partner for our developer sandbox.
+
+The goal: ensure our field-level hashing maps to your release workflow — work scope, authorized certifier, component sign-offs — so you have provable, independently verifiable documentation at every step before your signature.
+
+In exchange for 20 minutes:
+→ Sandbox access + FAA Order 8300.10 / EASA Part-145 alignment documentation
+→ Direct input into how we model "release chain integrity"
+
+Worth a quick conversation?
+
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`,
+    },
+
+    aviation_logistics: {
+      subject: `Pilot Opportunity: Cryptographic Rotatable Parts Documentation Integrity`,
+      body: `Hi ${first},
+
+Rotatable components change hands dozens of times across their service life. Each handoff requires documentation — Form 8130-3, teardown reports, overhaul records — and each handoff is a moment where a document can be altered to misrepresent an unserviceable part as airworthy.
+
+We're building the ProofDeed API for component support documentation. We're looking for one VP of Component Support & Logistics to act as a Design Partner for our developer sandbox.
+
+The goal: map our field-level anchoring to your rotatable parts documentation workflow so every Form 8130-3 and overhaul report carries cryptographic proof of its original state.
+
+In exchange for 20 minutes:
+→ Sandbox access tailored to MRO parts documentation
+→ Input into how we model "birth certificate integrity" for rotatable components
+
+Is this on your radar?
+
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`,
+    },
+
+    aviation_cdo: {
+      subject: `Pilot Opportunity: Cryptographic Integrity for Electronic Technical Logs`,
+      body: `Hi ${first},
+
+The transition from paper logbooks to eTechLogs introduces a new risk: digital records are easier to alter than paper ones, and the current eTechLog platforms don't natively anchor records to an immutable external proof. If a log entry is edited, there's no way to detect it without a system audit.
+
+We're building the ProofDeed API to add a blockchain integrity layer to existing eTechLog workflows. We're looking for one Chief Digital Officer in MRO to act as a Design Partner for our developer sandbox.
+
+The goal: understand how your current eTechLog system generates and stores records — and identify where our anchoring API fits without replacing your platform.
+
+In exchange for 20 minutes:
+→ Sandbox access + eTechLog integration documentation
+→ Input into how we model "immutable log entry" for CAMP / Ultramain / AMOS environments
+
+Worth a call?
+
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`,
+    },
+
+    aviation_sms: {
+      subject: `Pilot Opportunity: Cryptographic Integrity for Safety Incident Reports`,
+      body: `Hi ${first},
+
+The value of a Safety Management System depends entirely on the integrity of its data. If an incident report can be quietly edited after submission — changing severity ratings, removing witnesses, adjusting timelines — the SMS becomes a liability shield instead of a safety tool.
+
+We're finalizing the ProofDeed API for aviation safety data integrity. We're looking for one Aviation SMS Lead to act as a Design Partner for our developer sandbox.
+
+The goal: ensure our anchoring logic maps to your incident report workflow — reporter ID, event timestamp, severity classification, contributing factors — so every submitted report is cryptographically locked at the moment of filing.
+
+In exchange for 20 minutes:
+→ Sandbox access + ICAO Annex 19 / FAA SMS alignment documentation
+→ Input into how we model "immutable incident report" for regulatory audit scenarios
+
+Worth a conversation?
+
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`,
+    },
+
+    aviation_records: {
+      subject: `Pilot Opportunity: Cryptographic Fleet Technical Records Integrity`,
+      body: `Hi ${first},
+
+A fleet's technical records — birth certificates, Form 8130-3s, major repair/alteration records — are the legal proof that every aircraft is airworthy. When those records are questioned (during an audit, a sale, or an incident investigation), the burden is on you to prove they're unaltered originals. Right now, that proof doesn't exist natively.
+
+We're finalizing the ProofDeed API for fleet technical records. We're looking for one Head of Fleet Technical Records to act as a Design Partner for our developer sandbox.
+
+The goal: ensure our field-level hashing maps perfectly to your technical records workflow — aircraft registration, form type, certifying authority, date of issue — so every record carries cryptographic proof of its original state.
+
+In exchange for 20 minutes:
+→ Sandbox access + FAA AC 120-78B / EASA alignment documentation
+→ Input into how we model "birth certificate integrity" at fleet scale
+
+Worth a conversation?
+
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`,
+    },
+  };
+
+  const v = variants[role];
+  if (v) return v.body;
+
+  // Fallback — generic sandbox hook
+  return `Hi ${first},
+
+We're in the final stages of building the ProofDeed API for document integrity verification. We're looking for one ${role.replace(/_/g,' ')} at a ${company}-sized organization to act as a Design Partner for our developer sandbox.
+
+In exchange for 20 minutes of feedback on our API specification, you get early access to our blockchain document verification layer — and direct input into how we build for your industry.
+
+Worth a conversation?
+
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`;
 };
 
 const INITIAL_EMAIL = (name, company, industry, role) => {
@@ -4218,6 +4692,28 @@ gov@proofdeed.com | proofdeed.com`;
     alta:           alta_title,
     ag_fraud:       ag_fraud,
     tax:            tax_assessor,
+    // Sandbox / Design Partner roles — routed through SANDBOX_EMAIL at send time;
+    // these entries provide fallback text if called directly through INITIAL_EMAIL
+    auto_remarketing2:      auto_remarketing,
+    auto_warranty:          auto_iso,
+    auto_dds:               auto_cdo,
+    auto_coo:               auto_supply,
+    auto_blockchain:        auto_cdo,
+    inst_ethics:            inst_gcc,
+    inst_fund:              inst_ir,
+    inst_ma:                inst_dd,
+    inst_aml:               inst_compliance,
+    inst_digital_assets:    inst_gcc,
+    pharma_gxp:             pharma_qa,
+    pharma_trial:           pharma_clinical,
+    pharma_serial:          pharma_supply,
+    pharma_lims:            pharma_qa,
+    pharma_coldchain:       pharma_supply,
+    aviation_airworthy:     aviation_dom,
+    aviation_logistics:     aviation_parts,
+    aviation_cdo:           aviation_cto,
+    aviation_sms:           aviation_dom,
+    aviation_records:       aviation_parts,
     // Shared fallbacks
     ops:            inst_compliance,
     finance:        inst_legal,
@@ -4236,10 +4732,10 @@ function calcPriorityScore(title, industry, role) {
   if (['recorder','dealer','compliance','title_ops','claims','lien','audit','deal','litigation','transact'].includes(r)) score += 3;
 
   // +3 High document volume industry
-  if (['government','title_escrow','legal','auto','construction','pe_ma'].includes(ind)) score += 3;
+  if (['government','title_escrow','legal','auto','construction','pe_ma','pharma','aviation'].includes(ind)) score += 3;
 
   // +2 Regulated industry
-  if (['government','regulated','institutional','insurance','accounting'].includes(ind)) score += 2;
+  if (['government','regulated','institutional','insurance','accounting','pharma','aviation'].includes(ind)) score += 2;
 
   // +3 Risk signal in title
   if (['risk','compliance','fraud','audit','legal','counsel','investigation','integrity','claims','lien'].some(k => t.includes(k))) score += 3;
@@ -4322,12 +4818,18 @@ async function runLeadEngine(targetsPerRun = 3) {
 
           const replyTag = crypto.randomBytes(8).toString('hex');
           const isAffiliate = target.tier === 'affiliate';
+          const sandboxRoles = new Set(['auto_remarketing2','auto_warranty','auto_dds','auto_coo','auto_blockchain','inst_ethics','inst_fund','inst_ma','inst_aml','inst_digital_assets','pharma_gxp','pharma_trial','pharma_serial','pharma_lims','pharma_coldchain','aviation_airworthy','aviation_logistics','aviation_cdo','aviation_sms','aviation_records']);
+          const isSandbox = sandboxRoles.has(target.role);
           const emailBody = isAffiliate
             ? AFFILIATE_EMAIL(lead.name, lead.company, target.role)
-            : INITIAL_EMAIL(lead.name, lead.company, lead.industry || target.industry, target.role);
+            : isSandbox
+              ? SANDBOX_EMAIL(lead.name, lead.company, target.role)
+              : INITIAL_EMAIL(lead.name, lead.company, lead.industry || target.industry, target.role);
           const subject = isAffiliate
             ? `Referral Partnership Opportunity — ProofDeed`
-            : `Blockchain Document Certification for ${lead.company}`;
+            : isSandbox
+              ? `Pilot Opportunity: Cryptographic ${(lead.industry || target.industry).replace(/_/g,' ')} Document Integrity`
+              : `Blockchain Document Certification for ${lead.company}`;
 
           try {
             const result = await resend.emails.send({
