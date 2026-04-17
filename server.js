@@ -3695,7 +3695,7 @@ async function runLeadEngine(targetsPerRun = 3) {
 
     try {
       const response = await anthropic.messages.create({
-        model: 'claude-opus-4-6',
+        model: 'claude-haiku-4-5-20251001',
         max_tokens: 2500,
         tools: [{ type: 'web_search_20250305', name: 'web_search' }],
         messages: [{
