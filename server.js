@@ -3158,6 +3158,30 @@ const LEAD_TARGETS = [
   { industry: 'pe_ma', role: 'deal',  tier: 'primary',    title: 'VP of Transactions',             query: '"VP of Transactions" OR "Deal Director" "private equity" USA contact email' },
   { industry: 'pe_ma', role: 'legal', tier: 'influencer', title: 'M&A Counsel',                    query: '"M&A Counsel" OR "Mergers and Acquisitions Attorney" USA contact email' },
   { industry: 'pe_ma', role: 'ops',   tier: 'influencer', title: 'Portfolio Operations Director',  query: '"Portfolio Operations Director" "private equity" USA contact email' },
+
+  // ════════════════════════════════════════════════════════
+  // ANTI-FRAUD / TITLE INTEGRITY — highest pain, direct buyers
+  // ════════════════════════════════════════════════════════
+  // County Recorder — clouded titles, deed fraud
+  { industry: 'government', role: 'anti_fraud', tier: 'primary',  title: 'County Recorder Anti-Fraud',     query: '"County Recorder" OR "Register of Deeds" "deed fraud" OR "title fraud" contact email county USA site:*.gov' },
+  { industry: 'government', role: 'anti_fraud', tier: 'primary',  title: 'Chief Deputy County Recorder',   query: '"Chief Deputy Recorder" OR "Deputy Register of Deeds" county USA contact email site:*.gov' },
+
+  // Secretary of State — RON / e-notarization
+  { industry: 'government', role: 'ron',      tier: 'primary',    title: 'Secretary of State RON Director', query: '"Secretary of State" "remote online notarization" OR "RON" director OR counsel USA contact email site:*.gov' },
+  { industry: 'government', role: 'ron',      tier: 'primary',    title: 'State Notary Division Director',  query: '"Notary Division" OR "Notary Program" director state government USA contact email site:*.gov' },
+
+  // ALTA / Title Associations — insurance risk reduction
+  { industry: 'title_escrow', role: 'alta',   tier: 'primary',    title: 'ALTA State Chapter Director',    query: '"American Land Title Association" OR "ALTA" state chapter director OR executive USA contact email' },
+  { industry: 'title_escrow', role: 'alta',   tier: 'primary',    title: 'Title Insurance Underwriter',    query: '"title insurance" underwriter OR "underwriting counsel" USA contact email' },
+  { industry: 'title_escrow', role: 'alta',   tier: 'primary',    title: 'Title Claims Manager',           query: '"title insurance" "claims manager" OR "claims director" USA contact email' },
+
+  // Attorney General — home title theft prosecution
+  { industry: 'government', role: 'ag_fraud', tier: 'primary',    title: 'Attorney General Consumer Protection', query: '"Attorney General" "consumer protection" OR "real estate fraud" OR "deed fraud" director counsel USA contact email site:*.gov' },
+  { industry: 'government', role: 'ag_fraud', tier: 'primary',    title: 'State AG Real Estate Fraud Unit', query: '"Attorney General" "real estate fraud" OR "mortgage fraud" investigator OR director USA site:*.gov contact email' },
+
+  // Tax Assessor — ownership data accuracy
+  { industry: 'government', role: 'tax',      tier: 'primary',    title: 'County Tax Assessor',            query: '"County Tax Assessor" OR "County Assessor" contact email county USA site:*.gov' },
+  { industry: 'government', role: 'tax',      tier: 'primary',    title: 'Property Appraiser Director',    query: '"Property Appraiser" director OR chief county USA contact email site:*.gov' },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -3582,6 +3606,88 @@ Scott Kiersten
 Founder & CEO, ProofDeed
 gov@proofdeed.com | proofdeed.com`;
 
+  // ── County Recorder Anti-Fraud / Clouded Title
+  const anti_fraud_recorder = `Hi ${first},
+
+Deed fraud and clouded titles are becoming a significant operational burden for county recorders. Once a fraudulent deed is recorded, the damage to the chain of title — and the staff time to unwind it — is substantial.
+
+ProofDeed creates a blockchain-anchored digital fingerprint of every deed at the moment of recording. If that document is ever altered, the fingerprint doesn't match — immediate, irrefutable evidence of tampering. Court-admissible under FRE Rule 901.
+
+No system replacement. Works alongside your existing recording software via a single API call.
+
+See it in 2 minutes: proofdeed.com/demo
+
+Worth a brief conversation this week?
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`;
+
+  // ── Secretary of State / RON / e-Notarization
+  const ron_director = `Hi ${first},
+
+As states move toward Remote Online Notarization, the core challenge is proving document integrity after the fact — that what was notarized remotely is exactly what exists in the record today.
+
+ProofDeed provides the cryptographic proof layer that RON is missing: a blockchain-anchored certificate at the moment of notarization, independently verifiable by any party, court-admissible under FRE Rule 901.
+
+We're currently working with state-level offices exploring how to make RON records defensible long-term.
+
+Would a brief call make sense?
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`;
+
+  // ── ALTA / Title Associations / Underwriters
+  const alta_title = `Hi ${first},
+
+Title fraud claims are expensive — and most of them come down to a document that can't be proven original. A deed that may have been altered. A release that doesn't match the recorded version. When the claim hits, the title company pays if they can't prove integrity.
+
+ProofDeed anchors title documents to the Polygon blockchain at the moment they're processed — tamper-proof proof of the exact document at the exact time. Every claim that hinges on document integrity becomes immediately resolvable.
+
+This reduces your fraud claim exposure directly.
+
+See it in 2 minutes: proofdeed.com/demo
+
+Worth 20 minutes?
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`;
+
+  // ── Attorney General / Fraud Unit
+  const ag_fraud = `Hi ${first},
+
+Home title theft and deed fraud cases are increasingly difficult to prosecute because the fraudulent document, by the time it's discovered, has passed through multiple hands. Proving which version was recorded and when — without an immutable record — often comes down to competing paper trails.
+
+ProofDeed creates a blockchain-anchored fingerprint of every document at recording — court-admissible cryptographic proof of integrity and timestamp under FRE Rule 901. It turns deed fraud into a provable, prosecutable offense.
+
+Would a brief conversation make sense?
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`;
+
+  // ── Tax Assessor — ownership data accuracy
+  const tax_assessor = `Hi ${first},
+
+Incorrect ownership data in assessment records often traces back to a title transfer that wasn't properly documented — or a deed where the recorded version doesn't match what was actually signed. The assessor's office bears the burden of reconciling disputes they didn't create.
+
+ProofDeed anchors deeds and title documents to the blockchain at the moment of recording, creating a tamper-proof record that makes ownership disputes immediately resolvable. No system replacement — single API call alongside your existing workflow.
+
+See it in 2 minutes: proofdeed.com/demo
+
+Worth a quick call?
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`;
+
   const byRole = {
     // Government
     recorder:       recorder,
@@ -3623,6 +3729,12 @@ gov@proofdeed.com | proofdeed.com`;
     audit:          accounting,
     // PE / M&A
     deal:           pe_ma,
+    // Anti-fraud / Title Integrity
+    anti_fraud:     anti_fraud_recorder,
+    ron:            ron_director,
+    alta:           alta_title,
+    ag_fraud:       ag_fraud,
+    tax:            tax_assessor,
     // Shared fallbacks
     ops:            inst_compliance,
     finance:        inst_legal,
