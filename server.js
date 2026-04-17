@@ -4284,77 +4284,94 @@ async function runLeadEngine(targetsPerRun = 3) {
 
   let totalSent = 0, totalSkipped = 0;
 
-  for (let i = 0; i < TARGETS_PER_RUN; i++) {
-    const target = ALL_TARGETS[(currentIdx + i) % ALL_TARGETS.length];
-    console.log(`[LeadEngine] Target ${i + 1}/${TARGETS_PER_RUN} — ${target.title} / ${target.industry}`);
+  // Process targets in parallel batches of 3 to avoid timeouts
+  const PARALLEL = 3;
+  for (let batch = 0; batch < TARGETS_PER_RUN; batch += PARALLEL) {
+    const batchTargets = Array.from({ length: Math.min(PARALLEL, TARGETS_PER_RUN - batch) }, (_, j) =>
+      ({ target: ALL_TARGETS[(currentIdx + batch + j) % ALL_TARGETS.length], idx: batch + j })
+    );
+    console.log(`[LeadEngine] Batch ${Math.floor(batch/PARALLEL)+1} — ${batchTargets.map(b => b.target.title).join(', ')}`);
 
-    try {
-      const response = await anthropic.messages.create({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 2500,
-        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-        messages: [{
-          role: 'user',
-          content: `Use web search to find 10 real people currently working as ${target.title} at ${target.industry.replace(/_/g,' ')} organizations in the USA. Search company websites, press releases, and news.\n\nYour entire response must be ONLY a raw JSON array. No words before or after. Start your response with [ and end with ]. Example format:\n[{"name":"Jane Smith","title":"County Recorder","company":"Clark County","email":"jsmith@clarkcounty.gov","industry":"${target.industry}","source":"https://example.com"}]`
-        }]
-      });
+    const batchResults = await Promise.allSettled(batchTargets.map(async ({ target }) => {
+      try {
+        const response = await anthropic.messages.create({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 2500,
+          tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+          messages: [{
+            role: 'user',
+            content: `Use web search to find 10 real people currently working as ${target.title} at ${target.industry.replace(/_/g,' ')} organizations in the USA. Search company websites, press releases, and news.\n\nYour entire response must be ONLY a raw JSON array. No words before or after. Start your response with [ and end with ]. Example format:\n[{"name":"Jane Smith","title":"County Recorder","company":"Clark County","email":"jsmith@clarkcounty.gov","industry":"${target.industry}","source":"https://example.com"}]`
+          }]
+        });
 
-      const rawText = response.content.filter((b) => b.type === 'text').map((b) => b.text).join('');
-      let leads = [];
-      const match = rawText.match(/\[[\s\S]*\]/);
-      if (match) { try { leads = JSON.parse(match[0]); if (!Array.isArray(leads)) leads = []; } catch { leads = []; } }
-      if (!leads.length) { console.log(`[LeadEngine] No leads parsed for ${target.title} — raw: ${rawText.substring(0,200)}`); continue; }
-      console.log(`[LeadEngine] Found ${leads.length} leads for ${target.title}`);
-
-      let sent = 0, skipped = 0;
-      for (const lead of leads) {
-        if (!lead.email || !lead.name || !lead.company) { skipped++; continue; }
-        const exists = await pool.query('SELECT id FROM outreach_contacts WHERE email=$1', [lead.email.toLowerCase()]);
-        if (exists.rows.length > 0) { skipped++; continue; }
-
-        const replyTag = crypto.randomBytes(8).toString('hex');
-        const isAffiliate = target.tier === 'affiliate';
-        const emailBody = isAffiliate
-          ? AFFILIATE_EMAIL(lead.name, lead.company, target.role)
-          : INITIAL_EMAIL(lead.name, lead.company, lead.industry || target.industry, target.role);
-        const subject = isAffiliate
-          ? `Referral Partnership Opportunity — ProofDeed`
-          : `Blockchain Document Certification for ${lead.company}`;
-
-        try {
-          const result = await resend.emails.send({
-            from: 'Scott Kiersten <gov@send.proofdeed.com>',
-            reply_to: `reply+${replyTag}@send.proofdeed.com`,
-            to: lead.email,
-            subject,
-            text: emailBody,
-          });
-
-          const pscore = calcPriorityScore(lead.title, lead.industry || target.industry, target.role);
-          const useCase = `${target.title} — ${(lead.industry || target.industry).replace(/_/g,' ')}`;
-          await pool.query(
-            `INSERT INTO outreach_contacts (name, email, company, title, industry, tier, priority_score, pipeline_stage, pain_status, use_case, status, reply_to_tag, resend_message_id, first_sent_at, last_contact_at)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,'contacted','unaware',$8,'sent',$9,$10,NOW(),NOW())`,
-            [lead.name, lead.email.toLowerCase(), lead.company, lead.title, lead.industry || target.industry, target.tier || 'primary', pscore, useCase, replyTag, result.data?.id || null]
-          );
-          await pool.query(
-            `INSERT INTO outreach_events (contact_id, event_type, event_source, metadata, occurred_at)
-             SELECT id, 'sent', 'lead_engine', $1, NOW() FROM outreach_contacts WHERE email=$2`,
-            [JSON.stringify({ subject, source: lead.source }), lead.email.toLowerCase()]
-          );
-
-          sent++; totalSent++;
-          console.log(`[LeadEngine] Sent → ${lead.name} (${lead.company})`);
-          await new Promise(r => setTimeout(r, 2000));
-        } catch (e) {
-          console.error(`[LeadEngine] Send fail ${lead.email}:`, e.message);
-          skipped++; totalSkipped++;
+        const rawText = response.content.filter((b) => b.type === 'text').map((b) => b.text).join('');
+        let leads = [];
+        const match = rawText.match(/\[[\s\S]*\]/);
+        if (match) { try { leads = JSON.parse(match[0]); if (!Array.isArray(leads)) leads = []; } catch { leads = []; } }
+        if (!leads.length) {
+          console.log(`[LeadEngine] No leads parsed for ${target.title} — raw: ${rawText.substring(0,200)}`);
+          return { sent: 0, skipped: 0 };
         }
+        console.log(`[LeadEngine] Found ${leads.length} leads for ${target.title}`);
+
+        let sent = 0, skipped = 0;
+        for (const lead of leads) {
+          if (!lead.email || !lead.name || !lead.company) { skipped++; continue; }
+          const exists = await pool.query('SELECT id FROM outreach_contacts WHERE email=$1', [lead.email.toLowerCase()]);
+          if (exists.rows.length > 0) { skipped++; continue; }
+
+          const replyTag = crypto.randomBytes(8).toString('hex');
+          const isAffiliate = target.tier === 'affiliate';
+          const emailBody = isAffiliate
+            ? AFFILIATE_EMAIL(lead.name, lead.company, target.role)
+            : INITIAL_EMAIL(lead.name, lead.company, lead.industry || target.industry, target.role);
+          const subject = isAffiliate
+            ? `Referral Partnership Opportunity — ProofDeed`
+            : `Blockchain Document Certification for ${lead.company}`;
+
+          try {
+            const result = await resend.emails.send({
+              from: 'Scott Kiersten <gov@send.proofdeed.com>',
+              reply_to: `reply+${replyTag}@send.proofdeed.com`,
+              to: lead.email,
+              subject,
+              text: emailBody,
+            });
+
+            const pscore = calcPriorityScore(lead.title, lead.industry || target.industry, target.role);
+            const useCase = `${target.title} — ${(lead.industry || target.industry).replace(/_/g,' ')}`;
+            await pool.query(
+              `INSERT INTO outreach_contacts (name, email, company, title, industry, tier, priority_score, pipeline_stage, pain_status, use_case, status, reply_to_tag, resend_message_id, first_sent_at, last_contact_at)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,'contacted','unaware',$8,'sent',$9,$10,NOW(),NOW())`,
+              [lead.name, lead.email.toLowerCase(), lead.company, lead.title, lead.industry || target.industry, target.tier || 'primary', pscore, useCase, replyTag, result.data?.id || null]
+            );
+            await pool.query(
+              `INSERT INTO outreach_events (contact_id, event_type, event_source, metadata, occurred_at)
+               SELECT id, 'sent', 'lead_engine', $1, NOW() FROM outreach_contacts WHERE email=$2`,
+              [JSON.stringify({ subject, source: lead.source }), lead.email.toLowerCase()]
+            );
+
+            sent++;
+            console.log(`[LeadEngine] Sent → ${lead.name} (${lead.company})`);
+            await new Promise(r => setTimeout(r, 2000));
+          } catch (e) {
+            console.error(`[LeadEngine] Send fail ${lead.email}:`, e.message);
+            skipped++;
+          }
+        }
+        console.log(`[LeadEngine] Target done — sent: ${sent}, skipped: ${skipped}`);
+        return { sent, skipped };
+      } catch (err) {
+        console.error(`[LeadEngine] Error on target ${target.title}:`, err.message);
+        return { sent: 0, skipped: 0 };
       }
-      console.log(`[LeadEngine] Target done — sent: ${sent}, skipped: ${skipped}`);
-      await new Promise(r => setTimeout(r, 5000)); // pause between targets
-    } catch (err) {
-      console.error(`[LeadEngine] Error on target ${target.title}:`, err.message);
+    }));
+
+    for (const r of batchResults) {
+      if (r.status === 'fulfilled') {
+        totalSent += r.value.sent;
+        totalSkipped += r.value.skipped;
+      }
     }
   }
 
