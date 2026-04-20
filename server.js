@@ -3309,13 +3309,11 @@ app.post(['/api/admin/affiliates/:id/payout', '/admin/affiliates/:id/payout'], a
     const { amount, payout_method, reference, notes } = req.body;
     if (!amount || isNaN(parseFloat(amount))) return res.status(400).json({ error: 'Valid amount required.' });
     const affId = req.params.id;
-    // Insert payout record
     const payout = await pool.query(
       `INSERT INTO affiliate_payouts (affiliate_id, amount, payout_method, reference, notes, status, paid_at)
        VALUES ($1,$2,$3,$4,$5,'paid',NOW()) RETURNING *`,
       [affId, parseFloat(amount), payout_method || 'manual', reference || null, notes || null]
     );
-    // Mark pending converted referrals as paid
     await pool.query(
       "UPDATE affiliate_referrals SET commission_status='paid' WHERE affiliate_id=$1 AND commission_status='pending' AND status='converted'",
       [affId]
@@ -3323,6 +3321,144 @@ app.post(['/api/admin/affiliates/:id/payout', '/admin/affiliates/:id/payout'], a
     res.json({ payout: payout.rows[0] });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
+
+// GET /api/admin/affiliates/payout-settings — get current payout day (1-28)
+app.get(['/api/admin/affiliates/payout-settings', '/admin/affiliates/payout-settings'], authRateLimit, async (req, res) => {
+  if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
+  try {
+    const row = await pool.query("SELECT value FROM lead_engine_state WHERE key='affiliate_payout_day'").catch(() => ({ rows: [] }));
+    const day = row.rows[0] ? parseInt(row.rows[0].value) : 1;
+    // Calculate next payout date
+    const now = new Date();
+    let next = new Date(now.getFullYear(), now.getMonth(), day);
+    if (next <= now) next = new Date(now.getFullYear(), now.getMonth() + 1, day);
+    // Get total pending across all affiliates
+    const pending = await pool.query(
+      "SELECT COALESCE(SUM(commission_amount),0) as total FROM affiliate_referrals WHERE commission_status='pending' AND status='converted'"
+    ).catch(() => ({ rows: [{ total: 0 }] }));
+    const affCount = await pool.query(
+      "SELECT COUNT(DISTINCT affiliate_id) as count FROM affiliate_referrals WHERE commission_status='pending' AND status='converted'"
+    ).catch(() => ({ rows: [{ count: 0 }] }));
+    const isDueToday = now.getDate() === day;
+    res.json({
+      payout_day: day,
+      next_payout_date: next.toISOString().split('T')[0],
+      is_due_today: isDueToday,
+      pending_total: parseFloat(pending.rows[0].total),
+      affiliates_owed: parseInt(affCount.rows[0].count),
+    });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// PUT /api/admin/affiliates/payout-settings — set payout day
+app.put(['/api/admin/affiliates/payout-settings', '/admin/affiliates/payout-settings'], authRateLimit, async (req, res) => {
+  if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
+  try {
+    const { payout_day } = req.body;
+    const day = parseInt(payout_day);
+    if (!day || day < 1 || day > 28) return res.status(400).json({ error: 'Payout day must be 1–28.' });
+    await pool.query(
+      `INSERT INTO lead_engine_state (key, value, updated_at) VALUES ('affiliate_payout_day',$1,NOW())
+       ON CONFLICT (key) DO UPDATE SET value=$1, updated_at=NOW()`,
+      [String(day)]
+    );
+    res.json({ payout_day: day });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ── Affiliate monthly payout reminder — runs daily at 8am PT, fires on payout day
+cron.schedule('0 8 * * *', async () => {
+  try {
+    const row = await pool.query("SELECT value FROM lead_engine_state WHERE key='affiliate_payout_day'").catch(() => ({ rows: [] }));
+    const payoutDay = row.rows[0] ? parseInt(row.rows[0].value) : 1;
+    const today = new Date();
+    if (today.getDate() !== payoutDay) return; // not payout day, skip
+
+    console.log('[AffiliatePayouts] Payout day — generating statements...');
+    const { Resend } = await import('resend');
+    const resend = new Resend(process.env.RESEND_API_KEY);
+
+    // Get all affiliates with pending commissions
+    const affiliates = await pool.query(`
+      SELECT a.id, a.name, a.email, a.company, a.referral_code, a.payout_method, a.payout_email, a.commission_rate,
+        COUNT(DISTINCT r.id) FILTER (WHERE r.status='converted') as conversions,
+        COUNT(DISTINCT r.id) FILTER (WHERE r.commission_status='pending' AND r.status='converted') as pending_count,
+        COALESCE(SUM(r.commission_amount) FILTER (WHERE r.commission_status='pending' AND r.status='converted'),0) as pending_amount,
+        COALESCE(SUM(r.commission_amount) FILTER (WHERE r.commission_status='paid'),0) as total_paid
+      FROM affiliates a
+      LEFT JOIN affiliate_referrals r ON r.affiliate_id = a.id
+      WHERE a.status = 'active'
+      GROUP BY a.id
+      HAVING COALESCE(SUM(r.commission_amount) FILTER (WHERE r.commission_status='pending' AND r.status='converted'),0) > 0
+    `);
+
+    if (!affiliates.rows.length) {
+      console.log('[AffiliatePayouts] No pending payouts this month.');
+      return;
+    }
+
+    const totalOwed = affiliates.rows.reduce((s, a) => s + parseFloat(a.pending_amount), 0);
+    const month = today.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+    // Send admin summary
+    const adminLines = affiliates.rows.map(a =>
+      `  • ${a.name} (${a.company || 'N/A'}) — $${parseFloat(a.pending_amount).toFixed(2)} via ${a.payout_method}${a.payout_email ? ' @ ' + a.payout_email : ''} — ${a.pending_count} conversion(s)`
+    ).join('\n');
+
+    await sendAlertEmail(
+      `💸 ProofDeed Affiliate Payout Due — ${month} — $${totalOwed.toFixed(2)} Total`,
+      `Affiliate Payout Summary — ${month}\n\nTotal owed: $${totalOwed.toFixed(2)} across ${affiliates.rows.length} affiliate(s)\n\n${adminLines}\n\nMark payouts as complete in the admin:\nhttps://proofdeed.com/admin\n\n(Tab: 🤝 Affiliates)`
+    ).catch(() => {});
+
+    // Send each affiliate their statement
+    for (const aff of affiliates.rows) {
+      const referrals = await pool.query(
+        `SELECT referred_name, referred_company, plan, commission_amount, converted_at
+         FROM affiliate_referrals
+         WHERE affiliate_id=$1 AND commission_status='pending' AND status='converted'
+         ORDER BY converted_at DESC`,
+        [aff.id]
+      );
+      const refLines = referrals.rows.map(r =>
+        `  • ${r.referred_name || 'New Customer'} (${r.referred_company || 'N/A'}) — ${r.plan || 'Paid Plan'} — Commission: $${parseFloat(r.commission_amount).toFixed(2)}`
+      ).join('\n');
+
+      await resend.emails.send({
+        from: 'Scott Kiersten <gov@send.proofdeed.com>',
+        to: aff.email,
+        subject: `Your ProofDeed Commission Statement — ${month}`,
+        text: `Hi ${aff.name.split(' ')[0]},
+
+Here is your ProofDeed affiliate commission statement for ${month}.
+
+Pending Commission: $${parseFloat(aff.pending_amount).toFixed(2)}
+Referrals this period: ${aff.pending_count}
+
+Breakdown:
+${refLines || '  (No individual referral details available)'}
+
+Your referral link: https://proofdeed.com/ref/${aff.referral_code}
+Commission rate: ${aff.commission_rate}%
+
+Payment will be sent to you via ${aff.payout_method}${aff.payout_email ? ' (' + aff.payout_email + ')' : ''} shortly.
+
+If you have any questions, reply to this email.
+
+Thank you for being a ProofDeed partner.
+
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`,
+      }).catch(e => console.error(`[AffiliatePayouts] Failed to email ${aff.email}:`, e.message));
+
+      console.log(`[AffiliatePayouts] Statement sent to ${aff.name} (${aff.email}) — $${aff.pending_amount}`);
+    }
+
+    console.log(`[AffiliatePayouts] Done. Total owed: $${totalOwed.toFixed(2)} to ${affiliates.rows.length} affiliates.`);
+  } catch (err) {
+    console.error('[AffiliatePayouts] Error:', err.message);
+  }
+}, { timezone: 'America/Los_Angeles' });
 
 /* ---------------- Lead Engine ---------------- */
 const LEAD_TARGETS = [
