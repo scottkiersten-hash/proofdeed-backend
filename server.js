@@ -5435,6 +5435,13 @@ app.post(['/api/admin/lead-engine/run', '/admin/lead-engine/run'], authRateLimit
   });
 });
 
+// Force-reset stuck is_running flag
+app.post(['/api/admin/lead-engine/reset', '/admin/lead-engine/reset'], authRateLimit, async (req, res) => {
+  if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
+  await pool.query(`INSERT INTO lead_engine_state (key,value,updated_at) VALUES ('is_running','false',NOW()) ON CONFLICT (key) DO UPDATE SET value='false',updated_at=NOW()`).catch(() => {});
+  res.json({ success: true, message: 'Engine flag reset — you can now run again.' });
+});
+
 /* ---------------- Outreach Autopilot (daily 8am UTC) ---------------- */
 async function sendOutreachFollowUp(contact, day) {
   if (!process.env.RESEND_API_KEY) return;
