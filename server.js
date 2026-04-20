@@ -2085,6 +2085,17 @@ app.post(["/stripe-webhook", "/api/stripe-webhook"], express.raw({ type: "applic
   res.json({ received: true });
 });
 
+// Track referral click — set cookie and redirect to homepage
+app.get('/ref/:code', async (req, res) => {
+  const { code } = req.params;
+  const aff = await pool.query('SELECT id FROM affiliates WHERE referral_code=$1 AND status=$2', [code, 'active']).catch(() => ({ rows: [] }));
+  if (aff.rows.length) {
+    res.cookie('pd_ref', code, { maxAge: 30 * 24 * 60 * 60 * 1000, httpOnly: false, sameSite: 'lax' });
+    await pool.query('INSERT INTO affiliate_referrals (affiliate_id, referral_code, status) VALUES ($1,$2,$3)', [aff.rows[0].id, code, 'clicked']).catch(() => {});
+  }
+  res.redirect('https://proofdeed.com');
+});
+
 /* ---------------- ADMIN DASHBOARD ---------------- */
 app.get(["/admin/stats", "/api/admin/stats"], authRateLimit, async (req, res) => {
   try {
@@ -2442,6 +2453,53 @@ async function ensureIndexes() {
       CREATE INDEX IF NOT EXISTS idx_inbound_emails_from ON inbound_emails(from_email);
       CREATE INDEX IF NOT EXISTS idx_inbound_emails_thread ON inbound_emails(thread_id);
       CREATE INDEX IF NOT EXISTS idx_inbound_emails_received ON inbound_emails(received_at DESC);
+
+      -- Affiliate tracking
+      CREATE TABLE IF NOT EXISTS affiliates (
+        id SERIAL PRIMARY KEY,
+        contact_id INTEGER REFERENCES outreach_contacts(id) ON DELETE SET NULL,
+        name TEXT NOT NULL,
+        email TEXT UNIQUE NOT NULL,
+        company TEXT,
+        referral_code TEXT UNIQUE NOT NULL,
+        commission_rate NUMERIC(5,2) DEFAULT 20.00,
+        commission_type TEXT DEFAULT 'percentage',
+        flat_amount NUMERIC(10,2),
+        payout_method TEXT DEFAULT 'manual',
+        payout_email TEXT,
+        status TEXT DEFAULT 'active',
+        notes TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS affiliate_referrals (
+        id SERIAL PRIMARY KEY,
+        affiliate_id INTEGER REFERENCES affiliates(id) ON DELETE CASCADE,
+        referred_email TEXT,
+        referred_name TEXT,
+        referred_company TEXT,
+        user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        referral_code TEXT,
+        status TEXT DEFAULT 'clicked',
+        plan TEXT,
+        mrr NUMERIC(10,2) DEFAULT 0,
+        commission_amount NUMERIC(10,2) DEFAULT 0,
+        commission_status TEXT DEFAULT 'pending',
+        converted_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS affiliate_payouts (
+        id SERIAL PRIMARY KEY,
+        affiliate_id INTEGER REFERENCES affiliates(id) ON DELETE CASCADE,
+        amount NUMERIC(10,2) NOT NULL,
+        payout_method TEXT DEFAULT 'manual',
+        reference TEXT,
+        status TEXT DEFAULT 'pending',
+        notes TEXT,
+        paid_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
 
       -- Outreach events log
       CREATE TABLE IF NOT EXISTS outreach_events (
@@ -3155,6 +3213,114 @@ app.post(['/api/admin/inbox/:id/reply', '/admin/inbox/:id/reply'], authRateLimit
 
     console.log(`✅ Admin replied to ${email.from_email} re: "${replySubject}"`);
     res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+/* ---------------- ADMIN: AFFILIATES ---------------- */
+
+// GET /api/admin/affiliates/stats — summary stats
+app.get(['/api/admin/affiliates/stats', '/admin/affiliates/stats'], authRateLimit, async (req, res) => {
+  if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
+  try {
+    const totalAffiliates = (await pool.query('SELECT COUNT(*) FROM affiliates')).rows[0].count;
+    const totalReferrals = (await pool.query('SELECT COUNT(*) FROM affiliate_referrals')).rows[0].count;
+    const totalConversions = (await pool.query("SELECT COUNT(*) FROM affiliate_referrals WHERE status='converted'")).rows[0].count;
+    const pendingCommission = (await pool.query("SELECT COALESCE(SUM(commission_amount),0) as total FROM affiliate_referrals WHERE commission_status='pending' AND status='converted'")).rows[0].total;
+    const totalPaid = (await pool.query("SELECT COALESCE(SUM(commission_amount),0) as total FROM affiliate_referrals WHERE commission_status='paid'")).rows[0].total;
+    res.json({ totalAffiliates: parseInt(totalAffiliates), totalReferrals: parseInt(totalReferrals), totalConversions: parseInt(totalConversions), pendingCommission: parseFloat(pendingCommission), totalPaid: parseFloat(totalPaid) });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET /api/admin/affiliates — list all with computed stats
+app.get(['/api/admin/affiliates', '/admin/affiliates'], authRateLimit, async (req, res) => {
+  if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
+  try {
+    const result = await pool.query(`
+      SELECT a.*,
+        COUNT(DISTINCT r.id) as total_referrals,
+        COUNT(DISTINCT CASE WHEN r.status='converted' THEN r.id END) as total_conversions,
+        COALESCE(SUM(CASE WHEN r.commission_status='pending' AND r.status='converted' THEN r.commission_amount END),0) as pending_commission,
+        COALESCE(SUM(CASE WHEN r.commission_status='paid' THEN r.commission_amount END),0) as total_paid
+      FROM affiliates a
+      LEFT JOIN affiliate_referrals r ON r.affiliate_id = a.id
+      GROUP BY a.id
+      ORDER BY a.created_at DESC
+    `);
+    res.json({ affiliates: result.rows });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// POST /api/admin/affiliates — create new affiliate
+app.post(['/api/admin/affiliates', '/admin/affiliates'], authRateLimit, async (req, res) => {
+  if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
+  try {
+    const { name, email, company, commission_rate, commission_type, flat_amount, payout_method, payout_email, notes, contact_id } = req.body;
+    if (!name || !email) return res.status(400).json({ error: 'name and email required.' });
+    const referral_code = crypto.randomBytes(4).toString('hex');
+    const result = await pool.query(
+      `INSERT INTO affiliates (name, email, company, referral_code, commission_rate, commission_type, flat_amount, payout_method, payout_email, notes, contact_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+      [name, email, company || null, referral_code, commission_rate || 20.00, commission_type || 'percentage', flat_amount || null, payout_method || 'manual', payout_email || null, notes || null, contact_id || null]
+    );
+    res.json({ affiliate: result.rows[0] });
+  } catch (err) {
+    if (err.code === '23505') return res.status(409).json({ error: 'Affiliate with this email already exists.' });
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/admin/affiliates/:id — update affiliate
+app.put(['/api/admin/affiliates/:id', '/admin/affiliates/:id'], authRateLimit, async (req, res) => {
+  if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
+  try {
+    const { status, commission_rate, payout_method, payout_email, notes, company } = req.body;
+    const result = await pool.query(
+      `UPDATE affiliates SET
+        status = COALESCE($1, status),
+        commission_rate = COALESCE($2, commission_rate),
+        payout_method = COALESCE($3, payout_method),
+        payout_email = COALESCE($4, payout_email),
+        notes = COALESCE($5, notes),
+        company = COALESCE($6, company)
+       WHERE id=$7 RETURNING *`,
+      [status || null, commission_rate || null, payout_method || null, payout_email || null, notes || null, company || null, req.params.id]
+    );
+    if (!result.rows.length) return res.status(404).json({ error: 'Affiliate not found.' });
+    res.json({ affiliate: result.rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET /api/admin/affiliates/:id/referrals — list referrals for one affiliate
+app.get(['/api/admin/affiliates/:id/referrals', '/admin/affiliates/:id/referrals'], authRateLimit, async (req, res) => {
+  if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
+  try {
+    const result = await pool.query(
+      'SELECT * FROM affiliate_referrals WHERE affiliate_id=$1 ORDER BY created_at DESC',
+      [req.params.id]
+    );
+    res.json({ referrals: result.rows });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// POST /api/admin/affiliates/:id/payout — record a manual payout
+app.post(['/api/admin/affiliates/:id/payout', '/admin/affiliates/:id/payout'], authRateLimit, async (req, res) => {
+  if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
+  try {
+    const { amount, payout_method, reference, notes } = req.body;
+    if (!amount || isNaN(parseFloat(amount))) return res.status(400).json({ error: 'Valid amount required.' });
+    const affId = req.params.id;
+    // Insert payout record
+    const payout = await pool.query(
+      `INSERT INTO affiliate_payouts (affiliate_id, amount, payout_method, reference, notes, status, paid_at)
+       VALUES ($1,$2,$3,$4,$5,'paid',NOW()) RETURNING *`,
+      [affId, parseFloat(amount), payout_method || 'manual', reference || null, notes || null]
+    );
+    // Mark pending converted referrals as paid
+    await pool.query(
+      "UPDATE affiliate_referrals SET commission_status='paid' WHERE affiliate_id=$1 AND commission_status='pending' AND status='converted'",
+      [affId]
+    );
+    res.json({ payout: payout.rows[0] });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
