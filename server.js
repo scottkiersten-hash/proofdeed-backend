@@ -3514,25 +3514,25 @@ const LEAD_TARGETS = [
   { industry: 'auto', role: 'lender',     tier: 'approver',   title: 'Loan Servicing Director',        query: '"Loan Servicing Director" auto lender USA contact email executive' },
 
   // ── TIER 4: Digital Platform Players
-  { industry: 'auto', role: 'digital',    tier: 'expansion',  title: 'VP of Operations (Online Auto)', query: '"VP of Operations" Carvana OR Vroom OR CarMax OR "online auto" USA contact email' },
-  { industry: 'auto', role: 'digital',    tier: 'expansion',  title: 'Title & Registration Ops Lead',  query: '"Title and Registration" operations lead "digital dealer" OR "online dealer" USA contact' },
-  { industry: 'auto', role: 'digital',    tier: 'expansion',  title: 'Marketplace Compliance Lead',    query: '"Marketplace Compliance" automotive platform USA contact email executive' },
+  { industry: 'auto', role: 'digital',    tier: 'expansion',  title: 'VP of Operations — Carvana/CarMax', query: 'VP Operations OR "Head of Title" OR "Title Operations" Carvana OR CarMax OR Vroom site:linkedin.com email contact' },
+  { industry: 'auto', role: 'digital',    tier: 'expansion',  title: 'Head of Title Operations — Online Auto', query: '"Head of Title" OR "Title Operations Manager" Carvana OR CarMax OR AutoNation USA email contact' },
+  { industry: 'auto', role: 'digital',    tier: 'expansion',  title: 'Compliance Director — Auto Platform', query: '"Compliance Director" OR "Head of Compliance" Carvana OR CarMax OR Cox Automotive USA email contact' },
 
   // ── TIER 5: Extended Buyers
-  { industry: 'auto', role: 'insurance',  tier: 'expansion',  title: 'Auto Insurance Claims Director', query: '"Insurance Claims Director" auto claims "document" OR "total loss" USA contact email' },
-  { industry: 'auto', role: 'insurance',  tier: 'expansion',  title: 'Salvage & Total Loss Manager',   query: '"Total Loss Manager" OR "Salvage Manager" auto insurance USA contact email' },
+  { industry: 'auto', role: 'insurance',  tier: 'expansion',  title: 'Total Loss Director — Auto Insurer', query: '"Total Loss Director" OR "Total Loss Manager" "State Farm" OR "GEICO" OR "Progressive" OR "Allstate" USA email contact' },
+  { industry: 'auto', role: 'insurance',  tier: 'expansion',  title: 'Auto Claims VP — Major Insurer',     query: '"VP of Claims" OR "Claims Director" auto insurance "State Farm" OR "GEICO" OR "Progressive" USA email contact' },
 
-  // ── TIER 6: VIN-Integrity / OEM Supply Chain (new)
-  { industry: 'auto', role: 'auto_supply', tier: 'primary',   title: 'VP of Supply Chain / Logistics', query: '"VP of Supply Chain" OR "VP of Logistics" automotive OEM manufacturer USA contact email' },
-  { industry: 'auto', role: 'auto_cdo',   tier: 'primary',    title: 'Chief Digital Officer (Auto OEM)', query: '"Chief Digital Officer" automotive OR "auto manufacturer" OR OEM USA contact email' },
-  { industry: 'auto', role: 'auto_remarketing', tier: 'primary', title: 'Head of Remarketing / Fleet Ops', query: '"Head of Remarketing" OR "Director of Remarketing" automotive OEM OR "fleet operations" USA contact email' },
-  { industry: 'auto', role: 'auto_iso',   tier: 'primary',    title: 'Director of Quality / ISO Compliance', query: '"Director of Quality" OR "Quality Compliance Director" automotive "ISO" OR "IATF" USA contact email' },
+  // ── TIER 6: VIN-Integrity / OEM Supply Chain
+  { industry: 'auto', role: 'auto_supply', tier: 'primary',   title: 'VP Supply Chain — Ford/GM/Stellantis', query: '"VP of Supply Chain" OR "VP Supply Chain" Ford OR "General Motors" OR Stellantis OR Toyota OR Honda USA email contact' },
+  { industry: 'auto', role: 'auto_cdo',   tier: 'primary',    title: 'Chief Digital Officer — Major OEM',    query: '"Chief Digital Officer" OR "CDO" Ford OR "General Motors" OR Toyota OR BMW OR Mercedes OR Honda USA email contact' },
+  { industry: 'auto', role: 'auto_remarketing', tier: 'primary', title: 'Head of Remarketing — OEM/Fleet',  query: '"Head of Remarketing" OR "Director of Remarketing" Ford OR GM OR Toyota OR "Cox Automotive" OR Manheim USA email contact' },
+  { industry: 'auto', role: 'auto_iso',   tier: 'primary',    title: 'Quality Director — IATF Automotive',  query: '"Director of Quality" OR "VP Quality" Ford OR "General Motors" OR Toyota OR Honda IATF OR ISO 16949 USA email contact' },
   // Sandbox Design Partner targets — deeper automotive title & supply chain roles
-  { industry: 'auto', role: 'auto_remarketing2', tier: 'primary', title: 'Head of Remarketing Operations', query: '"Head of Remarketing Operations" OR "VP Remarketing" "fleet" OR "title" automotive "title washing" OR "clean title" USA contact email' },
-  { industry: 'auto', role: 'auto_warranty',  tier: 'primary',  title: 'Director of Warranty & Quality Compliance', query: '"Director of Warranty" OR "Warranty Compliance Director" automotive manufacturer USA contact email' },
-  { industry: 'auto', role: 'auto_dds',       tier: 'primary',  title: 'VP of Digital Dealer Solutions', query: '"VP of Digital Dealer Solutions" OR "VP Dealer Digital" automotive OEM OR dealer software USA contact email' },
-  { industry: 'auto', role: 'auto_coo',       tier: 'primary',  title: 'Supply Chain Transparency Manager', query: '"Supply Chain Transparency" OR "Certificate of Origin" manager director automotive OEM USA contact email' },
-  { industry: 'auto', role: 'auto_blockchain',tier: 'primary',  title: 'Principal Blockchain Architect (Auto)', query: '"Blockchain Architect" OR "Vehicle Digital Identity" automotive OEM USA contact email site:linkedin.com' },
+  { industry: 'auto', role: 'auto_remarketing2', tier: 'primary', title: 'Head of Remarketing Ops — Fleet', query: '"Head of Remarketing" OR "VP Fleet Remarketing" Hertz OR Enterprise OR "Cox Automotive" OR Manheim OR ADESA USA email contact' },
+  { industry: 'auto', role: 'auto_warranty',  tier: 'primary',  title: 'Warranty Director — Auto OEM',       query: '"Director of Warranty" OR "Warranty Quality Director" Ford OR "General Motors" OR Toyota OR Stellantis USA email contact' },
+  { industry: 'auto', role: 'auto_dds',       tier: 'primary',  title: 'VP Digital Solutions — CDK/Reynolds', query: '"VP" OR "Director" digital solutions OR dealer technology CDK OR "Reynolds and Reynolds" OR DealerSocket OR Tekion USA email contact' },
+  { industry: 'auto', role: 'auto_coo',       tier: 'primary',  title: 'Supply Chain Transparency — OEM',    query: '"Supply Chain" transparency OR integrity OR compliance director Ford OR Toyota OR Honda OR GM OR Stellantis USA email contact' },
+  { industry: 'auto', role: 'auto_blockchain',tier: 'primary',  title: 'Blockchain/Digital Identity — Auto', query: '"Blockchain" OR "Digital Identity" OR "Vehicle Identity" architect OR director Ford OR GM OR BMW OR Toyota USA site:linkedin.com email' },
 
   // ════════════════════════════════════════════════════════
   // INSTITUTIONAL — audit-proof document integrity
@@ -5273,7 +5273,7 @@ async function runLeadEngine(targetsPerRun = 3) {
           tools: [{ type: 'web_search_20250305', name: 'web_search' }],
           messages: [{
             role: 'user',
-            content: `Use web search to find 10 real people currently working as ${target.title} at ${target.industry.replace(/_/g,' ')} organizations in the USA. Search company websites, press releases, and news.\n\nYour entire response must be ONLY a raw JSON array. No words before or after. Start your response with [ and end with ]. Example format:\n[{"name":"Jane Smith","title":"County Recorder","company":"Clark County","email":"jsmith@clarkcounty.gov","industry":"${target.industry}","source":"https://example.com"}]`
+            content: `Use web search to find real people currently working as ${target.title} in the USA. Search using this query: ${target.query}\n\nAlso try searching LinkedIn, company websites, press releases, and news articles. Find as many as you can — even 2 or 3 real people with verified emails is valuable. Do not return placeholder or guessed emails.\n\nYour entire response must be ONLY a raw JSON array. No words before or after. Start your response with [ and end with ]. If you truly cannot find anyone with a verified email, return an empty array: []\nExample format:\n[{"name":"Jane Smith","title":"County Recorder","company":"Clark County","email":"jsmith@clarkcounty.gov","industry":"${target.industry}","source":"https://example.com"}]`
           }]
         });
 
