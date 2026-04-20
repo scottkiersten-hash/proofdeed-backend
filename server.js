@@ -5235,6 +5235,19 @@ async function runLeadEngine(targetsPerRun = 3) {
     return;
   }
 
+  // Prevent overlapping runs
+  const runningRow = await pool.query(`SELECT value FROM lead_engine_state WHERE key='is_running'`).catch(() => ({ rows: [] }));
+  if (runningRow.rows[0]?.value === 'true') {
+    console.log('[LeadEngine] Already running — skipping duplicate trigger.');
+    return;
+  }
+
+  // Mark as running
+  await pool.query(
+    `INSERT INTO lead_engine_state (key, value, updated_at) VALUES ('is_running','true',NOW())
+     ON CONFLICT (key) DO UPDATE SET value='true', updated_at=NOW()`
+  ).catch(() => {});
+
   const TARGETS_PER_RUN = targetsPerRun;
   const ALL_TARGETS = [...LEAD_TARGETS, ...AFFILIATE_TARGETS];
 
@@ -5242,6 +5255,8 @@ async function runLeadEngine(targetsPerRun = 3) {
   const idxRow = await pool.query(`SELECT value FROM lead_engine_state WHERE key='rotation_index'`).catch(() => ({ rows: [] }));
   const currentIdx = idxRow.rows[0] ? parseInt(idxRow.rows[0].value) : 0;
   const nextIdx = (currentIdx + TARGETS_PER_RUN) % ALL_TARGETS.length;
+
+  console.log(`[LeadEngine] Starting — ${TARGETS_PER_RUN} targets from index ${currentIdx}, next will be ${nextIdx}`);
 
   // Save next index immediately so crashes don't repeat the same targets
   await pool.query(
@@ -5371,6 +5386,12 @@ async function runLeadEngine(targetsPerRun = 3) {
   );
 
   console.log(`[LeadEngine] All done. Total sent: ${totalSent}, skipped: ${totalSkipped}, next index: ${nextIdx}`);
+
+  // Mark as no longer running
+  await pool.query(
+    `INSERT INTO lead_engine_state (key, value, updated_at) VALUES ('is_running','false',NOW())
+     ON CONFLICT (key) DO UPDATE SET value='false', updated_at=NOW()`
+  ).catch(() => {});
 }
 
 // Run Tuesday, Wednesday, Thursday at 8am PT (11am ET — peak B2B open rates)
@@ -5385,21 +5406,33 @@ app.get(['/api/admin/lead-engine', '/admin/lead-engine'], authRateLimit, async (
     rows.rows.forEach(r => { state[r.key] = { value: r.value, updated_at: r.updated_at }; });
     res.json({
       enabled: true,
+      is_running: state.is_running?.value === 'true',
       targets: LEAD_TARGETS.map((t, i) => ({ ...t, index: i })),
       currentIndex: parseInt(state.rotation_index?.value || '0'),
       lastRun: state.last_run?.value || null,
       lastResult: state.last_result?.value ? JSON.parse(state.last_result.value) : null,
       nextTarget: LEAD_TARGETS[parseInt(state.rotation_index?.value || '0') % LEAD_TARGETS.length],
-      schedule: 'Every Monday 9am PT',
+      schedule: 'Tue/Wed/Thu 8am PT',
     });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.post(['/api/admin/lead-engine/run', '/admin/lead-engine/run'], authRateLimit, async (req, res) => {
   if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
+
+  // Check if already running
+  const runningRow = await pool.query(`SELECT value FROM lead_engine_state WHERE key='is_running'`).catch(() => ({ rows: [] }));
+  if (runningRow.rows[0]?.value === 'true') {
+    return res.json({ success: false, message: 'Engine is already running — check DO logs for progress.' });
+  }
+
   const count = parseInt(req.body?.count) || 3;
-  res.json({ success: true, message: `Lead engine started (${count} targets) — check CRM in ~${count * 60}s.` });
-  runLeadEngine(count); // fire and forget
+  res.json({ success: true, running: true, message: `Lead engine started — ${count} targets. Refresh in 2-3 minutes.` });
+  runLeadEngine(count).catch(err => {
+    console.error('[LeadEngine] Fatal error:', err.message);
+    // Always clear the running flag even if it crashes
+    pool.query(`INSERT INTO lead_engine_state (key,value,updated_at) VALUES ('is_running','false',NOW()) ON CONFLICT (key) DO UPDATE SET value='false',updated_at=NOW()`).catch(() => {});
+  });
 });
 
 /* ---------------- Outreach Autopilot (daily 8am UTC) ---------------- */
