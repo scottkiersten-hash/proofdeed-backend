@@ -45,6 +45,8 @@ function getTOTPUri(secret) {
   return totp.toString();
 }
 import { anchorToPolygon } from "./polygon.js";
+import multer from 'multer';
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 dotenv.config();
 
@@ -3213,6 +3215,233 @@ app.post(['/api/admin/inbox/:id/reply', '/admin/inbox/:id/reply'], authRateLimit
 
     console.log(`✅ Admin replied to ${email.from_email} re: "${replySubject}"`);
     res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+/* ---------------- ADMIN: CSV IMPORT (Apollo.io) ---------------- */
+app.post(['/api/admin/import/csv', '/admin/import/csv'], authRateLimit, upload.single('file'), async (req, res) => {
+  if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
+
+    const csv = req.file.buffer.toString('utf8');
+    const lines = csv.split('\n').map(l => l.trim()).filter(Boolean);
+    if (lines.length < 2) return res.status(400).json({ error: 'CSV appears empty.' });
+
+    // Parse headers — normalize to lowercase, strip quotes
+    const headers = lines[0].split(',').map(h => h.replace(/^"|"$/g, '').trim().toLowerCase().replace(/\s+/g, '_'));
+
+    // Apollo column name mappings → our field names
+    const colMap = {
+      // Name
+      first_name: 'first_name', last_name: 'last_name', full_name: 'name',
+      'first name': 'first_name', 'last name': 'last_name',
+      // Title
+      title: 'title', job_title: 'title', 'job title': 'title',
+      // Company
+      company: 'company', organization: 'company', company_name: 'company', account_name: 'company',
+      // Email
+      email: 'email', 'work_email': 'email', 'email_address': 'email',
+      // Industry
+      industry: 'industry', 'company_industry': 'industry',
+      // LinkedIn
+      linkedin_url: 'linkedin', 'person_linkedin_url': 'linkedin',
+      // Phone
+      phone: 'phone', direct_phone_number: 'phone',
+      // Location
+      city: 'city', state: 'state', country: 'country',
+      // Company size
+      employees: 'company_size', num_employees: 'company_size', 'number_of_employees': 'company_size',
+    };
+
+    const getField = (row, ...keys) => {
+      for (const key of keys) {
+        const idx = headers.indexOf(key);
+        if (idx !== -1 && row[idx]) return row[idx].replace(/^"|"$/g, '').trim();
+      }
+      return '';
+    };
+
+    // Determine industry from Apollo industry string
+    const mapIndustry = (apolloIndustry) => {
+      const s = (apolloIndustry || '').toLowerCase();
+      if (s.includes('real estate') || s.includes('property')) return 'title_escrow';
+      if (s.includes('government') || s.includes('public') || s.includes('municipal')) return 'government';
+      if (s.includes('pharma') || s.includes('biotech') || s.includes('life science')) return 'pharma';
+      if (s.includes('aviation') || s.includes('aerospace') || s.includes('airline')) return 'aviation';
+      if (s.includes('automotive') || s.includes('auto') || s.includes('vehicle')) return 'auto';
+      if (s.includes('financial') || s.includes('private equity') || s.includes('investment') || s.includes('banking')) return 'institutional';
+      if (s.includes('insurance')) return 'insurance';
+      if (s.includes('legal') || s.includes('law')) return 'legal';
+      if (s.includes('construction')) return 'construction';
+      if (s.includes('hospital') || s.includes('health') || s.includes('medical')) return 'healthcare';
+      if (s.includes('education') || s.includes('university') || s.includes('college')) return 'education';
+      return 'institutional'; // default
+    };
+
+    // Determine role from title
+    const mapRole = (title) => {
+      const t = (title || '').toLowerCase();
+      if (t.includes('chief digital') || t.includes('cdo')) return 'uae_redev';
+      if (t.includes('chief technology') || t.includes('cto')) return 'uae_redev';
+      if (t.includes('chief information') || t.includes('cio')) return 'uae_redev';
+      if (t.includes('chief compliance') || t.includes('cco')) return 'compliance';
+      if (t.includes('chief operating') || t.includes('coo')) return 'ops';
+      if (t.includes('digital transform')) return 'uae_redev';
+      if (t.includes('compliance')) return 'compliance';
+      if (t.includes('supply chain')) return 'auto_supply';
+      if (t.includes('quality') || t.includes('qc') || t.includes('qa')) return 'pharma_qa';
+      if (t.includes('legal') || t.includes('counsel') || t.includes('attorney')) return 'legal';
+      if (t.includes('finance') || t.includes('financial')) return 'finance';
+      if (t.includes('operations') || t.includes('ops')) return 'ops';
+      if (t.includes('record')) return 'recorder';
+      if (t.includes('it director') || t.includes('information technology')) return 'uae_redev';
+      return 'compliance';
+    };
+
+    let imported = 0, skipped = 0, duplicates = 0;
+    const errors = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      try {
+        // Handle quoted CSV values with commas inside
+        const row = [];
+        let current = '';
+        let inQuotes = false;
+        for (const char of lines[i]) {
+          if (char === '"') { inQuotes = !inQuotes; }
+          else if (char === ',' && !inQuotes) { row.push(current.trim()); current = ''; }
+          else { current += char; }
+        }
+        row.push(current.trim());
+
+        const email = getField(row, 'email', 'work_email', 'email_address');
+        if (!email || !email.includes('@')) { skipped++; continue; }
+
+        const firstName = getField(row, 'first_name', 'first name');
+        const lastName = getField(row, 'last_name', 'last name');
+        const fullName = getField(row, 'full_name') || `${firstName} ${lastName}`.trim();
+        if (!fullName || fullName === '') { skipped++; continue; }
+
+        const company = getField(row, 'company', 'organization', 'company_name', 'account_name');
+        const title = getField(row, 'title', 'job_title', 'job title');
+        const apolloIndustry = getField(row, 'industry', 'company_industry');
+        const country = getField(row, 'country');
+        const linkedin = getField(row, 'linkedin_url', 'person_linkedin_url');
+
+        // Determine industry — UAE companies get uae_ prefix
+        let industry = mapIndustry(apolloIndustry);
+        const isUAE = country && (country.toLowerCase().includes('united arab') || country.toLowerCase().includes('uae'));
+        if (isUAE && industry === 'title_escrow') industry = 'uae_realestate';
+        if (isUAE && industry === 'auto') industry = 'uae_auto';
+
+        const role = mapRole(title);
+
+        // Check duplicate
+        const exists = await pool.query('SELECT id FROM outreach_contacts WHERE email=$1', [email.toLowerCase()]);
+        if (exists.rows.length > 0) { duplicates++; continue; }
+
+        // Calculate priority score
+        const pscore = (() => {
+          let score = 0;
+          const t = title.toLowerCase();
+          const ind = industry;
+          if (['government','title_escrow','legal','auto','construction','pe_ma','pharma','aviation','uae_realestate','uae_auto'].includes(ind)) score += 3;
+          if (['government','regulated','institutional','insurance','accounting','pharma','aviation','uae_realestate','uae_auto'].includes(ind)) score += 2;
+          if (['risk','compliance','fraud','audit','legal','counsel','investigation','integrity','claims','lien'].some(k => t.includes(k))) score += 3;
+          if (['director','vp ','vice president','chief','head of','partner','officer','president','counsel'].some(k => t.includes(k))) score += 1;
+          return Math.min(score, 12);
+        })();
+
+        await pool.query(
+          `INSERT INTO outreach_contacts (name, email, company, title, industry, tier, priority_score, pipeline_stage, pain_status, use_case, status, first_sent_at, last_contact_at)
+           VALUES ($1,$2,$3,$4,$5,'primary',$6,'targeted','unaware',$7,'pending',NOW(),NOW())`,
+          [fullName, email.toLowerCase(), company || '', title || '', industry, pscore, `Apollo Import — ${apolloIndustry || industry}`]
+        );
+
+        await pool.query(
+          `INSERT INTO outreach_events (contact_id, event_type, event_source, metadata, occurred_at)
+           SELECT id, 'imported', 'apollo_csv', $1, NOW() FROM outreach_contacts WHERE email=$2`,
+          [JSON.stringify({ source: 'apollo', linkedin, country, original_industry: apolloIndustry }), email.toLowerCase()]
+        );
+
+        imported++;
+      } catch (e) {
+        errors.push(`Row ${i}: ${e.message}`);
+        skipped++;
+      }
+    }
+
+    res.json({
+      success: true,
+      imported,
+      duplicates,
+      skipped,
+      total_rows: lines.length - 1,
+      errors: errors.slice(0, 10),
+      message: `Imported ${imported} new contacts. ${duplicates} duplicates skipped. ${skipped} rows invalid.`
+    });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get(['/api/admin/import/pending', '/admin/import/pending'], authRateLimit, async (req, res) => {
+  if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
+  try {
+    const result = await pool.query("SELECT COUNT(*) as count FROM outreach_contacts WHERE status='pending'");
+    res.json({ pending: parseInt(result.rows[0].count) });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post(['/api/admin/import/send-pending', '/admin/import/send-pending'], authRateLimit, async (req, res) => {
+  if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
+  try {
+    const limit = Math.min(parseInt(req.body?.limit) || 50, 200);
+    const contacts = await pool.query(
+      "SELECT * FROM outreach_contacts WHERE status='pending' AND email IS NOT NULL ORDER BY priority_score DESC LIMIT $1",
+      [limit]
+    );
+    res.json({ success: true, queued: contacts.rows.length, message: `Sending to ${contacts.rows.length} pending contacts in background.` });
+    // Fire and forget
+    (async () => {
+      const { Resend } = await import('resend');
+      const resend = new Resend(process.env.RESEND_API_KEY);
+      let sent = 0, failed = 0;
+      for (const contact of contacts.rows) {
+        try {
+          const replyTag = crypto.randomBytes(8).toString('hex');
+          const isUAE = ['uae_realestate','uae_auto'].includes(contact.industry);
+          const emailBody = isUAE
+            ? UAE_EMAIL(contact.name, contact.company, contact.role || 'uae_redev')
+            : INITIAL_EMAIL(contact.name, contact.company, contact.industry, contact.role || 'compliance');
+          const subject = isUAE
+            ? `Aligning ${contact.company} with Dubai's 2026 Paperless Mandate`
+            : `Blockchain Document Certification for ${contact.company}`;
+
+          await resend.emails.send({
+            from: 'Scott Kiersten <gov@send.proofdeed.com>',
+            reply_to: `reply+${replyTag}@send.proofdeed.com`,
+            to: contact.email,
+            subject,
+            text: emailBody,
+          });
+
+          await pool.query(
+            "UPDATE outreach_contacts SET status='sent', reply_to_tag=$1, pipeline_stage='contacted', first_sent_at=NOW(), last_contact_at=NOW() WHERE id=$2",
+            [replyTag, contact.id]
+          );
+          await pool.query(
+            `INSERT INTO outreach_events (contact_id, event_type, event_source, metadata, occurred_at) VALUES ($1,'sent','import_send',$2,NOW())`,
+            [contact.id, JSON.stringify({ subject })]
+          );
+          sent++;
+          await new Promise(r => setTimeout(r, 1500)); // 1.5s between sends for deliverability
+        } catch (e) {
+          console.error(`[ImportSend] Failed ${contact.email}:`, e.message);
+          failed++;
+        }
+      }
+      console.log(`[ImportSend] Done. Sent: ${sent}, Failed: ${failed}`);
+    })();
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
