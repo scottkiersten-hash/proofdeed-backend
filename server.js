@@ -5811,6 +5811,8 @@ cron.schedule('0 8 * * *', async () => {
 /* ---------------- System Health Monitor ---------------- */
 const ADMIN_ALERT_EMAIL = process.env.MAIL_TO || 'scott@proofdeed.com';
 let lastAlertSent = {};
+let failureStreak = {};  // tracks consecutive failure count per service
+const ALERT_AFTER_FAILURES = 3; // must fail 3 checks in a row (~45 min) before alerting
 
 async function sendAlertEmail(subject, body) {
   const domain = process.env.MAILGUN_DOMAIN;
@@ -5880,24 +5882,41 @@ async function runHealthChecks() {
 
   const failures = checks.filter(c => !c.ok);
 
-  // Alert on new failures (don't spam — once per hour per service)
+  // Increment streak for failing services, reset for healthy ones
   for (const f of failures) {
-    const lastSent = lastAlertSent[f.name] || 0;
-    if (now - lastSent > 60 * 60 * 1000) {
-      lastAlertSent[f.name] = now;
-      await sendAlertEmail(
-        `🚨 ProofDeed Alert: ${f.name} is DOWN`,
-        `ProofDeed system alert — ${new Date().toLocaleString()}\n\n${f.name} is not responding.\n\nError: ${f.error}\n\nCheck DigitalOcean logs immediately.\nhttps://cloud.digitalocean.com`
-      ).catch(() => {});
-      console.error(`[HealthMonitor] ALERT sent — ${f.name} down: ${f.error}`);
+    failureStreak[f.name] = (failureStreak[f.name] || 0) + 1;
+    console.warn(`[HealthMonitor] ${f.name} failure streak: ${failureStreak[f.name]}/${ALERT_AFTER_FAILURES}`);
+  }
+  for (const c of checks.filter(c => c.ok)) {
+    if (failureStreak[c.name]) {
+      // Recovered — send recovery email if we had previously alerted
+      if (lastAlertSent[c.name]) {
+        await sendAlertEmail(
+          `✅ ProofDeed Recovery: ${c.name} is back online`,
+          `ProofDeed system alert — ${new Date().toLocaleString()}\n\n${c.name} has recovered and is responding normally.\n\nDowntime streak: ${failureStreak[c.name]} checks (~${failureStreak[c.name] * 15} minutes)\n\nNo action needed.`
+        ).catch(() => {});
+        console.log(`[HealthMonitor] ${c.name} recovered — recovery email sent.`);
+      } else {
+        console.log(`[HealthMonitor] ${c.name} recovered after ${failureStreak[c.name]} check(s) — no alert was sent (blip).`);
+      }
+      delete failureStreak[c.name];
+      delete lastAlertSent[c.name];
     }
   }
 
-  // Clear alert state when service recovers
-  for (const c of checks.filter(c => c.ok)) {
-    if (lastAlertSent[c.name]) {
-      delete lastAlertSent[c.name];
-      console.log(`[HealthMonitor] ${c.name} recovered.`);
+  // Only alert after 3 consecutive failures (~45 min of real downtime)
+  for (const f of failures) {
+    if (failureStreak[f.name] >= ALERT_AFTER_FAILURES) {
+      const lastSent = lastAlertSent[f.name] || 0;
+      // Re-alert every 2 hours if still down (not every check)
+      if (now - lastSent > 2 * 60 * 60 * 1000) {
+        lastAlertSent[f.name] = now;
+        await sendAlertEmail(
+          `🚨 ProofDeed Alert: ${f.name} has been DOWN for ~${failureStreak[f.name] * 15} minutes`,
+          `ProofDeed system alert — ${new Date().toLocaleString()}\n\n${f.name} has failed ${failureStreak[f.name]} consecutive health checks (~${failureStreak[f.name] * 15} minutes of downtime).\n\nError: ${f.error}\n\nCheck DigitalOcean logs immediately:\nhttps://cloud.digitalocean.com\n\nYou will be notified again in 2 hours if still down, or immediately when it recovers.`
+        ).catch(() => {});
+        console.error(`[HealthMonitor] ALERT sent — ${f.name} down ${failureStreak[f.name]} checks: ${f.error}`);
+      }
     }
   }
 
