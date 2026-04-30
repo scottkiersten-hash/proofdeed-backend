@@ -3096,6 +3096,32 @@ app.put(['/api/admin/outreach/contacts/:id', '/admin/outreach/contacts/:id'], au
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ---------- Admin: Export contacts as CSV (for Instantly.ai etc) ----------
+app.get(['/api/admin/outreach/export-csv', '/admin/outreach/export-csv'], authRateLimit, async (req, res) => {
+  if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
+  try {
+    const { status } = req.query; // optional filter e.g. ?status=sent
+    let query = `SELECT name, email, company, title, industry, state, status, first_sent_at FROM outreach_contacts WHERE email IS NOT NULL AND email != ''`;
+    const params = [];
+    if (status) { params.push(status); query += ` AND status=$${params.length}`; }
+    query += ` ORDER BY created_at DESC`;
+    const result = await pool.query(query, params);
+    const rows = result.rows;
+    const header = ['First Name','Last Name','Email','Company','Title','Industry','State','Status','First Contact'];
+    const lines = [header.join(',')];
+    for (const r of rows) {
+      const parts = (r.name || '').trim().split(/\s+/);
+      const first = parts[0] || '';
+      const last = parts.slice(1).join(' ') || '';
+      const esc = (v) => `"${(v||'').replace(/"/g,'""')}"`;
+      lines.push([esc(first),esc(last),esc(r.email),esc(r.company),esc(r.title),esc(r.industry),esc(r.state),esc(r.status),esc(r.first_sent_at)].join(','));
+    }
+    res.setHeader('Content-Type','text/csv');
+    res.setHeader('Content-Disposition','attachment; filename="proofdeed-leads.csv"');
+    res.send(lines.join('\n'));
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ---------- Admin: Inbox (inbound emails) ----------
 app.get(['/api/admin/inbox', '/admin/inbox'], authRateLimit, async (req, res) => {
   if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
