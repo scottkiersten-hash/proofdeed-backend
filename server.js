@@ -2474,6 +2474,14 @@ async function ensureIndexes() {
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
 
+      -- White-label columns for affiliates
+      ALTER TABLE affiliates ADD COLUMN IF NOT EXISTS white_label_enabled BOOLEAN DEFAULT FALSE;
+      ALTER TABLE affiliates ADD COLUMN IF NOT EXISTS brand_name TEXT;
+      ALTER TABLE affiliates ADD COLUMN IF NOT EXISTS brand_logo_url TEXT;
+      ALTER TABLE affiliates ADD COLUMN IF NOT EXISTS brand_color TEXT DEFAULT '#1a3a8e';
+      ALTER TABLE affiliates ADD COLUMN IF NOT EXISTS brand_tagline TEXT;
+      ALTER TABLE affiliates ADD COLUMN IF NOT EXISTS brand_website TEXT;
+
       CREATE TABLE IF NOT EXISTS affiliate_referrals (
         id SERIAL PRIMARY KEY,
         affiliate_id INTEGER REFERENCES affiliates(id) ON DELETE CASCADE,
@@ -3618,6 +3626,183 @@ app.put(['/api/admin/affiliates/payout-settings', '/admin/affiliates/payout-sett
       [String(day)]
     );
     res.json({ payout_day: day });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ── PUT /api/admin/affiliates/:id/brand — set white-label brand config
+app.put(['/api/admin/affiliates/:id/brand', '/admin/affiliates/:id/brand'], authRateLimit, async (req, res) => {
+  if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
+  try {
+    const { white_label_enabled, brand_name, brand_logo_url, brand_color, brand_tagline, brand_website } = req.body;
+    const result = await pool.query(
+      `UPDATE affiliates SET
+        white_label_enabled = COALESCE($1, white_label_enabled),
+        brand_name          = COALESCE($2, brand_name),
+        brand_logo_url      = COALESCE($3, brand_logo_url),
+        brand_color         = COALESCE($4, brand_color),
+        brand_tagline       = COALESCE($5, brand_tagline),
+        brand_website       = COALESCE($6, brand_website)
+       WHERE id=$7 RETURNING *`,
+      [
+        white_label_enabled !== undefined ? white_label_enabled : null,
+        brand_name || null,
+        brand_logo_url || null,
+        brand_color || null,
+        brand_tagline || null,
+        brand_website || null,
+        req.params.id
+      ]
+    );
+    if (!result.rows.length) return res.status(404).json({ error: 'Affiliate not found.' });
+    res.json({ affiliate: result.rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ── GET /partner/:code — public white-label partner portal
+app.get('/partner/:code', async (req, res) => {
+  try {
+    const { code } = req.params;
+    const result = await pool.query(
+      `SELECT * FROM affiliates WHERE referral_code=$1 AND status='active'`,
+      [code]
+    );
+    if (!result.rows.length) return res.status(404).send('<h1>Partner portal not found.</h1>');
+    const aff = result.rows[0];
+
+    const brandName    = aff.brand_name    || aff.company || 'Document Certification';
+    const brandColor   = aff.brand_color   || '#1a3a8e';
+    const brandTagline = aff.brand_tagline || 'Tamper-proof blockchain document certification for your organization.';
+    const brandLogo    = aff.brand_logo_url;
+    const brandWebsite = aff.brand_website || '#';
+    const refCode      = aff.referral_code;
+
+    // Track the portal visit as a referral click
+    await pool.query(
+      `INSERT INTO affiliate_referrals (affiliate_id, referral_code, status, created_at)
+       VALUES ($1,$2,'clicked',NOW())`,
+      [aff.id, refCode]
+    ).catch(() => {});
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>${brandName} — Document Certification</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Georgia,serif;background:#f0f0ee;min-height:100vh;display:flex;flex-direction:column}
+    .topbar{height:5px;background:linear-gradient(90deg,${brandColor},${brandColor}cc,${brandColor})}
+    header{background:#fff;border-bottom:1px solid #e5e5e5;padding:24px 40px;display:flex;align-items:center;justify-content:space-between}
+    .logo-wrap{display:flex;align-items:center;gap:16px}
+    .logo-img{height:48px;width:auto;object-fit:contain}
+    .logo-text{font-size:22px;font-weight:700;color:#111;letter-spacing:-0.5px}
+    .header-cta{background:${brandColor};color:#fff;padding:10px 22px;border-radius:6px;text-decoration:none;font-family:sans-serif;font-size:14px;font-weight:600}
+    .hero{max-width:760px;margin:60px auto;padding:0 24px;text-align:center}
+    .hero h1{font-size:36px;color:#111;font-weight:700;line-height:1.2;margin-bottom:16px}
+    .hero p{font-size:17px;color:#555;line-height:1.7;margin-bottom:40px}
+    .cta-btn{display:inline-block;background:${brandColor};color:#fff;padding:16px 36px;border-radius:8px;text-decoration:none;font-family:sans-serif;font-size:16px;font-weight:700;margin-bottom:12px}
+    .cta-sub{font-size:13px;color:#999;font-family:sans-serif}
+    .features{max-width:900px;margin:0 auto 60px;padding:0 24px;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:24px}
+    .feature{background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:28px;border-top:3px solid ${brandColor}}
+    .feature h3{font-size:16px;font-weight:700;color:#111;margin-bottom:10px;font-family:sans-serif}
+    .feature p{font-size:14px;color:#666;line-height:1.6;font-family:sans-serif}
+    .how{background:#fff;border-top:1px solid #e5e5e5;border-bottom:1px solid #e5e5e5;padding:60px 24px;text-align:center}
+    .how h2{font-size:26px;font-weight:700;color:#111;margin-bottom:40px}
+    .steps{max-width:800px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:24px}
+    .step{text-align:center}
+    .step-num{width:44px;height:44px;border-radius:50%;background:${brandColor};color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;font-family:sans-serif;margin:0 auto 12px}
+    .step h4{font-size:15px;font-weight:700;color:#111;font-family:sans-serif;margin-bottom:6px}
+    .step p{font-size:13px;color:#666;font-family:sans-serif;line-height:1.5}
+    .bottom-cta{text-align:center;padding:60px 24px}
+    .bottom-cta h2{font-size:26px;font-weight:700;color:#111;margin-bottom:16px}
+    .bottom-cta p{font-size:16px;color:#555;margin-bottom:32px;font-family:sans-serif}
+    footer{margin-top:auto;padding:24px;text-align:center;font-family:sans-serif;font-size:12px;color:#aaa;border-top:1px solid #e5e5e5;background:#fff}
+    footer a{color:#aaa;text-decoration:none}
+  </style>
+</head>
+<body>
+  <div class="topbar"></div>
+  <header>
+    <div class="logo-wrap">
+      ${brandLogo ? `<img src="${brandLogo}" alt="${brandName} logo" class="logo-img"/>` : `<span class="logo-text">${brandName}</span>`}
+    </div>
+    <a href="https://proofdeed.com/document?ref=${refCode}" class="header-cta">Get Started</a>
+  </header>
+
+  <div class="hero">
+    <h1>${brandName}<br/>Document Certification</h1>
+    <p>${brandTagline}</p>
+    <a href="https://proofdeed.com/document?ref=${refCode}" class="cta-btn">Certify a Document</a>
+    <div class="cta-sub">No account required &nbsp;·&nbsp; Instant certificate &nbsp;·&nbsp; Court-admissible</div>
+  </div>
+
+  <div class="features">
+    <div class="feature">
+      <h3>Tamper-Proof</h3>
+      <p>Every document is anchored to the Polygon blockchain the moment it's certified. Any alteration is immediately detectable — permanently.</p>
+    </div>
+    <div class="feature">
+      <h3>Court-Admissible</h3>
+      <p>Certificates satisfy Federal Rules of Evidence Rule 901. Independently verifiable by any court, auditor, or regulator without access to internal systems.</p>
+    </div>
+    <div class="feature">
+      <h3>Instant & Easy</h3>
+      <p>Upload a document, receive a blockchain certificate in seconds. No software to install, no account required for one-time certifications.</p>
+    </div>
+  </div>
+
+  <div class="how">
+    <h2>How It Works</h2>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <h4>Upload</h4>
+        <p>Upload any document — PDF, image, contract, deed, or record.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <h4>Certify</h4>
+        <p>A unique fingerprint is created and anchored to the Polygon blockchain instantly.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <h4>Prove</h4>
+        <p>Share your certificate. Anyone can verify it — no account needed.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="bottom-cta">
+    <h2>Ready to protect your documents?</h2>
+    <p>Join organizations using blockchain certification to eliminate document fraud and disputes.</p>
+    <a href="https://proofdeed.com/document?ref=${refCode}" class="cta-btn">Certify Your First Document</a>
+  </div>
+
+  <footer>
+    <p>Certification services provided by <a href="https://proofdeed.com" target="_blank">ProofDeed</a> &mdash; Blockchain Document Certification &nbsp;|&nbsp; <a href="https://proofdeed.com/verify">Verify a Certificate</a></p>
+  </footer>
+</body>
+</html>`;
+
+    res.setHeader('Content-Type', 'text/html');
+    res.send(html);
+  } catch (err) {
+    console.error('[PartnerPortal]', err.message);
+    res.status(500).send('<h1>Something went wrong. Please try again.</h1>');
+  }
+});
+
+// ── GET /api/partner/:code — returns brand config JSON (for frontend embedding)
+app.get('/api/partner/:code', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT referral_code, brand_name, brand_logo_url, brand_color, brand_tagline, brand_website, company, white_label_enabled
+       FROM affiliates WHERE referral_code=$1 AND status='active'`,
+      [req.params.code]
+    );
+    if (!result.rows.length) return res.status(404).json({ error: 'Partner not found.' });
+    res.json({ partner: result.rows[0] });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
