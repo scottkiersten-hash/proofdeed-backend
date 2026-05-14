@@ -3658,8 +3658,8 @@ app.put(['/api/admin/affiliates/:id/brand', '/admin/affiliates/:id/brand'], auth
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ── GET /partner/:code — public white-label partner portal
-app.get('/partner/:code', async (req, res) => {
+// ── GET /api/partner/:code — public white-label partner portal (HTML)
+app.get(['/api/partner/:code', '/partner/:code'], async (req, res) => {
   try {
     const { code } = req.params;
     const result = await pool.query(
@@ -3793,8 +3793,8 @@ app.get('/partner/:code', async (req, res) => {
   }
 });
 
-// ── GET /api/partner/:code — returns brand config JSON (for frontend embedding)
-app.get('/api/partner/:code', async (req, res) => {
+// ── GET /api/partner/:code/config — returns brand config JSON (for frontend embedding)
+app.get('/api/partner/:code/config', async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT referral_code, brand_name, brand_logo_url, brand_color, brand_tagline, brand_website, company, white_label_enabled
