@@ -3104,6 +3104,60 @@ app.put(['/api/admin/outreach/contacts/:id', '/admin/outreach/contacts/:id'], au
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ---------- Public: Reseller / White-Label Signup ----------
+app.post('/api/reseller/apply', authRateLimit, async (req, res) => {
+  try {
+    const { name, email, company, industry, website, plan, brand_name, brand_color, brand_tagline } = req.body;
+    if (!name || !email || !company || !plan) return res.status(400).json({ error: 'name, email, company, and plan are required.' });
+
+    const referral_code = crypto.randomBytes(4).toString('hex');
+    const portal_url = `https://proofdeed.com/api/partner/${referral_code}`;
+    const planLabels = { starter: 'Starter — $49/mo', pro: 'Pro — $149/mo', enterprise: 'Enterprise — Custom' };
+
+    // Insert affiliate with white-label enabled
+    let aff;
+    try {
+      const result = await pool.query(
+        `INSERT INTO affiliates (name, email, company, referral_code, commission_type, payout_method, status,
+          white_label_enabled, brand_name, brand_logo_url, brand_color, brand_tagline, brand_website, notes)
+         VALUES ($1,$2,$3,$4,'flat','manual','pending',true,$5,null,$6,$7,$8,$9) RETURNING *`,
+        [name, email.toLowerCase(), company, referral_code,
+         brand_name || company, brand_color || '#1a3a8e', brand_tagline || null,
+         website || null, `Reseller plan: ${plan}. Industry: ${industry || 'N/A'}`]
+      );
+      aff = result.rows[0];
+    } catch (e) {
+      if (e.code === '23505') return res.status(409).json({ error: 'An account with this email already exists.' });
+      throw e;
+    }
+
+    const domain = process.env.MAILGUN_DOMAIN;
+    const key = process.env.MAILGUN_API_KEY;
+
+    // Welcome email to reseller
+    if (domain && key) {
+      await fetch(`https://api.mailgun.net/v3/${domain}/messages`, {
+        method: 'POST',
+        headers: { Authorization: 'Basic ' + Buffer.from('api:' + key).toString('base64'), 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          from: process.env.MAIL_FROM || `ProofDeed <noreply@${domain}>`,
+          to: email,
+          subject: `Welcome to ProofDeed Reseller — Your Portal Is Being Set Up`,
+          text: `Hi ${name},\n\nThank you for applying to become a ProofDeed Reseller.\n\nYour branded portal is being configured and will be live within 24 hours at:\n\n${portal_url}\n\nPlan selected: ${planLabels[plan] || plan}\n\nWe will send your payment instructions to this email address within 24 hours. Once payment is confirmed, your portal will be activated and your clients can begin using it immediately.\n\nYour referral code: ${referral_code}\n\nIf you have any questions, reply to this email or contact us at info@proofdeed.com.\n\nProofDeed\nhttps://proofdeed.com`,
+        }),
+      }).catch(() => {});
+
+      // Admin notification
+      await sendAlertEmail(
+        `🏪 New Reseller Application — ${company} (${plan})`,
+        `New reseller signup:\n\nName: ${name}\nEmail: ${email}\nCompany: ${company}\nIndustry: ${industry || 'N/A'}\nPlan: ${planLabels[plan] || plan}\nWebsite: ${website || 'N/A'}\nBrand Name: ${brand_name || 'N/A'}\nBrand Color: ${brand_color || 'N/A'}\nTagline: ${brand_tagline || 'N/A'}\n\nPortal URL: ${portal_url}\nAffiliate ID: ${aff.id}\n\nAction needed: Send payment link and activate account in admin.\nhttps://proofdeed.com/admin`
+      ).catch(() => {});
+    }
+
+    res.json({ success: true, referral_code, portal_url });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ---------- Admin: Export contacts as CSV (for Instantly.ai etc) ----------
 app.get(['/api/admin/outreach/export-csv', '/admin/outreach/export-csv'], authRateLimit, async (req, res) => {
   if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
