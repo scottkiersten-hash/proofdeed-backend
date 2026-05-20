@@ -5723,9 +5723,110 @@ function priorityLabel(score) {
   return 'cold';
 }
 
+// ── Google Custom Search lead finder (replaces Anthropic API) ──────────────
+const EMAIL_REGEX = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
+const SKIP_EMAIL_PATTERNS = /noreply|no-reply|donotreply|webmaster|postmaster|admin@|info@|support@|help@|contact@|office@|mail@|spam|abuse|privacy@|legal@|press@/i;
+
+function isLeadEmail(email) {
+  if (SKIP_EMAIL_PATTERNS.test(email)) return false;
+  if (email.length > 80) return false;
+  return true;
+}
+
+function extractNameFromContext(html, email) {
+  const idx = html.indexOf(email);
+  if (idx === -1) return null;
+  const ctx = html.substring(Math.max(0, idx - 300), idx + 100);
+  // Common patterns: "Name: Jane Smith", "Jane Smith,", "Contact Jane Smith"
+  const patterns = [
+    /(?:name|contact|director|manager|recorder|clerk|officer)[:\s]+([A-Z][a-z]+ [A-Z][a-z]+)/i,
+    /([A-Z][a-z]+ [A-Z][a-z]+)[\s,]+(?:director|manager|recorder|clerk|officer|attorney|coordinator)/i,
+    /([A-Z][a-z]+ (?:[A-Z]\. )?[A-Z][a-z]+)/,
+  ];
+  for (const p of patterns) {
+    const m = ctx.match(p);
+    if (m && m[1] && m[1].length < 50) return m[1].trim();
+  }
+  return null;
+}
+
+function domainToCompany(domain) {
+  // danecounty.gov → Dane County | cityofmadison.com → City of Madison
+  const d = domain.replace(/^www\./, '').replace(/\.(gov|com|org|us|net).*$/, '');
+  return d.replace(/([a-z])([A-Z])/g, '$1 $2')
+          .replace(/[-_]/g, ' ')
+          .replace(/\b\w/g, c => c.toUpperCase());
+}
+
+async function searchLeadsViaGoogle(target) {
+  const apiKey = process.env.GOOGLE_SEARCH_API_KEY;
+  const cx    = process.env.GOOGLE_SEARCH_CX;
+  if (!apiKey || !cx) {
+    console.log('[LeadEngine] Missing GOOGLE_SEARCH_API_KEY or GOOGLE_SEARCH_CX — skipping');
+    return [];
+  }
+
+  const leads = [];
+  const seenEmails = new Set();
+
+  try {
+    // 2 pages of Google results = up to 20 URLs to mine
+    for (let start = 1; start <= 11; start += 10) {
+      const url = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${cx}&q=${encodeURIComponent(target.query)}&start=${start}&num=10`;
+      const res = await fetch(url);
+      if (!res.ok) { console.log(`[LeadEngine] Google API error ${res.status}`); break; }
+      const data = await res.json();
+      if (!data.items?.length) break;
+
+      for (const item of data.items) {
+        const domain = item.displayLink || '';
+        const company = item.title
+          ? item.title.split(/[-|–,]/)[0].trim()
+          : domainToCompany(domain);
+
+        // ① Quick pass — emails visible in snippet
+        const snippetEmails = (item.snippet || '').match(EMAIL_REGEX) || [];
+        for (const email of snippetEmails) {
+          if (!isLeadEmail(email) || seenEmails.has(email)) continue;
+          seenEmails.add(email);
+          const name = extractNameFromContext(item.snippet, email) || target.title;
+          leads.push({ name, title: target.title, email, company, industry: target.industry, source: item.link });
+        }
+
+        // ② Scrape the actual page for emails not in snippet
+        try {
+          const pageRes = await fetch(item.link, {
+            signal: AbortSignal.timeout(6000),
+            headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ProofDeed/1.0)' },
+          });
+          if (!pageRes.ok) continue;
+          const html = await pageRes.text();
+          const pageEmails = html.match(EMAIL_REGEX) || [];
+          for (const email of pageEmails) {
+            if (!isLeadEmail(email) || seenEmails.has(email)) continue;
+            seenEmails.add(email);
+            const name = extractNameFromContext(html, email) || target.title;
+            leads.push({ name, title: target.title, email, company, industry: target.industry, source: item.link });
+          }
+        } catch { /* timeout / blocked — skip page */ }
+
+        await new Promise(r => setTimeout(r, 800)); // polite delay between pages
+      }
+
+      await new Promise(r => setTimeout(r, 500));
+    }
+  } catch (err) {
+    console.error('[LeadEngine] Google search error:', err.message);
+  }
+
+  console.log(`[LeadEngine] Google found ${leads.length} raw leads for "${target.title}"`);
+  return leads;
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 async function runLeadEngine(targetsPerRun = 3) {
-  if (!process.env.ANTHROPIC_API_KEY || !process.env.RESEND_API_KEY) {
-    console.log(`[LeadEngine] Missing API keys — ANTHROPIC: ${!!process.env.ANTHROPIC_API_KEY}, RESEND: ${!!process.env.RESEND_API_KEY}`);
+  if (!process.env.GOOGLE_SEARCH_API_KEY || !process.env.RESEND_API_KEY) {
+    console.log(`[LeadEngine] Missing API keys — GOOGLE: ${!!process.env.GOOGLE_SEARCH_API_KEY}, RESEND: ${!!process.env.RESEND_API_KEY}`);
     return;
   }
 
@@ -5759,8 +5860,6 @@ async function runLeadEngine(targetsPerRun = 3) {
     [String(nextIdx)]
   ).catch(() => {});
 
-  const Anthropic = (await import('@anthropic-ai/sdk')).default;
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   const { Resend } = await import('resend');
   const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -5776,25 +5875,11 @@ async function runLeadEngine(targetsPerRun = 3) {
 
     const batchResults = await Promise.allSettled(batchTargets.map(async ({ target }) => {
       try {
-        const response = await anthropic.messages.create({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 2500,
-          tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-          messages: [{
-            role: 'user',
-            content: `Use web search to find real people currently working as ${target.title} in the USA. Search using this query: ${target.query}\n\nAlso try searching LinkedIn, company websites, press releases, and news articles. Find as many as you can — even 2 or 3 real people with verified emails is valuable. Do not return placeholder or guessed emails.\n\nYour entire response must be ONLY a raw JSON array. No words before or after. Start your response with [ and end with ]. If you truly cannot find anyone with a verified email, return an empty array: []\nExample format:\n[{"name":"Jane Smith","title":"County Recorder","company":"Clark County","email":"jsmith@clarkcounty.gov","industry":"${target.industry}","source":"https://example.com"}]`
-          }]
-        });
-
-        const rawText = response.content.filter((b) => b.type === 'text').map((b) => b.text).join('');
-        let leads = [];
-        const match = rawText.match(/\[[\s\S]*\]/);
-        if (match) { try { leads = JSON.parse(match[0]); if (!Array.isArray(leads)) leads = []; } catch { leads = []; } }
+        const leads = await searchLeadsViaGoogle(target);
         if (!leads.length) {
-          console.log(`[LeadEngine] No leads parsed for ${target.title} — raw: ${rawText.substring(0,200)}`);
+          console.log(`[LeadEngine] No leads found for ${target.title}`);
           return { sent: 0, skipped: 0 };
         }
-        console.log(`[LeadEngine] Found ${leads.length} leads for ${target.title}`);
 
         let sent = 0, skipped = 0;
         for (const lead of leads) {
