@@ -5992,6 +5992,11 @@ app.get(['/api/admin/lead-engine', '/admin/lead-engine'], authRateLimit, async (
       lastResult: state.last_result?.value ? JSON.parse(state.last_result.value) : null,
       nextTarget: LEAD_TARGETS[parseInt(state.rotation_index?.value || '0') % LEAD_TARGETS.length],
       schedule: 'Tue/Wed/Thu 8am PT',
+      envCheck: {
+        GOOGLE_SEARCH_API_KEY: !!process.env.GOOGLE_SEARCH_API_KEY,
+        GOOGLE_SEARCH_CX: !!process.env.GOOGLE_SEARCH_CX,
+        RESEND_API_KEY: !!process.env.RESEND_API_KEY,
+      },
     });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
