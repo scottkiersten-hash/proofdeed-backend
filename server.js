@@ -5759,10 +5759,9 @@ function domainToCompany(domain) {
 }
 
 async function searchLeadsViaGoogle(target) {
-  const apiKey = process.env.GOOGLE_SEARCH_API_KEY;
-  const cx    = process.env.GOOGLE_SEARCH_CX;
-  if (!apiKey || !cx) {
-    console.log('[LeadEngine] Missing GOOGLE_SEARCH_API_KEY or GOOGLE_SEARCH_CX — skipping');
+  const apiKey = process.env.SERPER_API_KEY;
+  if (!apiKey) {
+    console.log('[LeadEngine] Missing SERPER_API_KEY — skipping');
     return [];
   }
 
@@ -5770,15 +5769,26 @@ async function searchLeadsViaGoogle(target) {
   const seenEmails = new Set();
 
   try {
-    // 2 pages of Google results = up to 20 URLs to mine
-    for (let start = 1; start <= 11; start += 10) {
-      const url = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${cx}&q=${encodeURIComponent(target.query)}&start=${start}&num=10`;
-      const res = await fetch(url);
-      if (!res.ok) { console.log(`[LeadEngine] Google API error ${res.status}`); break; }
+    // 2 pages of Serper results = up to 20 URLs to mine
+    for (let page = 1; page <= 2; page++) {
+      const res = await fetch('https://google.serper.dev/search', {
+        method: 'POST',
+        headers: { 'X-API-KEY': apiKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ q: target.query, num: 10, page }),
+      });
+      if (!res.ok) { console.log(`[LeadEngine] Serper API error ${res.status}`); break; }
       const data = await res.json();
-      if (!data.items?.length) break;
+      const items = data.organic || [];
+      if (!items.length) break;
+      // Map Serper format to same structure as Google CSE
+      const mappedItems = items.map(item => ({
+        title: item.title || '',
+        snippet: item.snippet || '',
+        link: item.link || '',
+        displayLink: item.link ? new URL(item.link).hostname : '',
+      }));
 
-      for (const item of data.items) {
+      for (const item of mappedItems) {
         const domain = item.displayLink || '';
         const company = item.title
           ? item.title.split(/[-|–,]/)[0].trim()
@@ -5825,8 +5835,8 @@ async function searchLeadsViaGoogle(target) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function runLeadEngine(targetsPerRun = 3) {
-  if (!process.env.GOOGLE_SEARCH_API_KEY || !process.env.RESEND_API_KEY) {
-    console.log(`[LeadEngine] Missing API keys — GOOGLE: ${!!process.env.GOOGLE_SEARCH_API_KEY}, RESEND: ${!!process.env.RESEND_API_KEY}`);
+  if (!process.env.SERPER_API_KEY || !process.env.RESEND_API_KEY) {
+    console.log(`[LeadEngine] Missing API keys — SERPER: ${!!process.env.SERPER_API_KEY}, RESEND: ${!!process.env.RESEND_API_KEY}`);
     return;
   }
 
@@ -5993,8 +6003,7 @@ app.get(['/api/admin/lead-engine', '/admin/lead-engine'], authRateLimit, async (
       nextTarget: LEAD_TARGETS[parseInt(state.rotation_index?.value || '0') % LEAD_TARGETS.length],
       schedule: 'Tue/Wed/Thu 8am PT',
       envCheck: {
-        GOOGLE_SEARCH_API_KEY: !!process.env.GOOGLE_SEARCH_API_KEY,
-        GOOGLE_SEARCH_CX: !!process.env.GOOGLE_SEARCH_CX,
+        SERPER_API_KEY: !!process.env.SERPER_API_KEY,
         RESEND_API_KEY: !!process.env.RESEND_API_KEY,
       },
     });
