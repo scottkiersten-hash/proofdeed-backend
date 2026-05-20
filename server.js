@@ -1478,7 +1478,7 @@ app.post(["/contact", "/api/contact"], async (req, res) => {
         },
         body: new URLSearchParams({
           from: process.env.MAIL_FROM || "ProofDeed <mailgun@" + mailgunDomain + ">",
-          to: process.env.MAIL_TO || process.env.ADMIN_EMAIL || "gov@proofdeed.com",
+          to: process.env.MAIL_TO || process.env.ADMIN_EMAIL || "SJJK@pm.me",
           subject: "🏛 PO Request: $15K Pilot — " + (resolvedCompany || name),
           text: "Purchase Order request received.\n\nName: " + name + "\nAgency: " + (resolvedCompany || "N/A") + "\nEmail: " + email + "\nMessage: " + (resolvedNotes || "N/A") + "\n\nAction required: Send invoice to " + email + "\n\nProofDeed Admin\nhttps://proofdeed.com/admin"
         })
@@ -5918,8 +5918,11 @@ async function runLeadEngine(targetsPerRun = 3) {
                 : `Blockchain Document Certification for ${lead.company}`;
 
           try {
+            const fromAddr = target.industry === 'government'
+              ? 'Scott Kiersten <gov@send.proofdeed.com>'
+              : 'Scott Kiersten <info@send.proofdeed.com>';
             const result = await resend.emails.send({
-              from: 'Scott Kiersten <gov@send.proofdeed.com>',
+              from: fromAddr,
               reply_to: `reply+${replyTag}@send.proofdeed.com`,
               to: lead.email,
               subject,
@@ -6176,7 +6179,7 @@ cron.schedule('0 8 * * *', async () => {
 }, { timezone: 'America/Los_Angeles' });
 
 /* ---------------- System Health Monitor ---------------- */
-const ADMIN_ALERT_EMAIL = process.env.MAIL_TO || 'scott@proofdeed.com';
+const ADMIN_ALERT_EMAIL = process.env.MAIL_TO || 'SJJK@pm.me';
 let lastAlertSent = {};
 let failureStreak = {};  // tracks consecutive failure count per service
 const ALERT_AFTER_FAILURES = 3; // must fail 3 checks in a row (~45 min) before alerting
