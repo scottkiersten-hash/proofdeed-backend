@@ -2768,6 +2768,22 @@ app.post(['/api/webhooks/resend', '/webhooks/resend'], express.raw({ type: '*/*'
         UPDATE outreach_contacts SET status=$1, last_contact_at=NOW()${extra} WHERE id=$2
       `, [newStatus, contact.id]);
     }
+
+    // Auto-suppress hard bounces and complaints — protects sending reputation
+    if (newStatus === 'bounced' && metadata.bounce_type === 'hard') {
+      await pool.query(
+        `UPDATE outreach_contacts SET status='bounced', pipeline_stage='suppressed', suppressed_at=NOW(), suppressed_reason='hard_bounce' WHERE id=$1`,
+        [contact.id]
+      );
+      console.log(`[Resend Webhook] Hard bounce suppressed: ${contact.email}`);
+    }
+    if (newStatus === 'complained') {
+      await pool.query(
+        `UPDATE outreach_contacts SET status='complained', pipeline_stage='suppressed', suppressed_at=NOW(), suppressed_reason='spam_complaint' WHERE id=$1`,
+        [contact.id]
+      );
+      console.log(`[Resend Webhook] Spam complaint suppressed: ${contact.email}`);
+    }
   } catch (err) {
     console.error('Resend webhook error:', err.message);
   }
@@ -5727,9 +5743,34 @@ function priorityLabel(score) {
 const EMAIL_REGEX = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
 const SKIP_EMAIL_PATTERNS = /noreply|no-reply|donotreply|webmaster|postmaster|admin@|info@|support@|help@|contact@|office@|mail@|spam|abuse|privacy@|legal@|press@/i;
 
+// Reject file-extension false-positives scraped from HTML (e.g. icon@2x.png, lib@1.0.min.js)
+const FAKE_EMAIL_TLD = /\.(png|jpg|jpeg|gif|svg|webp|ico|js|mjs|cjs|css|min|map|woff|woff2|ttf|eot|otf|json|xml|zip|gz|pdf|doc|docx|xls|xlsx|txt|md|ts|jsx|tsx|vue|py|rb|php|sh|env|lock|yaml|yml|toml)(\?.*)?$/i;
+
+// Strip HTML entities and artifacts before matching emails (e.g. > → >, &lt; → <)
+function decodeHtmlEntities(str) {
+  return str
+    .replace(/\\u003e/gi, '').replace(/\\u003c/gi, '')
+    .replace(/&gt;/gi, '').replace(/&lt;/gi, '')
+    .replace(/&amp;/gi, '&').replace(/&#\d+;/g, '')
+    .replace(/&[a-z]+;/gi, '');
+}
+
 function isLeadEmail(email) {
   if (SKIP_EMAIL_PATTERNS.test(email)) return false;
   if (email.length > 80) return false;
+  // Reject HTML entity artifacts in the local part (e.g. u003eplease@domain.com)
+  const local = email.split('@')[0] || '';
+  if (/u003[ce]|u0026|u002[26]|&[a-z]+;|&#\d+;/i.test(local)) return false;
+  // Local part must start with alphanumeric — not html remnants
+  if (!/^[a-zA-Z0-9]/.test(local)) return false;
+  // Must have a real TLD — reject file-extension lookalikes
+  if (FAKE_EMAIL_TLD.test(email)) return false;
+  // Must have at least one dot in the domain part
+  const domain = email.split('@')[1] || '';
+  if (!domain.includes('.')) return false;
+  // Domain TLD must be 2–10 alpha chars (no digits-only TLDs like .2x)
+  const tld = domain.split('.').pop();
+  if (!/^[a-zA-Z]{2,10}$/.test(tld)) return false;
   return true;
 }
 
@@ -5810,7 +5851,7 @@ async function searchLeadsViaGoogle(target) {
             headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ProofDeed/1.0)' },
           });
           if (!pageRes.ok) continue;
-          const html = await pageRes.text();
+          const html = decodeHtmlEntities(await pageRes.text());
           const pageEmails = html.match(EMAIL_REGEX) || [];
           for (const email of pageEmails) {
             if (!isLeadEmail(email) || seenEmails.has(email)) continue;
@@ -5873,7 +5914,22 @@ async function runLeadEngine(targetsPerRun = 3) {
   const { Resend } = await import('resend');
   const resend = new Resend(process.env.RESEND_API_KEY);
 
+  // Hard daily send cap — stay safely under Resend free-tier 100/day limit
+  const DAILY_SEND_CAP = 80;
+  const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+  const sentTodayRow = await pool.query(
+    `SELECT COUNT(*) FROM outreach_contacts WHERE first_sent_at >= $1`,
+    [todayStart]
+  ).catch(() => ({ rows: [{ count: '0' }] }));
+  let dailySentSoFar = parseInt(sentTodayRow.rows[0]?.count || '0');
+
   let totalSent = 0, totalSkipped = 0;
+
+  if (dailySentSoFar >= DAILY_SEND_CAP) {
+    console.log(`[LeadEngine] Daily cap reached (${dailySentSoFar}/${DAILY_SEND_CAP}) — skipping run.`);
+    await pool.query(`INSERT INTO lead_engine_state (key,value,updated_at) VALUES ('is_running','false',NOW()) ON CONFLICT (key) DO UPDATE SET value='false',updated_at=NOW()`).catch(() => {});
+    return;
+  }
 
   // Process targets in parallel batches of 3 to avoid timeouts
   const PARALLEL = 3;
@@ -5893,9 +5949,10 @@ async function runLeadEngine(targetsPerRun = 3) {
 
         let sent = 0, skipped = 0;
         for (const lead of leads) {
+          if (dailySentSoFar + totalSent >= DAILY_SEND_CAP) { skipped++; continue; } // daily cap guard
           if (!lead.email || !lead.name || !lead.company) { skipped++; continue; }
-          const exists = await pool.query('SELECT id FROM outreach_contacts WHERE email=$1', [lead.email.toLowerCase()]);
-          if (exists.rows.length > 0) { skipped++; continue; }
+          const exists = await pool.query('SELECT id, pipeline_stage FROM outreach_contacts WHERE email=$1', [lead.email.toLowerCase()]);
+          if (exists.rows.length > 0) { skipped++; continue; } // already contacted or suppressed
 
           const replyTag = crypto.randomBytes(8).toString('hex');
           const isAffiliate = target.tier === 'affiliate';
@@ -5986,11 +6043,8 @@ async function runLeadEngine(targetsPerRun = 3) {
   ).catch(() => {});
 }
 
-// Run Tuesday, Wednesday, Thursday at 8am PT (11am ET — peak B2B open rates)
-// Lead engine — Mon-Fri, 3x per day, Chicago time, 10 targets per run = 30 leads/day
-cron.schedule('0 8  * * 1-5', () => runLeadEngine(10), { timezone: 'America/Chicago' });
-cron.schedule('0 12 * * 1-5', () => runLeadEngine(10), { timezone: 'America/Chicago' });
-cron.schedule('0 17 * * 1-5', () => runLeadEngine(10), { timezone: 'America/Chicago' });
+// Lead engine — Mon-Fri once daily at 8am Chicago (keeps total sends well under free-tier 100/day cap)
+cron.schedule('0 8 * * 1-5', () => runLeadEngine(4), { timezone: 'America/Chicago' });
 
 /* ---------------- Lead Engine API ----------------  */
 app.get(['/api/admin/lead-engine', '/admin/lead-engine'], authRateLimit, async (req, res) => {
