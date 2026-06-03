@@ -6196,6 +6196,23 @@ gov@proofdeed.com | proofdeed.com`;
 cron.schedule('0 8 * * *', async () => {
   console.log('[Autopilot] Running daily follow-up check...');
   try {
+    // Global daily cap — shared with lead engine, never exceed 80 total sends/day
+    const AUTOPILOT_DAILY_CAP = 30; // max follow-ups per day
+    const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+    const newSentToday = parseInt((await pool.query(
+      `SELECT COUNT(*) FROM outreach_contacts WHERE first_sent_at >= $1`, [todayStart]
+    ).catch(() => ({ rows: [{ count: '0' }] }))).rows[0]?.count || '0');
+    const followUpsSentToday = parseInt((await pool.query(
+      `SELECT COUNT(*) FROM outreach_events WHERE event_source='autopilot' AND occurred_at >= $1`, [todayStart]
+    ).catch(() => ({ rows: [{ count: '0' }] }))).rows[0]?.count || '0');
+    let autopilotSent = 0;
+    const remainingBudget = Math.max(0, AUTOPILOT_DAILY_CAP - followUpsSentToday);
+    console.log(`[Autopilot] Budget: ${remainingBudget} follow-ups remaining (${newSentToday} new sent today, ${followUpsSentToday} follow-ups already sent)`);
+    if (remainingBudget === 0) {
+      console.log('[Autopilot] Daily follow-up cap reached — skipping.');
+      return;
+    }
+
     // Day 7: no reply, first_sent_at between 7-8 days ago — skip dead/lost
     const day7 = await pool.query(`
       SELECT * FROM outreach_contacts
@@ -6205,9 +6222,11 @@ cron.schedule('0 8 * * *', async () => {
       AND first_sent_at > NOW() - INTERVAL '8 days'
       AND company NOT LIKE '[PDF]%'
       AND length(split_part(email, '@', 1)) > 3
+      LIMIT 10
     `);
     for (const c of day7.rows) {
-      try { await sendOutreachFollowUp(c, 7); console.log(`[Autopilot] Day 7 → ${c.name}`); }
+      if (autopilotSent >= remainingBudget) break;
+      try { await sendOutreachFollowUp(c, 7); autopilotSent++; console.log(`[Autopilot] Day 7 → ${c.name}`); }
       catch (e) { console.error(`[Autopilot] Day 7 fail ${c.email}:`, e.message); }
       await new Promise(r => setTimeout(r, 3000));
     }
@@ -6221,9 +6240,11 @@ cron.schedule('0 8 * * *', async () => {
       AND first_sent_at > NOW() - INTERVAL '15 days'
       AND company NOT LIKE '[PDF]%'
       AND length(split_part(email, '@', 1)) > 3
+      LIMIT 10
     `);
     for (const c of day14.rows) {
-      try { await sendOutreachFollowUp(c, 14); console.log(`[Autopilot] Day 14 → ${c.name}`); }
+      if (autopilotSent >= remainingBudget) break;
+      try { await sendOutreachFollowUp(c, 14); autopilotSent++; console.log(`[Autopilot] Day 14 → ${c.name}`); }
       catch (e) { console.error(`[Autopilot] Day 14 fail ${c.email}:`, e.message); }
       await new Promise(r => setTimeout(r, 3000));
     }
@@ -6237,10 +6258,13 @@ cron.schedule('0 8 * * *', async () => {
       AND first_sent_at > NOW() - INTERVAL '22 days'
       AND company NOT LIKE '[PDF]%'
       AND length(split_part(email, '@', 1)) > 3
+      LIMIT 10
     `);
     for (const c of day21.rows) {
+      if (autopilotSent >= remainingBudget) break;
       try {
         await sendOutreachFollowUp(c, 21);
+        autopilotSent++;
         await pool.query(`UPDATE outreach_contacts SET status='closed_lost' WHERE id=$1`, [c.id]);
         console.log(`[Autopilot] Day 21 breakup → ${c.name}`);
       }
@@ -6248,7 +6272,7 @@ cron.schedule('0 8 * * *', async () => {
       await new Promise(r => setTimeout(r, 3000));
     }
 
-    console.log(`[Autopilot] Done. Day7: ${day7.rows.length}, Day14: ${day14.rows.length}, Day21: ${day21.rows.length}`);
+    console.log(`[Autopilot] Done. Sent: ${autopilotSent}. Day7: ${day7.rows.length}, Day14: ${day14.rows.length}, Day21: ${day21.rows.length}`);
   } catch (err) {
     console.error('[Autopilot] Cron error:', err.message);
   }
