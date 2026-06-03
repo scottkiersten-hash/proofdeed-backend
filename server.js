@@ -5763,6 +5763,8 @@ function isLeadEmail(email) {
   if (/u003[ce]|u0026|u002[26]|&[a-z]+;|&#\d+;/i.test(local)) return false;
   // Local part must start with alphanumeric — not html remnants
   if (!/^[a-zA-Z0-9]/.test(local)) return false;
+  // Local part must be at least 4 characters — blocks PDF binary garbage like m@, p@, u@
+  if (local.length < 4) return false;
   // Must have a real TLD — reject file-extension lookalikes
   if (FAKE_EMAIL_TLD.test(email)) return false;
   // Must have at least one dot in the domain part
@@ -5771,6 +5773,9 @@ function isLeadEmail(email) {
   // Domain TLD must be 2–10 alpha chars (no digits-only TLDs like .2x)
   const tld = domain.split('.').pop();
   if (!/^[a-zA-Z]{2,10}$/.test(tld)) return false;
+  // Domain must have a reasonable length (blocks 1-2 char domains like 1s.cf, k.ye)
+  const domainWithoutTld = domain.substring(0, domain.lastIndexOf('.'));
+  if (domainWithoutTld.length < 3) return false;
   return true;
 }
 
@@ -5831,9 +5836,17 @@ async function searchLeadsViaGoogle(target) {
 
       for (const item of mappedItems) {
         const domain = item.displayLink || '';
-        const company = item.title
+
+        // Skip PDF results entirely — scraping PDFs produces binary garbage that fakes email patterns
+        const isPdf = /\.pdf(\?.*)?$/i.test(item.link) || /^\[PDF\]/i.test(item.title || '');
+        if (isPdf) continue;
+
+        const rawCompany = item.title
           ? item.title.split(/[-|–,]/)[0].trim()
           : domainToCompany(domain);
+        // Skip if company name looks like garbage (starts with bracket, all caps gibberish, very short)
+        if (/^\[/.test(rawCompany) || rawCompany.length < 3) continue;
+        const company = rawCompany;
 
         // ① Quick pass — emails visible in snippet
         const snippetEmails = (item.snippet || '').match(EMAIL_REGEX) || [];
@@ -5851,6 +5864,9 @@ async function searchLeadsViaGoogle(target) {
             headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ProofDeed/1.0)' },
           });
           if (!pageRes.ok) continue;
+          // Skip if server returns a PDF content type
+          const contentType = pageRes.headers.get('content-type') || '';
+          if (contentType.includes('pdf')) continue;
           const html = decodeHtmlEntities(await pageRes.text());
           const pageEmails = html.match(EMAIL_REGEX) || [];
           for (const email of pageEmails) {
