@@ -3174,7 +3174,7 @@ app.post('/api/reseller/apply', authRateLimit, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ---------- Admin: Export contacts as CSV (for Instantly.ai etc) ----------
+// ---------- Admin: Export contacts as CSV ----------
 app.get(['/api/admin/outreach/export-csv', '/admin/outreach/export-csv'], authRateLimit, async (req, res) => {
   if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
   try {
@@ -6187,6 +6187,8 @@ cron.schedule('0 8 * * *', async () => {
       AND pipeline_stage NOT IN ('pilot_discussed','pilot_sent','pilot_approved','closed','qualified')
       AND first_sent_at <= NOW() - INTERVAL '7 days'
       AND first_sent_at > NOW() - INTERVAL '8 days'
+      AND company NOT LIKE '[PDF]%'
+      AND length(split_part(email, '@', 1)) > 3
     `);
     for (const c of day7.rows) {
       try { await sendOutreachFollowUp(c, 7); console.log(`[Autopilot] Day 7 → ${c.name}`); }
@@ -6201,6 +6203,8 @@ cron.schedule('0 8 * * *', async () => {
       AND pipeline_stage NOT IN ('pilot_discussed','pilot_sent','pilot_approved','closed','qualified')
       AND first_sent_at <= NOW() - INTERVAL '14 days'
       AND first_sent_at > NOW() - INTERVAL '15 days'
+      AND company NOT LIKE '[PDF]%'
+      AND length(split_part(email, '@', 1)) > 3
     `);
     for (const c of day14.rows) {
       try { await sendOutreachFollowUp(c, 14); console.log(`[Autopilot] Day 14 → ${c.name}`); }
@@ -6215,6 +6219,8 @@ cron.schedule('0 8 * * *', async () => {
       AND pipeline_stage NOT IN ('pilot_discussed','pilot_sent','pilot_approved','closed','qualified')
       AND first_sent_at <= NOW() - INTERVAL '21 days'
       AND first_sent_at > NOW() - INTERVAL '22 days'
+      AND company NOT LIKE '[PDF]%'
+      AND length(split_part(email, '@', 1)) > 3
     `);
     for (const c of day21.rows) {
       try {
@@ -6239,21 +6245,14 @@ let failureStreak = {};  // tracks consecutive failure count per service
 const ALERT_AFTER_FAILURES = 3; // must fail 3 checks in a row (~45 min) before alerting
 
 async function sendAlertEmail(subject, body) {
-  const domain = process.env.MAILGUN_DOMAIN;
-  const key = process.env.MAILGUN_API_KEY;
-  if (!domain || !key) return;
-  await fetch(`https://api.mailgun.net/v3/${domain}/messages`, {
-    method: 'POST',
-    headers: {
-      Authorization: 'Basic ' + Buffer.from('api:' + key).toString('base64'),
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: new URLSearchParams({
-      from: process.env.MAIL_FROM || `ProofDeed <noreply@${domain}>`,
-      to: ADMIN_ALERT_EMAIL,
-      subject,
-      text: body,
-    }),
+  if (!process.env.RESEND_API_KEY) return;
+  const { Resend } = await import('resend');
+  const resend = new Resend(process.env.RESEND_API_KEY);
+  await resend.emails.send({
+    from: 'ProofDeed System <gov@send.proofdeed.com>',
+    to: ADMIN_ALERT_EMAIL,
+    subject,
+    text: body,
   });
 }
 
