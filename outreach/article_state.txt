@@ -1,0 +1,45 @@
+One Technology That Stops Deed Fraud Before Your Members Even Know It Happened
+
+By Scott Kiersten, Founder & CEO, ProofDeed LLC
+
+The FBI warned in 2025 that deed fraud is rising sharply across the country. Complaints to state attorneys general have tripled in some states. Homeowners are losing properties through forged documents that pass every standard check.
+
+County recorder and clerk offices are on the front line of this problem. They are also in the best position to address it — because they are the point at which every document enters the public record.
+
+The technology that closes this gap is called blockchain document certification. It requires no changes to existing recording systems, no new infrastructure, and integrates in days. This article explains how it works and why recorder offices across the country are beginning to implement it.
+
+THE GAP IN CURRENT FRAUD PREVENTION
+
+Existing deed fraud protections — property alert services, fraud hotlines, e-recording validation — are reactive by design. They notify property owners or staff after a suspicious document is filed.
+
+What none of these systems do is create a tamper-evident record of exactly what each document said at the moment it was recorded — before any alteration is possible, and before any dispute arises.
+
+This is the gap fraudsters exploit. A forged deed looks legitimate because it moves through legitimate channels. When fraud is discovered months later, proving what the original document contained requires costly investigation and carries no guarantee of resolution.
+
+HOW BLOCKCHAIN CERTIFICATION WORKS
+
+Blockchain document certification adds a single step at the moment of recording — without replacing any existing system.
+
+When a document is processed, the system computes a SHA-256 hash: a unique mathematical fingerprint of that document's exact contents. If a single character changes after certification, the fingerprint changes completely. This hash is anchored to the Polygon public blockchain — a permanent, public, tamper-proof ledger.
+
+The resulting record is independently verifiable by any party: a court, an investigator, a title examiner, or a property owner. No call to your office. No subpoena. No access to internal systems required.
+
+If a fraudster records an altered deed after the original was certified, the mismatch is mathematically provable. Fraud becomes detectable, immediately and permanently.
+
+WHAT CHANGES FOR YOUR MEMBERS — AND WHAT DOES NOT
+
+Recorder offices do not change their recording workflow in any meaningful way. Documents are not stored outside existing systems. The certification step adds seconds per document and can be batched for high-volume offices at minimal cost.
+
+What changes is the defensibility of every recorded document. When a dispute arises — a forgery claim, a litigation hold, a regulatory audit — a certified record answers the question of document integrity with mathematical certainty. No staff testimony required. No internal record retrieval. The blockchain record speaks for itself.
+
+Under Federal Rule of Evidence Rule 901(b)(9), evidence produced by a process that produces an accurate result meets authentication standards. Blockchain-anchored hash evidence meets this standard. Recorder offices that certify their documents are building a self-authenticating public record.
+
+A RESPONSE YOUR MEMBERS CAN IMPLEMENT NOW
+
+County recorder and clerk associations exist to help members stay ahead of the challenges facing their offices. Deed fraud is one of the most urgent challenges of this decade.
+
+Blockchain certification is not a theoretical tool. It is a production-deployed technology available to recorder offices today, at a cost that scales with volume and requires no capital investment or infrastructure change.
+
+For associations looking to bring a concrete, actionable solution to your membership on the deed fraud issue — this is it.
+
+Scott Kiersten is Founder & CEO of ProofDeed LLC, a Veteran-Owned Small Business (VOSB) providing blockchain document certification for county recorder offices and government agencies. Headquartered in Oshkosh, Wisconsin. ProofDeed has active proposals with NSF SBIR and DHS LRBAA for this technology. Contact: gov@proofdeed.com | 727-619-4592 | proofdeed.com

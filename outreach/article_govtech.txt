@@ -1,0 +1,57 @@
+County Recorders Have a Document Fraud Problem. Blockchain Fixes It.
+
+By Scott Kiersten, Founder & CEO, ProofDeed LLC
+
+The FBI's Boston field office issued a warning in early 2025 that should have landed on the desk of every county recorder in America: quit claim deed fraud is rising sharply, and existing alert systems are not stopping it.
+
+The warning was not hypothetical. Complaints of deed theft to New York's Attorney General tripled in recent years. A Texas woman's grandmother had her East Austin home stolen and sold for ten dollars through a forged deed. An 85-year-old Atlanta homeowner's property was transferred through fake paperwork that passed every standard check.
+
+Each of these cases has something in common: the fraud happened after the document was recorded. And in every case, the recorder's office had no way to prove what the original document said at the moment it was filed.
+
+That is the gap blockchain certification closes.
+
+THE PROBLEM WITH CURRENT SYSTEMS
+
+County recorder offices have adopted property alert services, fraud hotlines, and staff training programs. These are valuable tools. They are also, by design, reactive. They notify property owners after a suspicious document is filed. Investigations begin after damage is done.
+
+What no current system does is create a cryptographic record of exactly what a document said at the exact moment it was recorded — before any alteration is possible.
+
+This is the gap fraudsters exploit. A deed looks legitimate because it was processed through legitimate channels. The forgery happened before recording, or the document was altered after the fact. Without a tamper-evident record tied to the moment of filing, proving what the original contained is nearly impossible.
+
+HOW BLOCKCHAIN CERTIFICATION WORKS
+
+Blockchain document certification is simpler than it sounds and requires no changes to existing recording infrastructure.
+
+When a document is submitted, the system computes a SHA-256 hash — the same cryptographic standard used by the federal government, banks, and the SSL certificates securing every government website. This hash is a unique 64-character mathematical fingerprint of that document's exact contents. If a single character changes after certification, the hash changes completely.
+
+That fingerprint is anchored to the Polygon public blockchain — a permanent, public ledger — in a single transaction. The blockchain record cannot be altered, deleted, or tampered with by anyone, including the certification provider.
+
+Any party — a court, a title examiner, an investigator, or a property owner — can verify that a document matches its certified record independently, without contacting the recorder's office, without a subpoena, and without access to internal systems.
+
+WHAT THIS MEANS FOR RECORDER OFFICES
+
+For county recorder offices specifically, blockchain certification addresses three operational realities.
+
+First, it creates an independent chain of custody from the moment of recording. When investigators ask what a document contained on the day it was filed, the blockchain record answers that question with mathematical certainty — no internal staff testimony required.
+
+Second, it reduces the burden on recorder staff in fraud investigations. Rather than pulling original records, responding to attorney inquiries, and testifying about document integrity, a certified record speaks for itself. Any party can verify it directly.
+
+Third, it positions recorder offices to meet a standard of care that courts and regulators are beginning to expect. Federal Rule of Evidence Rule 901(b)(9) establishes authentication standards for evidence produced by a process that produces an accurate result. Blockchain-anchored hash evidence meets this standard. Recorder offices that certify their records today are building an audit trail that will hold up in any proceeding.
+
+IMPLEMENTATION: WHAT CHANGES AND WHAT DOES NOT
+
+The question I hear most often from recorder offices is whether this requires replacing existing recording systems. It does not.
+
+Blockchain certification integrates via API alongside existing document management and e-recording platforms. The certification step adds seconds to the recording workflow. Documents are not stored by the certification provider — only the mathematical fingerprint is transmitted. No private document content ever leaves the recorder's system.
+
+For offices that process high volumes — hundreds or thousands of recordings per day — Merkle tree batching allows the entire day's recordings to be certified in a single blockchain transaction, with each document receiving its own individual proof. Cost scales with volume, but stays low regardless of recording counts.
+
+THE BROADER CASE
+
+County recorder offices are the foundational layer of property rights in the United States. Every title search, every mortgage, every real estate transaction depends on the integrity of recorded documents.
+
+The FBI's warning on deed fraud is not an isolated concern. It reflects a broader vulnerability in a system that has not kept pace with the sophistication of modern document fraud. Blockchain certification is not a replacement for that system — it is a layer of cryptographic certainty added to what already exists.
+
+Recorder offices that implement this technology are not changing how they work. They are ensuring that what they do can be proven, permanently, to any party who asks.
+
+Scott Kiersten is Founder & CEO of ProofDeed LLC, a Veteran-Owned Small Business providing blockchain document certification for county recorder offices, title companies, and government agencies. ProofDeed is headquartered in Oshkosh, Wisconsin. Contact: gov@proofdeed.com | proofdeed.com

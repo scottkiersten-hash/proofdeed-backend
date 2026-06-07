@@ -1,0 +1,59 @@
+After the FBI Warning on Deed Fraud — What Recorder Offices Can Do Right Now
+
+By Scott Kiersten, Founder & CEO, ProofDeed LLC
+
+When the FBI's Boston Division issued its warning on quit claim deed fraud in 2025, it described a crime that is growing precisely because it is hard to detect and harder to prove.
+
+The warning outlined a straightforward scheme: a fraudster forges a deed, records it through normal channels, and either sells the property or takes out a mortgage against it before the rightful owner discovers what happened. By the time an alert fires or an investigation begins, the damage is done.
+
+What the FBI did not describe — because it did not yet have a widespread solution to point to — was a technology that makes this type of fraud mathematically detectable at the moment of recording.
+
+That technology now exists. And it requires no changes to how your office operates.
+
+THE CORE PROBLEM
+
+Every recorder office in the country processes documents it cannot independently verify at the moment of filing. A deed arrives through standard channels, passes identity and formatting checks, and is recorded. Whether that document is authentic — whether it represents what the grantor actually signed — is a question that cannot be answered at recording.
+
+Existing alert systems notify property owners after a document is recorded. They are valuable. They are also, by definition, too late to prevent the fraud they detect.
+
+What is missing is a tamper-evident record of what each document contained at the moment it entered the public record — before any alteration is possible, and before any dispute arises.
+
+THE SOLUTION: CRYPTOGRAPHIC ANCHORING AT RECORDING
+
+Blockchain document certification creates exactly this record, and it integrates alongside existing recording workflows in days.
+
+The process works as follows. When a document is processed for recording, a SHA-256 cryptographic hash is computed — a unique 64-character mathematical fingerprint of that document's exact contents. This hash is anchored to the Polygon public blockchain, creating a permanent, timestamped record tied to the specific document filed on that specific day.
+
+If the document is later altered — even a single character changed — the fingerprint no longer matches. Fraud is not suspected. It is mathematically proven.
+
+The blockchain record is public, permanent, and independently verifiable. Any party — a court, an investigator, an attorney, or a property owner — can verify that a document matches its recorded fingerprint without contacting your office, without a subpoena, and without access to your internal systems.
+
+YOUR OFFICE DOES NOT CHANGE HOW IT WORKS
+
+The most important thing to understand about blockchain certification is what it does not require.
+
+It does not replace your recording software. It does not alter your recording workflow in any meaningful way. It does not store your documents anywhere outside your existing systems. It does not require new hardware, new staff, or new training beyond a brief onboarding.
+
+The certification step is a single API call per document, adding seconds to the recording process. For high-volume offices, Merkle tree batching certifies an entire day's recordings in one blockchain transaction, with each document receiving its own individual proof. The cost per certification is fractions of a cent at volume.
+
+WHAT YOUR OFFICE GAINS
+
+Three concrete operational benefits result from blockchain certification of recorded documents.
+
+Independent chain of custody. When a fraud investigation asks what a document contained on the day it was recorded, the blockchain record answers with mathematical certainty. No internal testimony. No pulling of original records. No dispute over what your system shows.
+
+Reduced staff burden in disputes. Property fraud investigations and litigation routinely require recorder offices to respond to attorney inquiries, produce records, and verify document integrity. Certified records are self-verifying — any party can confirm authenticity independently, reducing demands on your staff.
+
+Court-admissible authentication. Federal Rule of Evidence Rule 901(b)(9) establishes standards for evidence produced by a process that produces an accurate result. Blockchain-anchored hash evidence meets this standard. Your certified records become self-authenticating in any federal or state proceeding.
+
+A PRACTICAL RESPONSE TO A REAL WARNING
+
+The FBI warning is not a theoretical concern. Deed fraud complaints in New York tripled in recent years. Federal investigators have gone door to door in multiple states investigating falsified government records. Homeowners across the country have lost properties through forged documents that passed every standard check.
+
+County recorder offices are on the front line of this problem. They are also in the best position to address it — because they are the point at which documents enter the public record.
+
+Blockchain certification at recording does not solve every dimension of deed fraud. It does solve the most persistent one: the inability to prove, with mathematical certainty, what a document said the day it was filed.
+
+For recorder offices looking for a concrete response to the FBI's warning, this is it.
+
+Scott Kiersten is Founder & CEO of ProofDeed LLC, a Veteran-Owned Small Business providing blockchain document certification for county recorder offices and government agencies. ProofDeed has submitted proposals to NSF SBIR and DHS LRBAA for this technology applied to government document authentication. Headquartered in Oshkosh, Wisconsin. Contact: gov@proofdeed.com | proofdeed.com
