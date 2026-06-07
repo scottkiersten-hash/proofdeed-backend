@@ -6439,7 +6439,8 @@ app.post(['/api/admin/send-articles', '/admin/send-articles'], authRateLimit, as
     }
   ];
 
-  const resendClient = new Resend(process.env.RESEND_API_KEY);
+  const { Resend: ResendClass } = await import('resend');
+  const resendClient = new ResendClass(process.env.RESEND_API_KEY);
   const results = [];
   for (const email of emails) {
     try {
