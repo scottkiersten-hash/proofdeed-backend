@@ -6445,7 +6445,7 @@ app.post(['/api/admin/send-articles', '/admin/send-articles'], authRateLimit, as
   for (const email of emails) {
     try {
       const result = await resendClient.emails.send({
-        from: 'Scott Kiersten <gov@proofdeed.com>',
+        from: 'Scott Kiersten <gov@send.proofdeed.com>',
         reply_to: 'gov@proofdeed.com',
         to: email.to,
         subject: email.subject,
