@@ -82,8 +82,8 @@ async function sendOutreach() {
       const replyTag = randomBytes(8).toString('hex');
 
       const result = await resend.emails.send({
-        from: 'Scott Kiersten <gov@send.proofdeed.com>',
-        reply_to: `reply+${replyTag}@send.proofdeed.com`,
+        from: 'Scott Kiersten <gov@proofdeed.com>',
+        reply_to: `reply+${replyTag}@proofdeed.com`,
         to: contact.email,
         subject,
         text: body,

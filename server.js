@@ -3522,8 +3522,8 @@ app.post(['/api/admin/import/send-pending', '/admin/import/send-pending'], authR
             : `Blockchain Document Certification for ${contact.company}`;
 
           await resend.emails.send({
-            from: 'Scott Kiersten <gov@send.proofdeed.com>',
-            reply_to: `reply+${replyTag}@send.proofdeed.com`,
+            from: 'Scott Kiersten <gov@proofdeed.com>',
+            reply_to: `reply+${replyTag}@proofdeed.com`,
             to: contact.email,
             subject,
             text: emailBody,
@@ -3934,7 +3934,7 @@ cron.schedule('0 8 * * *', async () => {
       ).join('\n');
 
       await resend.emails.send({
-        from: 'Scott Kiersten <gov@send.proofdeed.com>',
+        from: 'Scott Kiersten <gov@proofdeed.com>',
         to: aff.email,
         subject: `Your ProofDeed Commission Statement — ${month}`,
         text: `Hi ${aff.name.split(' ')[0]},
@@ -5992,11 +5992,11 @@ async function runLeadEngine(targetsPerRun = 3) {
 
           try {
             const fromAddr = target.industry === 'government'
-              ? 'Scott Kiersten <gov@send.proofdeed.com>'
-              : 'Scott Kiersten <info@send.proofdeed.com>';
+              ? 'Scott Kiersten <gov@proofdeed.com>'
+              : 'Scott Kiersten <info@proofdeed.com>';
             const result = await resend.emails.send({
               from: fromAddr,
-              reply_to: `reply+${replyTag}@send.proofdeed.com`,
+              reply_to: `reply+${replyTag}@proofdeed.com`,
               to: lead.email,
               subject,
               text: emailBody,
@@ -6175,8 +6175,8 @@ gov@proofdeed.com | proofdeed.com`;
 
   const replyTag = crypto.randomBytes(8).toString('hex');
   await resend.emails.send({
-    from: 'Scott Kiersten <gov@send.proofdeed.com>',
-    reply_to: `reply+${replyTag}@send.proofdeed.com`,
+    from: 'Scott Kiersten <gov@proofdeed.com>',
+    reply_to: `reply+${replyTag}@proofdeed.com`,
     to: contact.email,
     subject,
     text,
@@ -6289,7 +6289,7 @@ async function sendAlertEmail(subject, body) {
   const { Resend } = await import('resend');
   const resend = new Resend(process.env.RESEND_API_KEY);
   await resend.emails.send({
-    from: 'ProofDeed System <gov@send.proofdeed.com>',
+    from: 'ProofDeed System <gov@proofdeed.com>',
     to: ADMIN_ALERT_EMAIL,
     subject,
     text: body,

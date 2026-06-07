@@ -50,7 +50,7 @@ async function sendFollowUps() {
       const body = buildFollowUp(contact);
 
       await resend.emails.send({
-        from: 'Scott Kiersten <gov@send.proofdeed.com>',
+        from: 'Scott Kiersten <gov@proofdeed.com>',
         reply_to: 'gov@proofdeed.com',
         to: contact.email,
         subject: `Re: Blockchain Document Certification for ${contact.county} County`,

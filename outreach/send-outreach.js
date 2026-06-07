@@ -65,7 +65,7 @@ async function sendOutreach() {
       const body = buildEmail(contact);
 
       await resend.emails.send({
-        from: 'Scott Kiersten <gov@send.proofdeed.com>',
+        from: 'Scott Kiersten <gov@proofdeed.com>',
         reply_to: 'gov@proofdeed.com',
         to: contact.email,
         subject: contact.subject,
