@@ -6451,6 +6451,86 @@ app.post(['/api/admin/send-articles', '/admin/send-articles'], authRateLimit, as
   res.json({ results });
 });
 
+/* ---------------- Daily Health Check Endpoint ---------------- */
+app.get(["/health-check", "/api/health-check"], async (req, res) => {
+  // Secured with a secret token to prevent public abuse
+  const token = req.headers["x-health-token"] || req.query.token;
+  if (token !== process.env.HEALTH_CHECK_TOKEN) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const BASE = "https://proofdeed.com";
+  const passed = [], failed = [], warnings = [];
+
+  const testGet = (url) => new Promise((resolve) => {
+    const https = require("https");
+    const req = https.get(url, { timeout: 10000 }, (r) => resolve({ url, status: r.statusCode }));
+    req.on("error", (e) => resolve({ url, status: 0, error: e.message }));
+    req.on("timeout", () => { req.destroy(); resolve({ url, status: 0, error: "timeout" }); });
+  });
+
+  // Test key pages
+  const pages = ["/", "/government", "/how-it-works", "/faq", "/login", "/verify", "/api-docs", "/privacy", "/terms"];
+  for (const page of pages) {
+    const r = await testGet(BASE + page);
+    if (r.status === 200) passed.push(`${page} → 200`);
+    else failed.push(`${page} → ${r.status || r.error}`);
+  }
+
+  // Test all 6 checkout plans
+  const plans = ["starter-monthly", "starter-annual", "pro-monthly", "pro-annual", "enterprise", "government-pilot"];
+  for (const plan of plans) {
+    try {
+      const session = await stripe.checkout.sessions.create({
+        mode: plan === "government-pilot" ? "payment" : "subscription",
+        ...(plan !== "government-pilot" ? { payment_method_types: ["card"] } : {}),
+        line_items: [{ price: {
+          "starter-monthly": process.env.PRICE_STARTER_MONTHLY,
+          "starter-annual":  process.env.PRICE_STARTER_YEARLY,
+          "pro-monthly":     process.env.PRICE_PRO_MONTHLY,
+          "pro-annual":      process.env.PRICE_PRO_YEARLY,
+          "enterprise":      process.env.PRICE_ENTERPRISE,
+          "government-pilot":process.env.PRICE_GOVERNMENT_PILOT,
+        }[plan], quantity: 1 }],
+        success_url: "https://proofdeed.com/success",
+        cancel_url: "https://proofdeed.com",
+      });
+      if (session.url) passed.push(`Checkout ${plan} → OK`);
+      else failed.push(`Checkout ${plan} → no URL`);
+    } catch (err) {
+      failed.push(`Checkout ${plan} → ${err.message}`);
+    }
+  }
+
+  // Test DB
+  try {
+    await pool.query("SELECT 1");
+    passed.push("Database → connected");
+  } catch (err) {
+    failed.push(`Database → ${err.message}`);
+  }
+
+  // Send alert email if failures
+  if (failed.length > 0 && process.env.RESEND_API_KEY) {
+    try {
+      await resend.emails.send({
+        from: "ProofDeed Health Check <info@proofdeed.com>",
+        to: "info@proofdeed.com",
+        subject: `🚨 ProofDeed Health Check FAILED — ${failed.length} issue(s)`,
+        text: `ProofDeed Daily Health Check — ${new Date().toUTCString()}\n\n❌ FAILED:\n${failed.map(f=>`  • ${f}`).join("\n")}\n\n✅ PASSED:\n${passed.map(p=>`  • ${p}`).join("\n")}\n\nFix: https://cloud.digitalocean.com/apps/753587e4-5e82-46af-a29e-a80b7dd60f87`,
+      });
+    } catch (e) { warnings.push("Alert email failed: " + e.message); }
+  }
+
+  const status = failed.length > 0 ? 500 : 200;
+  res.status(status).json({
+    timestamp: new Date().toISOString(),
+    passed: passed.length,
+    failed: failed.length,
+    results: { passed, failed, warnings }
+  });
+});
+
 /* ---------------- Start Server ---------------- */
 const server = app.listen(PORT, () => {
   console.log("ProofDeed backend running on port " + PORT);
