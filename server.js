@@ -1629,7 +1629,7 @@ app.post(["/create-checkout-session", "/api/create-checkout-session"], async (re
 
     const sessionParams = {
       mode: isOneTime ? "payment" : "subscription",
-      payment_method_types: ["card"],
+      ...(isOneTime ? {} : { payment_method_types: ["card"] }),
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: success_url || "https://proofdeed.com/success",
       cancel_url: cancel_url || "https://proofdeed.com",
