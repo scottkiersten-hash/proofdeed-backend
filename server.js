@@ -1640,8 +1640,7 @@ app.post(["/create-checkout-session", "/api/create-checkout-session"], async (re
     if (isOneTime) {
       sessionParams.payment_method_options = {
         us_bank_account: {
-          financial_connections: { permissions: ["payment_method"] },
-          verification_method: "instant",
+          verification_method: "automatic",
         },
       };
     }
