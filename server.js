@@ -6299,7 +6299,7 @@ async function runHealthChecks() {
     checks.push({ name: 'Database', ok: false, error: e.message });
   }
 
-  // 2. Stripe
+  // 2. Stripe API
   try {
     await stripe.balance.retrieve();
     checks.push({ name: 'Stripe', ok: true });
@@ -6332,6 +6332,41 @@ async function runHealthChecks() {
     }
   } catch (e) {
     checks.push({ name: 'Mailgun', ok: false, error: e.message });
+  }
+
+  // 5. Key Site Pages (frontend)
+  const pagesToCheck = ['/', '/government', '/login', '/verify', '/how-it-works', '/api-docs'];
+  for (const page of pagesToCheck) {
+    try {
+      const r = await fetch(`https://proofdeed.com${page}`, { signal: AbortSignal.timeout(10000) });
+      checks.push({ name: `Page ${page}`, ok: r.status === 200, error: r.status !== 200 ? `HTTP ${r.status}` : null });
+    } catch (e) {
+      checks.push({ name: `Page ${page}`, ok: false, error: e.message });
+    }
+  }
+
+  // 6. All Checkout Plans (creates real Stripe sessions — no charge until customer pays)
+  const checkoutPlans = [
+    { name: 'Checkout starter-monthly', mode: 'subscription', price: process.env.PRICE_STARTER_MONTHLY },
+    { name: 'Checkout starter-annual',  mode: 'subscription', price: process.env.PRICE_STARTER_YEARLY },
+    { name: 'Checkout pro-monthly',     mode: 'subscription', price: process.env.PRICE_PRO_MONTHLY },
+    { name: 'Checkout pro-annual',      mode: 'subscription', price: process.env.PRICE_PRO_YEARLY },
+    { name: 'Checkout enterprise',      mode: 'subscription', price: process.env.PRICE_ENTERPRISE },
+    { name: 'Checkout government-pilot',mode: 'payment',      price: process.env.PRICE_GOVERNMENT_PILOT },
+  ];
+  for (const plan of checkoutPlans) {
+    try {
+      const session = await stripe.checkout.sessions.create({
+        mode: plan.mode,
+        ...(plan.mode === 'subscription' ? { payment_method_types: ['card'] } : {}),
+        line_items: [{ price: plan.price, quantity: 1 }],
+        success_url: 'https://proofdeed.com/success',
+        cancel_url: 'https://proofdeed.com',
+      });
+      checks.push({ name: plan.name, ok: !!session.url, error: session.url ? null : 'No URL returned' });
+    } catch (e) {
+      checks.push({ name: plan.name, ok: false, error: e.message });
+    }
   }
 
   const failures = checks.filter(c => !c.ok);
@@ -6390,7 +6425,7 @@ cron.schedule('0 8 * * *', async () => {
     `ProofDeed Daily System Report — ${new Date().toLocaleDateString()}\n\n${lines}\n\nAdmin: https://proofdeed.com/admin`
   ).catch(() => {});
   console.log(`[HealthMonitor] Daily summary sent. All OK: ${allOk}`);
-}, { timezone: 'America/Los_Angeles' });
+}, { timezone: 'Asia/Bangkok' });
 
 // Expose health check endpoint for manual trigger
 app.get(['/api/admin/health-check', '/admin/health-check'], authRateLimit, async (req, res) => {
