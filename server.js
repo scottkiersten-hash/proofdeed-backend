@@ -1629,21 +1629,13 @@ app.post(["/create-checkout-session", "/api/create-checkout-session"], async (re
 
     const sessionParams = {
       mode: isOneTime ? "payment" : "subscription",
-      payment_method_types: isOneTime ? ["card", "us_bank_account"] : ["card"],
+      payment_method_types: ["card"],
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: success_url || "https://proofdeed.com/success",
       cancel_url: cancel_url || "https://proofdeed.com",
       client_reference_id: referral ? referral : undefined,
       metadata: { plan },
     };
-
-    if (isOneTime) {
-      sessionParams.payment_method_options = {
-        us_bank_account: {
-          verification_method: "automatic",
-        },
-      };
-    }
 
     const session = await stripe.checkout.sessions.create(sessionParams);
 
