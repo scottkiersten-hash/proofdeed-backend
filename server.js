@@ -6499,6 +6499,22 @@ cron.schedule('0 8 * * *', async () => {
   console.log(`[HealthMonitor] Daily summary sent. All OK: ${allOk}`);
 }, { timezone: 'Asia/Bangkok' });
 
+// Startup health check — fires 30s after deploy so every new deploy emails a report
+setTimeout(async () => {
+  try {
+    const checks = await runHealthChecks();
+    const allOk = checks.every(c => c.ok);
+    const lines = checks.map(c => `${c.ok ? '✅' : '❌'} ${c.name}${c.error ? ': ' + c.error : ''}`).join('\n');
+    await sendAlertEmail(
+      allOk ? '✅ ProofDeed Deploy Check — All Systems OK' : '⚠️ ProofDeed Deploy Check — Issues Detected',
+      `ProofDeed System Report (post-deploy) — ${new Date().toLocaleDateString()}\n\n${lines}\n\nAdmin: https://proofdeed.com/admin`
+    ).catch(() => {});
+    console.log(`[HealthMonitor] Startup check complete. All OK: ${allOk}`);
+  } catch (e) {
+    console.error('[HealthMonitor] Startup check failed:', e.message);
+  }
+}, 30000); // 30 second delay to let server fully initialize
+
 // Expose health check endpoint for manual trigger
 app.get(['/api/admin/health-check', '/admin/health-check'], authRateLimit, async (req, res) => {
   if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
