@@ -6270,7 +6270,7 @@ cron.schedule('0 8 * * *', async () => {
 }, { timezone: 'America/Los_Angeles' });
 
 /* ---------------- System Health Monitor ---------------- */
-const ADMIN_ALERT_EMAIL = process.env.MAIL_TO || 'SJJK@pm.me';
+const ADMIN_ALERT_EMAIL = process.env.MAIL_TO || 'info@proofdeed.com';
 let lastAlertSent = {};
 let failureStreak = {};  // tracks consecutive failure count per service
 const ALERT_AFTER_FAILURES = 3; // must fail 3 checks in a row (~45 min) before alerting
