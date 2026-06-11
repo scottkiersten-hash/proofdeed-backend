@@ -6276,15 +6276,23 @@ let failureStreak = {};  // tracks consecutive failure count per service
 const ALERT_AFTER_FAILURES = 3; // must fail 3 checks in a row (~45 min) before alerting
 
 async function sendAlertEmail(subject, body) {
-  if (!process.env.RESEND_API_KEY) return;
-  const { Resend } = await import('resend');
-  const resend = new Resend(process.env.RESEND_API_KEY);
-  await resend.emails.send({
-    from: 'ProofDeed System <gov@proofdeed.com>',
-    to: ADMIN_ALERT_EMAIL,
-    subject,
-    text: body,
-  });
+  if (!process.env.RESEND_API_KEY) {
+    console.error('[HealthMonitor] RESEND_API_KEY not set — cannot send alert email');
+    return;
+  }
+  try {
+    const { Resend } = await import('resend');
+    const resend = new Resend(process.env.RESEND_API_KEY);
+    const result = await resend.emails.send({
+      from: 'ProofDeed System <noreply@send.proofdeed.com>',
+      to: ADMIN_ALERT_EMAIL,
+      subject,
+      text: body,
+    });
+    console.log(`[HealthMonitor] Alert email sent to ${ADMIN_ALERT_EMAIL}`, result?.data?.id || '');
+  } catch (e) {
+    console.error('[HealthMonitor] Failed to send alert email:', e.message);
+  }
 }
 
 async function runHealthChecks() {
