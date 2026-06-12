@@ -5767,6 +5767,12 @@ function isLeadEmail(email) {
   // Domain must have a reasonable length (blocks 1-2 char domains like 1s.cf, k.ye)
   const domainWithoutTld = domain.substring(0, domain.lastIndexOf('.'));
   if (domainWithoutTld.length < 3) return false;
+  // Block known placeholder/test domains
+  const PLACEHOLDER_DOMAINS = /^(example|domain|test|sample|placeholder|email|user|company|yourcompany|yourdomain|mydomain|mycompany|acme|foo|bar|baz|lorem|ipsum|pagelines)\.com$/i;
+  if (PLACEHOLDER_DOMAINS.test(domain)) return false;
+  // Block role/generic local parts not caught by SKIP_EMAIL_PATTERNS
+  const GENERIC_LOCAL = /^(sales|marketing|billing|accounts|hr|jobs|careers|media|news|editor|editors|editorial|subscribe|subscription|newsletter|hello|hello|team|general|enquiries|enquiry|request|requests|info2|office2|recruiter)$/i;
+  if (GENERIC_LOCAL.test(local)) return false;
   return true;
 }
 
@@ -5974,12 +5980,12 @@ async function runLeadEngine(targetsPerRun = 3) {
                 ? SANDBOX_EMAIL(lead.name, lead.company, target.role)
                 : INITIAL_EMAIL(lead.name, lead.company, lead.industry || target.industry, target.role);
           const subject = isAffiliate
-            ? `Referral Partnership Opportunity — ProofDeed`
+            ? `Revenue share idea for ${lead.company}`
             : isUAE
-              ? `Aligning ${lead.company} with Dubai's 2026 Paperless Mandate`
+              ? `${lead.company} — Dubai 2026 paperless mandate`
               : isSandbox
-                ? `Pilot Opportunity: Cryptographic ${(lead.industry || target.industry).replace(/_/g,' ')} Document Integrity`
-                : `Blockchain Document Certification for ${lead.company}`;
+                ? `Document integrity pilot — ${lead.company}`
+                : `Quick question for ${lead.company}`;
 
           try {
             const fromAddr = target.industry === 'government'
@@ -6127,7 +6133,7 @@ Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
 gov@proofdeed.com | proofdeed.com`;
-    subject = `Re: Blockchain Document Certification for ${contact.company}`;
+    subject = `Re: Quick question for ${contact.company}`;
   } else if (day === 14) {
     text = `Hi ${first},
 
@@ -6145,7 +6151,7 @@ Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
 gov@proofdeed.com | proofdeed.com`;
-    subject = `Re: Blockchain Document Certification for ${contact.company}`;
+    subject = `Re: Quick question for ${contact.company}`;
   } else {
     text = `Hi ${first},
 
@@ -6161,7 +6167,7 @@ Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
 gov@proofdeed.com | proofdeed.com`;
-    subject = `Re: Blockchain Document Certification for ${contact.company}`;
+    subject = `Re: Quick question for ${contact.company}`;
   }
 
   const replyTag = crypto.randomBytes(8).toString('hex');
