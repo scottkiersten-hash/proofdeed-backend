@@ -2535,6 +2535,24 @@ async function ensureIndexes() {
 }
 ensureIndexes();
 
+/* ---------------- ONE-TIME: reset contacts sent from wrong domain ---------------- */
+async function resetWrongDomainContacts() {
+  try {
+    const flagRow = await pool.query(`SELECT value FROM lead_engine_state WHERE key='domain_reset_done'`);
+    if (flagRow.rows.length > 0 && flagRow.rows[0].value === 'true') return;
+    const result = await pool.query(`
+      DELETE FROM outreach_contacts
+      WHERE status IN ('sent','delivered','opened')
+      AND status NOT IN ('bounced','suppressed','complained','unsubscribed','replied','in_talks','closed_won','closed_lost')
+    `);
+    await pool.query(`INSERT INTO lead_engine_state (key,value,updated_at) VALUES ('domain_reset_done','true',NOW()) ON CONFLICT (key) DO UPDATE SET value='true',updated_at=NOW()`);
+    console.log(`[DomainReset] Cleared ${result.rowCount} contacts for re-outreach from correct domain.`);
+  } catch(err) {
+    console.error('[DomainReset] Error:', err.message);
+  }
+}
+resetWrongDomainContacts();
+
 /* ---------------- MONTHLY USAGE RESET ---------------- */
 // Runs at 00:00 on the 1st of every month (UTC)
 cron.schedule("0 0 1 * *", async () => {
@@ -6290,7 +6308,7 @@ async function sendAlertEmail(subject, body) {
     const { Resend } = await import('resend');
     const resend = new Resend(process.env.RESEND_API_KEY);
     const result = await resend.emails.send({
-      from: 'ProofDeed System <noreply@send.proofdeed.com>',
+      from: 'ProofDeed System <noreply@proofdeed.com>',
       to: ADMIN_ALERT_EMAIL,
       subject,
       text: body,
@@ -6573,7 +6591,7 @@ app.post(['/api/admin/send-articles', '/admin/send-articles'], authRateLimit, as
   for (const email of emails) {
     try {
       const result = await resendClient.emails.send({
-        from: 'Scott Kiersten <gov@send.proofdeed.com>',
+        from: 'Scott Kiersten <gov@proofdeed.com>',
         reply_to: 'gov@proofdeed.com',
         to: email.to,
         subject: email.subject,
