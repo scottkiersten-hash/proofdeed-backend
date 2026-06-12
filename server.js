@@ -4009,6 +4009,14 @@ const LEAD_TARGETS = [
   { industry: 'government', role: 'expansion',   tier: 'expansion', title: 'Public Records Officer',     query: '"Public Records Officer" OR "FOIA Officer" county government USA contact email' },
   { industry: 'government', role: 'expansion',   tier: 'expansion', title: 'State Records Manager',      query: '"State Records Management" director OR manager USA contact email site:*.gov' },
 
+  // ── California SB 255 Mandate Targets (58 counties must implement deed notification)
+  { industry: 'government', role: 'recorder', tier: 'primary', title: 'CA County Recorder SB255',   query: '"County Recorder" OR "County Clerk-Recorder" California "deed fraud" OR "property fraud" OR "SB 255" contact email site:*.ca.gov OR site:*.gov' },
+  { industry: 'government', role: 'recorder', tier: 'primary', title: 'Clark County Recorder',       query: '"Clark County Recorder" OR "Clark County" recorder "property fraud alert" contact email site:*.gov' },
+  { industry: 'government', role: 'recorder', tier: 'primary', title: 'El Dorado County Recorder',   query: '"El Dorado County" recorder OR "property monitoring" deed fraud contact email site:eldoradocounty.ca.gov OR site:*.gov' },
+  { industry: 'government', role: 'legal',    tier: 'primary', title: 'Ventura County REFAT',        query: '"Ventura County" "Real Estate Fraud" REFAT OR "district attorney" deed fraud contact email site:ventura.org OR site:*.gov' },
+  { industry: 'government', role: 'recorder', tier: 'primary', title: 'CA Recorder Deed Fraud',      query: 'California "County Recorder" "deed fraud" OR "title fraud" notification program contact email 2025 2026 site:*.ca.gov' },
+  { industry: 'government', role: 'recorder', tier: 'primary', title: 'CA Large County Recorders',   query: '"Los Angeles County Registrar" OR "San Diego County Recorder" OR "Orange County Clerk" recorder contact email site:*.gov' },
+
   // ════════════════════════════════════════════════════════
   // AUTOMOTIVE — proof of ownership + transaction integrity
   // ════════════════════════════════════════════════════════
