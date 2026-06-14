@@ -3975,7 +3975,7 @@ Thank you for being a ProofDeed partner.
 
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`,
+info@proofdeed.com | proofdeed.com`,
       }).catch(e => console.error(`[AffiliatePayouts] Failed to email ${aff.email}:`, e.message));
 
       console.log(`[AffiliatePayouts] Statement sent to ${aff.name} (${aff.email}) — $${aff.pending_amount}`);
@@ -4441,7 +4441,7 @@ Worth a quick call?
 
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`;
+info@proofdeed.com | proofdeed.com`;
 
   // Real estate — Operations / Sales / Asset Management / Handover
   const uae_reops = `Hi ${first},
@@ -4460,7 +4460,7 @@ Worth 20 minutes?
 
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`;
+info@proofdeed.com | proofdeed.com`;
 
   // Real estate — Legal & Compliance
   const uae_legal = `Hi ${first},
@@ -4480,7 +4480,7 @@ Worth a conversation with your team?
 
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`;
+info@proofdeed.com | proofdeed.com`;
 
   // Real estate — Customer Experience / Post-Sales / CX
   const uae_recx = `Hi ${first},
@@ -4497,7 +4497,7 @@ Worth a quick call?
 
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`;
+info@proofdeed.com | proofdeed.com`;
 
   // UAE Automotive conglomerates — import docs, title, CoO, franchise agreements
   const uae_autodev = `Hi ${first},
@@ -4516,7 +4516,7 @@ Worth a conversation?
 
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`;
+info@proofdeed.com | proofdeed.com`;
 
   const byRole = {
     uae_redev,
@@ -4558,7 +4558,7 @@ Is this worth 20 minutes?
 
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`,
+info@proofdeed.com | proofdeed.com`,
     },
 
     auto_warranty: {
@@ -4579,7 +4579,7 @@ Worth a quick conversation?
 
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`,
+info@proofdeed.com | proofdeed.com`,
     },
 
     auto_dds: {
@@ -4600,7 +4600,7 @@ Is this on your radar?
 
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`,
+info@proofdeed.com | proofdeed.com`,
     },
 
     auto_coo: {
@@ -4621,7 +4621,7 @@ Worth a conversation?
 
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`,
+info@proofdeed.com | proofdeed.com`,
     },
 
     auto_blockchain: {
@@ -4640,7 +4640,7 @@ Worth a call?
 
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`,
+info@proofdeed.com | proofdeed.com`,
     },
 
     // ── Institutional / Finance / PE
@@ -4662,7 +4662,7 @@ Is this worth 20 minutes?
 
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`,
+info@proofdeed.com | proofdeed.com`,
     },
 
     inst_fund: {
@@ -4683,7 +4683,7 @@ Worth exploring?
 
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`,
+info@proofdeed.com | proofdeed.com`,
     },
 
     inst_ma: {
@@ -4704,7 +4704,7 @@ Worth a conversation?
 
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`,
+info@proofdeed.com | proofdeed.com`,
     },
 
     inst_aml: {
@@ -4725,7 +4725,7 @@ Is this on your radar?
 
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`,
+info@proofdeed.com | proofdeed.com`,
     },
 
     inst_digital_assets: {
@@ -4746,7 +4746,7 @@ Worth exploring?
 
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`,
+info@proofdeed.com | proofdeed.com`,
     },
 
     // ── Pharma / Life Sciences — deep GXP / lab / logistics
@@ -4768,7 +4768,7 @@ Worth 20 minutes with your QA team?
 
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`,
+info@proofdeed.com | proofdeed.com`,
     },
 
     pharma_trial: {
@@ -4789,7 +4789,7 @@ Is this worth a conversation?
 
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`,
+info@proofdeed.com | proofdeed.com`,
     },
 
     pharma_serial: {
@@ -4810,7 +4810,7 @@ Worth exploring?
 
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`,
+info@proofdeed.com | proofdeed.com`,
     },
 
     pharma_lims: {
@@ -4831,7 +4831,7 @@ Is this worth a quick call?
 
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`,
+info@proofdeed.com | proofdeed.com`,
     },
 
     pharma_coldchain: {
@@ -4852,7 +4852,7 @@ Worth exploring?
 
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`,
+info@proofdeed.com | proofdeed.com`,
     },
 
     // ── Aviation / MRO — airworthiness / SMS / records
@@ -4874,7 +4874,7 @@ Worth a quick conversation?
 
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`,
+info@proofdeed.com | proofdeed.com`,
     },
 
     aviation_logistics: {
@@ -4895,7 +4895,7 @@ Is this on your radar?
 
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`,
+info@proofdeed.com | proofdeed.com`,
     },
 
     aviation_cdo: {
@@ -4916,7 +4916,7 @@ Worth a call?
 
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`,
+info@proofdeed.com | proofdeed.com`,
     },
 
     aviation_sms: {
@@ -4937,7 +4937,7 @@ Worth a conversation?
 
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`,
+info@proofdeed.com | proofdeed.com`,
     },
 
     aviation_records: {
@@ -4958,7 +4958,7 @@ Worth a conversation?
 
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`,
+info@proofdeed.com | proofdeed.com`,
     },
   };
 
@@ -4976,7 +4976,7 @@ Worth a conversation?
 
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`;
+info@proofdeed.com | proofdeed.com`;
 };
 
 const INITIAL_EMAIL = (name, company, industry, role) => {
@@ -5074,7 +5074,7 @@ Worth a 20-minute call this week?
 Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`;
+info@proofdeed.com | proofdeed.com`;
 
   // ── Auto Lender / Collateral / Lien — "lien accuracy + title chain integrity"
   const auto_lender = `Hi ${first},
@@ -5090,7 +5090,7 @@ Would 20 minutes be worth it?
 Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`;
+info@proofdeed.com | proofdeed.com`;
 
   // ── Auto Auction / Remarketing — "chain of custody for high-volume transfers"
   const auto_auction = `Hi ${first},
@@ -5108,7 +5108,7 @@ Worth a quick call?
 Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`;
+info@proofdeed.com | proofdeed.com`;
 
   // ── Institutional Compliance / Records / GRC — "audit-proof document integrity"
   const inst_compliance = `Hi ${first},
@@ -5124,7 +5124,7 @@ Worth a 20-minute conversation?
 Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`;
+info@proofdeed.com | proofdeed.com`;
 
   // ── Institutional Legal / Risk — "verifiable proof for disputes and regulatory reviews"
   const inst_legal = `Hi ${first},
@@ -5142,7 +5142,7 @@ Worth a quick call?
 Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`;
+info@proofdeed.com | proofdeed.com`;
 
   // ── Healthcare — "medical records integrity + audit trail"
   const inst_healthcare = `Hi ${first},
@@ -5158,7 +5158,7 @@ Would 20 minutes make sense this week?
 Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`;
+info@proofdeed.com | proofdeed.com`;
 
   // ── Title & Escrow — "make every closing document provable and tamper-proof"
   const title_escrow = `Hi ${first},
@@ -5212,7 +5212,7 @@ Worth a quick call to see how it fits your workflow?
 Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`;
+info@proofdeed.com | proofdeed.com`;
 
   // ── Construction & Lien — "ensure lien and waiver documents can't be challenged later"
   const construction = `Hi ${first},
@@ -5228,7 +5228,7 @@ Would 20 minutes be worth it?
 Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`;
+info@proofdeed.com | proofdeed.com`;
 
   // ── Supply Chain / Logistics — "verifiable proof of shipment documentation"
   const supply_chain = `Hi ${first},
@@ -5244,7 +5244,7 @@ Worth a quick call?
 Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`;
+info@proofdeed.com | proofdeed.com`;
 
   // ── Regulated Industries — "audit-proof regulatory records"
   const regulated = `Hi ${first},
@@ -5260,7 +5260,7 @@ Would 20 minutes make sense this week?
 Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`;
+info@proofdeed.com | proofdeed.com`;
 
   // ── Accounting / Audit — "evidence assurance layer"
   const accounting = `Hi ${first},
@@ -5276,7 +5276,7 @@ Worth a 20-minute conversation?
 Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`;
+info@proofdeed.com | proofdeed.com`;
 
   // ── Private Equity / M&A — "lock deal documents at every stage"
   const pe_ma = `Hi ${first},
@@ -5292,7 +5292,7 @@ Worth a quick call?
 Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`;
+info@proofdeed.com | proofdeed.com`;
 
   // ── PE / Institutional COO — back-office document workflow integrity
   const inst_coo = `Hi ${first},
@@ -5310,7 +5310,7 @@ Worth a 20-minute conversation?
 Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`;
+info@proofdeed.com | proofdeed.com`;
 
   // ── Head of Investor Relations — LP document security
   const inst_ir = `Hi ${first},
@@ -5328,7 +5328,7 @@ Would a brief call make sense?
 Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`;
+info@proofdeed.com | proofdeed.com`;
 
   // ── General Counsel / CCO — SEC audit trail
   const inst_gcc = `Hi ${first},
@@ -5344,7 +5344,7 @@ Worth 20 minutes this week?
 Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`;
+info@proofdeed.com | proofdeed.com`;
 
   // ── Director of Due Diligence — verify documents provided by targets
   const inst_dd = `Hi ${first},
@@ -5360,7 +5360,7 @@ Worth a quick call?
 Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`;
+info@proofdeed.com | proofdeed.com`;
 
   // ── Pharma QA/QC — ALCOA+ data integrity, CoA tamper detection
   const pharma_qa = `Hi ${first},
@@ -5378,7 +5378,7 @@ Worth 20 minutes with your QA team?
 Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`;
+info@proofdeed.com | proofdeed.com`;
 
   // ── Pharma CCO / Regulatory Affairs — FDA audit trail
   const pharma_cco = `Hi ${first},
@@ -5396,7 +5396,7 @@ Worth a brief conversation this week?
 Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`;
+info@proofdeed.com | proofdeed.com`;
 
   // ── Pharma Supply Chain — serialization + track and trace
   const pharma_supply = `Hi ${first},
@@ -5412,7 +5412,7 @@ Would a quick call make sense?
 Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`;
+info@proofdeed.com | proofdeed.com`;
 
   // ── Pharma Clinical — trial data integrity
   const pharma_clinical = `Hi ${first},
@@ -5428,7 +5428,7 @@ Worth 20 minutes to walk through the integration?
 Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`;
+info@proofdeed.com | proofdeed.com`;
 
   // ── Aviation DOM / Safety — maintenance log integrity
   const aviation_dom = `Hi ${first},
@@ -5446,7 +5446,7 @@ Worth a brief conversation?
 Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`;
+info@proofdeed.com | proofdeed.com`;
 
   // ── Aviation CTO / Digital Transformation — MRO records digitization
   const aviation_cto = `Hi ${first},
@@ -5464,7 +5464,7 @@ Worth 20 minutes?
 Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`;
+info@proofdeed.com | proofdeed.com`;
 
   // ── Aviation Parts — anti-counterfeit birth certificates
   const aviation_parts = `Hi ${first},
@@ -5482,7 +5482,7 @@ Worth a quick conversation?
 Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`;
+info@proofdeed.com | proofdeed.com`;
 
   // ── Auto OEM Supply Chain — VIN-linked document integrity
   const auto_supply = `Hi ${first},
@@ -5500,7 +5500,7 @@ Worth a quick conversation?
 Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`;
+info@proofdeed.com | proofdeed.com`;
 
   // ── Auto CDO — Digital Twin integrity
   const auto_cdo = `Hi ${first},
@@ -5516,7 +5516,7 @@ Worth 20 minutes to explore?
 Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`;
+info@proofdeed.com | proofdeed.com`;
 
   // ── Auto Remarketing / Fleet — title and service record integrity
   const auto_remarketing = `Hi ${first},
@@ -5532,7 +5532,7 @@ Would a brief call make sense?
 Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`;
+info@proofdeed.com | proofdeed.com`;
 
   // ── Auto ISO / Quality Director — parts and safety documentation
   const auto_iso = `Hi ${first},
@@ -5548,7 +5548,7 @@ Worth 20 minutes?
 Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`;
+info@proofdeed.com | proofdeed.com`;
 
   // ── County Recorder Anti-Fraud / Clouded Title
   const anti_fraud_recorder = `Hi ${first},
@@ -5566,7 +5566,7 @@ Worth a brief conversation this week?
 Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`;
+info@proofdeed.com | proofdeed.com`;
 
   // ── Secretary of State / RON / e-Notarization
   const ron_director = `Hi ${first},
@@ -5582,7 +5582,7 @@ Would a brief call make sense?
 Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`;
+info@proofdeed.com | proofdeed.com`;
 
   // ── ALTA / Title Associations / Underwriters
   const alta_title = `Hi ${first},
@@ -5600,7 +5600,7 @@ Worth 20 minutes?
 Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`;
+info@proofdeed.com | proofdeed.com`;
 
   // ── Attorney General / Fraud Unit
   const ag_fraud = `Hi ${first},
@@ -5614,7 +5614,7 @@ Would a brief conversation make sense?
 Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`;
+info@proofdeed.com | proofdeed.com`;
 
   // ── Tax Assessor — ownership data accuracy
   const tax_assessor = `Hi ${first},
@@ -5630,7 +5630,7 @@ Worth a quick call?
 Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`;
+info@proofdeed.com | proofdeed.com`;
 
   const byRole = {
     // Government
@@ -6170,7 +6170,7 @@ Would you have 20 minutes this week for a quick walkthrough?
 Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`;
+info@proofdeed.com | proofdeed.com`;
     subject = `Re: Quick question for ${contact.company}`;
   } else if (day === 14) {
     text = `Hi ${first},
@@ -6188,7 +6188,7 @@ Happy to work around your schedule if a 15-minute call makes sense.
 Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`;
+info@proofdeed.com | proofdeed.com`;
     subject = `Re: Quick question for ${contact.company}`;
   } else {
     text = `Hi ${first},
@@ -6204,7 +6204,7 @@ Either way, appreciate your time and wish you well.
 Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`;
+info@proofdeed.com | proofdeed.com`;
     subject = `Re: Quick question for ${contact.company}`;
   }
 
