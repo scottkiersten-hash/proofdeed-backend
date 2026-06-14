@@ -3407,7 +3407,7 @@ app.post(['/api/admin/import/csv', '/admin/import/csv'], authRateLimit, upload.s
       if (t.includes('legal') || t.includes('counsel') || t.includes('attorney')) return 'legal';
       if (t.includes('finance') || t.includes('financial')) return 'finance';
       if (t.includes('operations') || t.includes('ops')) return 'ops';
-      if (t.includes('record')) return 'recorder';
+      if (t.includes('record') || t.includes('clerk') || t.includes('register of deeds') || t.includes('fiscal officer')) return 'recorder';
       if (t.includes('it director') || t.includes('information technology')) return 'uae_redev';
       return 'compliance';
     };
@@ -3523,15 +3523,23 @@ app.post(['/api/admin/import/send-pending', '/admin/import/send-pending'], authR
         try {
           const replyTag = crypto.randomBytes(8).toString('hex');
           const isUAE = ['uae_realestate','uae_auto'].includes(contact.industry);
+          // Fall back to the best role for the industry when role is generic
+          const industryDefaultRole = {
+            government: 'recorder', title_escrow: 'title_ops', legal: 'transact',
+            auto: 'dealer', construction: 'lien', pe_ma: 'deal',
+          }[contact.industry] || 'compliance';
           const emailBody = isUAE
             ? UAE_EMAIL(contact.name, contact.company, contact.role || 'uae_redev')
-            : INITIAL_EMAIL(contact.name, contact.company, contact.industry, contact.role || 'compliance');
+            : INITIAL_EMAIL(contact.name, contact.company, contact.industry, contact.role || industryDefaultRole);
           const subject = isUAE
             ? `Aligning ${contact.company} with Dubai's 2026 Paperless Mandate`
-            : `Blockchain Document Certification for ${contact.company}`;
+            : `Quick question for ${contact.company}`;
+          const fromAddr = contact.industry === 'government'
+            ? 'Scott Kiersten <gov@proofdeed.com>'
+            : 'Scott Kiersten <info@proofdeed.com>';
 
           await resend.emails.send({
-            from: 'Scott Kiersten <gov@proofdeed.com>',
+            from: fromAddr,
             reply_to: `reply+${replyTag}@proofdeed.com`,
             to: contact.email,
             subject,
