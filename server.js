@@ -3388,7 +3388,9 @@ app.post(['/api/admin/import/csv', '/admin/import/csv'], authRateLimit, upload.s
       if (s.includes('legal') || s.includes('law')) return 'legal';
       if (s.includes('construction')) return 'construction';
       if (s.includes('hospital') || s.includes('health') || s.includes('medical')) return 'healthcare';
-      if (s.includes('education') || s.includes('university') || s.includes('college')) return 'education';
+      if (s.includes('education') || s.includes('university') || s.includes('college') || s.includes('credentialing') || s.includes('licensing board')) return 'education';
+      if (s.includes('logistics') || s.includes('freight') || s.includes('transportation') || s.includes('supply chain')) return 'supply_chain';
+      if (s.includes('research') || s.includes('r&d') || s.includes('intellectual property') || s.includes('software')) return 'ip_research';
       return 'institutional'; // default
     };
 
@@ -3527,7 +3529,8 @@ app.post(['/api/admin/import/send-pending', '/admin/import/send-pending'], authR
           const industryDefaultRole = {
             government: 'recorder', title_escrow: 'title_ops', legal: 'transact',
             auto: 'dealer', construction: 'lien', pe_ma: 'deal',
-            healthcare: 'healthcare',
+            healthcare: 'healthcare', supply_chain: 'trade_docs',
+            education: 'education', ip_research: 'ip_timestamp', insurance: 'claims',
           }[contact.industry] || 'compliance';
           const emailBody = isUAE
             ? UAE_EMAIL(contact.name, contact.company, contact.role || 'uae_redev')
@@ -5204,13 +5207,15 @@ info@proofdeed.com | proofdeed.com`;
   // ── Insurance (non-auto) — "prove claim documents haven't been altered"
   const insurance_gen = `Hi ${first},
 
-When a claim goes into dispute or a fraud investigation, the question your team faces is: can you prove the claim documents are unchanged from when they were submitted? Altered policies, backdated records, tampered loss documentation — if you can't prove integrity independently, you're vulnerable.
+Insurance fraud schemes succeed because claim photos, damage estimates, and loss documentation are easy to alter before submission — and by the time your SIU team investigates, there's no way to prove what the original showed. Photoshopped damage, inflated repair estimates, backdated reports: the manipulation happens before it ever reaches your desk.
 
-ProofDeed creates a blockchain-anchored certificate for every claim document at the moment it's processed — tamper-proof, independently verifiable proof under FRE Rule 901. No system replacement. Single API call.
+ProofDeed lets your field adjusters cryptographically fingerprint claim photos and repair estimates the second they're created — making it impossible for claimants to alter values after the fact. Each document gets a tamper-proof, court-admissible certificate under FRE Rule 901. No app for claimants. No system replacement. Single API call for your adjusters.
+
+Under $1 per report. Live in days.
 
 See it in 2 minutes: proofdeed.com/demo
 
-Worth a quick call to see how it fits your workflow?
+Worth a 20-minute call with your SIU or claims team?
 
 Best,
 Scott Kiersten
@@ -5233,16 +5238,54 @@ Scott Kiersten
 Founder & CEO, ProofDeed
 info@proofdeed.com | proofdeed.com`;
 
-  // ── Supply Chain / Logistics — "verifiable proof of shipment documentation"
+  // ── Supply Chain / Logistics — "Bill of Lading fraud + cargo-cloning prevention"
   const supply_chain = `Hi ${first},
 
-Bill of lading disputes, altered delivery records, tampered customs documentation — when a shipment claim goes into dispute, the documentation is the evidence. If you can't prove the document's integrity at the moment it was created, you're arguing about the paper instead of the shipment.
+Freight cargo theft and bill of lading fraud cost carriers billions annually — not because systems fail, but because PDF and digital documents can be altered in transit without leaving a trace. By the time a shipment dispute reaches your legal team, it's impossible to prove which version of the document is original.
 
-ProofDeed anchors trade and logistics documents to the Polygon blockchain at the moment they're processed — tamper-proof, independently verifiable proof under FRE Rule 901. No system replacement. Single API call.
+ProofDeed anchors your digital Bills of Lading to a cryptographic ledger at the origin point — stopping cargo-cloning and chain-of-custody fraud before it reaches the destination gate. Every document gets a tamper-proof certificate that's independently verifiable under FRE Rule 901. No system replacement. Single API call.
+
+Under $1 per document. Live in days.
 
 See it in 2 minutes: proofdeed.com/demo
 
-Worth a quick call?
+Worth a 20-minute call this week?
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+info@proofdeed.com | proofdeed.com`;
+
+  // ── Academic / Professional Credentialing — "un-copyable digital credentials"
+  const credentialing = `Hi ${first},
+
+Diploma mills and credential fraud cost employers millions annually — and the institutions that issued the credentials bear reputational liability they didn't create. The problem: most verification systems require checking back with your office. If your records system is unavailable, or a credential is forged entirely, there's no independent proof.
+
+ProofDeed turns diplomas and certificates into un-copyable digital credentials. At issuance, each credential is anchored to the Polygon blockchain — employers can instantly self-verify for free without contacting your office, and no forged document can replicate the cryptographic proof. Self-authenticating under FRE Rule 901.
+
+No records system replacement. Under $1 per credential. Live in days.
+
+See it in 2 minutes: proofdeed.com/demo
+
+Worth a 20-minute call?
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+info@proofdeed.com | proofdeed.com`;
+
+  // ── IP / R&D / Tech — "prior-art timestamp without revealing trade secrets"
+  const ip_timestamp = `Hi ${first},
+
+In patent disputes and trade secret litigation, the first question is always: who created this first, and can they prove it independently? Invention disclosures dated in internal systems don't hold up in court — judges want proof that wasn't controlled by the party claiming priority.
+
+ProofDeed locks an encrypted cryptographic timestamp of your code, design files, or trade secret documents onto the public ledger the moment they're created — securing bulletproof prior-art proof without exposing the contents. If ownership is ever challenged, you prove creation date in seconds under FRE Rule 901.
+
+No document storage on our end. Under $1 per file. Takes minutes to integrate.
+
+See it in 2 minutes: proofdeed.com/demo
+
+Would 20 minutes make sense?
 
 Best,
 Scott Kiersten
@@ -5653,7 +5696,8 @@ info@proofdeed.com | proofdeed.com`;
     // Institutional
     compliance:     inst_compliance,
     operations:     inst_compliance,
-    education:      inst_compliance,
+    education:      credentialing,
+    ip_timestamp:   ip_timestamp,
     financial:      inst_legal,
     healthcare:     inst_healthcare,
     // Title & Escrow
@@ -5740,6 +5784,10 @@ info@proofdeed.com | proofdeed.com`;
 
   // Industry-based overrides — ensure the right template regardless of role assignment
   if (industry === 'healthcare') return inst_healthcare;
+  if (industry === 'supply_chain') return supply_chain;
+  if (industry === 'ip_research') return ip_timestamp;
+  if (industry === 'insurance') return insurance_gen;
+  if (industry === 'education') return credentialing;
 
   return byRole[role] || recorder;
 };
