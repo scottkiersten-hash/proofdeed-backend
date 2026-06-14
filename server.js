@@ -4979,7 +4979,7 @@ const INITIAL_EMAIL = (name, company, industry, role) => {
 
 When a recorded document gets challenged — contested deed, disputed filing, chain-of-title dispute — your office has to prove it. The question isn't whether it's in your system. It's whether you can prove it hasn't been altered.
 
-ProofDeed anchors documents to the Polygon blockchain at the moment of recording. Every document gets a tamper-proof, timestamped certificate that satisfies FRE Rule 901 in court. No system replacement. No document storage. Works alongside your existing workflow via API — live in days.
+ProofDeed anchors documents to the Polygon blockchain at the moment of recording. Every document gets a tamper-proof, timestamped certificate that satisfies FRE Rule 901 in court. No system replacement. No document storage. No IT required. Works alongside your existing workflow — live in days, under $1 per recording.
 
 Several county offices are using this to get ahead of fraud liability before it becomes a headline.
 
@@ -5155,11 +5155,11 @@ gov@proofdeed.com | proofdeed.com`;
   // ── Title & Escrow — "make every closing document provable and tamper-proof"
   const title_escrow = `Hi ${first},
 
-Every real estate closing generates documents that can be disputed years later — deeds, settlement statements, wire instructions. Title fraud and post-closing disputes are rising, and the difference between a clean resolution and litigation is whether you can prove document integrity at the moment of closing.
+Every real estate closing generates documents that can be disputed years later — deeds, settlement statements, wire instructions. The problem most agencies don't realize: standard PDFs can be altered after signing without triggering any alert, making it impossible to prove what was in the document at the moment of closing.
 
-ProofDeed certifies every closing document at the field level — buyer name, sale price, legal description, recording date — each individually hashed on the Polygon blockchain the moment it's processed. If a single field is ever altered, it's immediately detectable. Buyers get a public verification link. You get court-admissible proof under FRE Rule 901.
+ProofDeed anchors every closing document to the Polygon blockchain the instant it's processed — buyer name, sale price, legal description, recording date, all individually locked. If a single field is ever changed, it's immediately detectable. Buyers get a public verification link. You get court-admissible proof under FRE Rule 901.
 
-Integrates via API into your existing closing software. No system replacement. Live in a day.
+No software to install. No IT required. Works alongside your existing closing platform. Under $1 per file, live in a day.
 
 See it in 2 minutes: proofdeed.com/demo
 
@@ -5168,14 +5168,18 @@ Worth a 20-minute call this week?
 Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`;
+info@proofdeed.com | proofdeed.com`;
 
   // ── Legal / Law Firms — "lock document integrity at creation so it holds up in court"
   const legal_firm = `Hi ${first},
 
-The most damaging thing opposing counsel can do is allege a document was altered after creation. If you can't prove it's unchanged from the moment it was drafted, you're defending the document instead of the case.
+With AI editing tools and deepfake technology now capable of altering signed documents without a trace, proving the exact date and authenticity of a deed, will, or trust in court has become a serious liability for estate and real estate attorneys.
 
-ProofDeed certifies legal documents at the field level — party names, dates, amounts, terms — each individually hashed on the Polygon blockchain at the moment of creation. If opposing counsel claims a figure was changed after signing, you prove it in seconds. Independently verifiable by any court under FRE Rule 901. No system changes, no document storage.
+The most damaging thing opposing counsel can do is allege a document was altered after creation — and if you can't prove otherwise independently, you're defending the document instead of the case.
+
+ProofDeed creates an immutable chain of custody for your firm's documents — party names, dates, amounts, terms — each individually hashed on the Polygon blockchain at the moment of creation. Documents become self-authenticating under FRE Rule 901. If opposing counsel claims anything was changed after signing, you prove it in seconds.
+
+No system changes. No IT required. Under $1 per document.
 
 See it in 2 minutes: proofdeed.com/demo
 
@@ -5184,7 +5188,7 @@ Would 20 minutes make sense?
 Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`;
+info@proofdeed.com | proofdeed.com`;
 
   // ── Insurance (non-auto) — "prove claim documents haven't been altered"
   const insurance_gen = `Hi ${first},
