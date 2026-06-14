@@ -3397,18 +3397,18 @@ app.post(['/api/admin/import/csv', '/admin/import/csv'], authRateLimit, upload.s
       const t = (title || '').toLowerCase();
       if (t.includes('chief digital') || t.includes('cdo')) return 'uae_redev';
       if (t.includes('chief technology') || t.includes('cto')) return 'uae_redev';
-      if (t.includes('chief information') || t.includes('cio')) return 'uae_redev';
+      if (t.includes('chief information') || t.includes('cio')) return 'it';
       if (t.includes('chief compliance') || t.includes('cco')) return 'compliance';
       if (t.includes('chief operating') || t.includes('coo')) return 'ops';
       if (t.includes('digital transform')) return 'uae_redev';
-      if (t.includes('compliance')) return 'compliance';
+      if (t.includes('compliance') || t.includes('integrity')) return 'compliance';
       if (t.includes('supply chain')) return 'auto_supply';
       if (t.includes('quality') || t.includes('qc') || t.includes('qa')) return 'pharma_qa';
       if (t.includes('legal') || t.includes('counsel') || t.includes('attorney')) return 'legal';
       if (t.includes('finance') || t.includes('financial')) return 'finance';
       if (t.includes('operations') || t.includes('ops')) return 'ops';
       if (t.includes('record') || t.includes('clerk') || t.includes('register of deeds') || t.includes('fiscal officer')) return 'recorder';
-      if (t.includes('it director') || t.includes('information technology')) return 'uae_redev';
+      if (t.includes('it director') || t.includes('information technology') || t.includes('it security') || t.includes('it infrastructure') || t.includes('cyber')) return 'it';
       return 'compliance';
     };
 
@@ -3527,6 +3527,7 @@ app.post(['/api/admin/import/send-pending', '/admin/import/send-pending'], authR
           const industryDefaultRole = {
             government: 'recorder', title_escrow: 'title_ops', legal: 'transact',
             auto: 'dealer', construction: 'lien', pe_ma: 'deal',
+            healthcare: 'healthcare',
           }[contact.industry] || 'compliance';
           const emailBody = isUAE
             ? UAE_EMAIL(contact.name, contact.company, contact.role || 'uae_redev')
@@ -5144,16 +5145,18 @@ Scott Kiersten
 Founder & CEO, ProofDeed
 info@proofdeed.com | proofdeed.com`;
 
-  // ── Healthcare — "medical records integrity + audit trail"
+  // ── Healthcare — "tamper-proof EHR + compliance audit trail"
   const inst_healthcare = `Hi ${first},
 
-When a patient record, consent form, or clinical document is disputed — in litigation, an audit, or a regulatory review — your organization has to prove it hasn't been altered. Most EHR and records systems log access but can't independently prove document integrity to a court or regulator.
+When a patient record, prescription, or clinical document gets disputed — in litigation, a federal audit, or a CMS review — your organization has to prove it hasn't been altered. Most EHR systems log who accessed a record. None of them can prove the content hasn't changed since it was created.
 
-ProofDeed anchors documents to the Polygon blockchain at the moment they're processed — tamper-proof, independently verifiable proof that holds up under FRE Rule 901 and strengthens your audit trail. No system replacement. Single API call.
+With AI tools now capable of altering scanned documents without a trace, that gap is a liability. Under HIPAA, CMS, and Joint Commission standards, document integrity isn't optional — but most compliance programs have no independent proof layer.
+
+ProofDeed anchors each record to the Polygon blockchain at the moment it's processed — patient name, dates, clinical data, all individually hashed. If a single field is changed after the fact, it's immediately detectable. Self-authenticating under FRE Rule 901. No system replacement. Under $1 per record.
 
 See it in 2 minutes: proofdeed.com/demo
 
-Would 20 minutes make sense this week?
+Would a 20-minute call make sense this week?
 
 Best,
 Scott Kiersten
@@ -5734,6 +5737,9 @@ info@proofdeed.com | proofdeed.com`;
     ops:            inst_compliance,
     finance:        inst_legal,
   };
+
+  // Industry-based overrides — ensure the right template regardless of role assignment
+  if (industry === 'healthcare') return inst_healthcare;
 
   return byRole[role] || recorder;
 };
