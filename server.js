@@ -3378,7 +3378,9 @@ app.post(['/api/admin/import/csv', '/admin/import/csv'], authRateLimit, upload.s
     // Determine industry from Apollo industry string
     const mapIndustry = (apolloIndustry) => {
       const s = (apolloIndustry || '').toLowerCase();
+      if (s.includes('proptech') || s.includes('real estate services') || s.includes('real estate investment') || s.includes('reit') || s.includes('real estate technology')) return 'real_estate';
       if (s.includes('real estate') || s.includes('property')) return 'title_escrow';
+      if (s.includes('government regulator') || s.includes('regulatory authority') || s.includes('tax authority') || s.includes('financial regulator') || s.includes('law enforcement') || s.includes('central bank') || s.includes('audit institution') || s.includes('anti-fraud') || s.includes('anti-corruption')) return 'gov_regulator';
       if (s.includes('government') || s.includes('public') || s.includes('municipal')) return 'government';
       if (s.includes('pharma') || s.includes('biotech') || s.includes('life science')) return 'pharma';
       if (s.includes('aviation') || s.includes('aerospace') || s.includes('airline')) return 'aviation';
@@ -3388,6 +3390,7 @@ app.post(['/api/admin/import/csv', '/admin/import/csv'], authRateLimit, upload.s
       if (s.includes('legal') || s.includes('law')) return 'legal';
       if (s.includes('construction')) return 'construction';
       if (s.includes('hospital') || s.includes('health') || s.includes('medical')) return 'healthcare';
+      if (s.includes('higher education') || s.includes('research institution') || s.includes('research university')) return 'university_research';
       if (s.includes('education') || s.includes('university') || s.includes('college') || s.includes('credentialing') || s.includes('licensing board')) return 'education';
       if (s.includes('logistics') || s.includes('freight') || s.includes('transportation') || s.includes('supply chain')) return 'supply_chain';
       if (s.includes('blockchain') || s.includes('web3') || s.includes('crypto') || s.includes('defi')) return 'blockchain_tech';
@@ -3539,6 +3542,8 @@ app.post(['/api/admin/import/send-pending', '/admin/import/send-pending'], authR
             education: 'education', ip_research: 'ip_timestamp', insurance: 'claims',
             blockchain_tech: 'blockchain_partner', auto_oem: 'auto_oem', pharma: 'pharma_cco',
             intl_archives: 'intl_archives', global_legal: 'global_law_firm', global_insurance: 'global_insurance',
+            real_estate: 'real_estate_ops', university_research: 'university_research',
+            gov_regulator: 'gov_regulator', construction_detail: 'construction_eng',
           }[contact.industry] || 'compliance';
           const emailBody = isUAE
             ? UAE_EMAIL(contact.name, contact.company, contact.role || 'uae_redev')
@@ -3546,7 +3551,7 @@ app.post(['/api/admin/import/send-pending', '/admin/import/send-pending'], authR
           const subject = isUAE
             ? `Aligning ${contact.company} with Dubai's 2026 Paperless Mandate`
             : `Quick question for ${contact.company}`;
-          const fromAddr = contact.industry === 'government'
+          const fromAddr = (contact.industry === 'government' || contact.industry === 'gov_regulator')
             ? 'Scott Kiersten <gov@proofdeed.com>'
             : 'Scott Kiersten <info@proofdeed.com>';
 
@@ -5776,6 +5781,78 @@ Scott Kiersten
 Founder & CEO, ProofDeed
 info@proofdeed.com | proofdeed.com`;
 
+  // ── Real Estate / PropTech — transaction document fraud, deed/agreement tampering
+  const real_estate = `Hi Team,
+
+Property transaction fraud is surging. Forged deeds, altered purchase agreements, and backdated lease amendments are being used to challenge title, dispute valuations, and manufacture claims in commercial and residential disputes. When a document's authenticity is challenged in court, the producing party has to prove it wasn't altered — without a chain of custody that starts at creation, that defense is expensive and uncertain.
+
+ProofDeed creates a cryptographic certificate for every executed agreement, deed, or closing document at the moment it is processed — tamper-proof proof of exactly what was in the document and when. Independently verifiable by any court without access to your systems. Court-admissible under FRE Rule 901. No process change for agents or attorneys.
+
+Under $1 per document. No system replacement. Works alongside your existing DMS.
+
+See it in 2 minutes: proofdeed.com/demo
+
+Worth a 20-minute call?
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+info@proofdeed.com | proofdeed.com`;
+
+  // ── University / Research — research integrity, data fabrication, retraction risk
+  const university_research = `Hi Team,
+
+Research data fabrication and document tampering are behind the majority of high-profile retractions — and increasingly the target of federal investigation. IRB files, lab notebooks, clinical datasets, and grant applications can all be altered after the fact, with no independent record of what was originally submitted. When misconduct is alleged, the institution carries the burden of proof.
+
+ProofDeed creates a cryptographic timestamp for research records at the moment they are created or submitted — tamper-proof, independently verifiable proof of the original document. Any auditor, federal agency, or institutional review board can verify the record's integrity without accessing your internal systems. Self-authenticating under FRE Rule 901.
+
+Under $1 per document. No workflow change required.
+
+See it in 2 minutes: proofdeed.com/demo
+
+Worth a 20-minute call with your research integrity or compliance office?
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+info@proofdeed.com | proofdeed.com`;
+
+  // ── Government Regulators / Enforcement — evidence integrity, audit documentation
+  const gov_regulator = `Hi Team,
+
+Enforcement actions fail when evidence integrity is challenged. Investigation documents, audit records, and regulatory findings can be questioned for authenticity — costing agencies years of litigation and, in some cases, entire prosecutions. The question is not whether your records are accurate. It is whether you can prove they were not altered after the fact.
+
+ProofDeed creates an independent, cryptographic chain of custody for investigation files, audit reports, and regulatory findings at the moment they are generated — verifiable by any court or oversight body globally without relying on your internal infrastructure. If the integrity of a record is ever challenged, the answer is immediate.
+
+Under $1 per record. Single API integration. No system replacement.
+
+See it in 2 minutes: proofdeed.com/demo
+
+Worth a brief call with your records, digital evidence, or compliance team?
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+gov@proofdeed.com | proofdeed.com`;
+
+  // ── Construction / Engineering — contract dispute documentation, claims evidence
+  const construction_eng = `Hi Team,
+
+Construction disputes — change order fraud, backdated RFIs, altered scope-of-work documents — succeed because the producing party cannot prove what was in the document at the time it was issued. By the time arbitration or litigation begins, document integrity has been compromised and both sides are working from competing versions.
+
+ProofDeed creates a cryptographic timestamp for every contract, RFI, change order, and progress report at the moment it is issued — establishing an immutable record of the original document. If authenticity is ever disputed, proof is immediate. Court-admissible under FRE Rule 901.
+
+Under $1 per document. Single API integration alongside your existing document management system.
+
+See it in 2 minutes: proofdeed.com/demo
+
+Worth a 20-minute call?
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+info@proofdeed.com | proofdeed.com`;
+
   const byRole = {
     // Government
     recorder:       recorder,
@@ -5801,6 +5878,10 @@ info@proofdeed.com | proofdeed.com`;
     intl_archives:       intl_archives,
     global_law_firm:     global_law_firm,
     global_insurance:    global_insurance,
+    real_estate_ops:     real_estate,
+    university_research: university_research,
+    gov_regulator:       gov_regulator,
+    construction_eng:    construction_eng,
     financial:      inst_legal,
     healthcare:     inst_healthcare,
     // Title & Escrow
@@ -5897,6 +5978,10 @@ info@proofdeed.com | proofdeed.com`;
   if (industry === 'intl_archives') return intl_archives;
   if (industry === 'global_legal') return global_law_firm;
   if (industry === 'global_insurance') return global_insurance;
+  if (industry === 'real_estate') return real_estate;
+  if (industry === 'university_research') return university_research;
+  if (industry === 'gov_regulator') return gov_regulator;
+  if (industry === 'construction_detail') return construction_eng;
 
   return byRole[role] || recorder;
 };
