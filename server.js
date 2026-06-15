@@ -4510,6 +4510,90 @@ const LEAD_TARGETS = [
     query: 'site:news.chubb.com "Kevin-Rampe-Global-Head-of-Claims" email contact press media' },
 
   // ════════════════════════════════════════════════════════
+  // TITLE INSURANCE — First American Financial
+  // ════════════════════════════════════════════════════════
+  { industry: 'title_escrow', role: 'title_closer', tier: 'primary', title: 'Paul Hurst — First American CIO',
+    query: '"Paul Hurst" "First American" email contact OR speaker OR conference OR interview OR podcast' },
+  { industry: 'title_escrow', role: 'title_closer', tier: 'primary', title: 'Mark Seaton — First American CEO',
+    query: '"Mark Seaton" "First American" email contact OR speaker OR conference OR interview OR podcast' },
+
+  // TITLE INSURANCE — Stewart Title
+  // ════════════════════════════════════════════════════════
+  { industry: 'title_escrow', role: 'title_closer', tier: 'primary', title: 'Jonathan Snyman — Stewart Title Compliance',
+    query: '"Jonathan Snyman" "Stewart" email contact OR speaker OR conference OR interview' },
+  { industry: 'title_escrow', role: 'title_closer', tier: 'primary', title: 'Karen Decker — Stewart Title Underwriting',
+    query: '"Karen Decker" "Stewart Title" email contact OR speaker OR conference OR interview' },
+  { industry: 'title_escrow', role: 'title_closer', tier: 'primary', title: 'Frank Maggisano — Stewart Title Claims',
+    query: '"Frank Maggisano" "Stewart" email contact OR speaker OR conference OR interview' },
+  { industry: 'title_escrow', role: 'title_closer', tier: 'primary', title: 'Ben Gunning — Stewart Title Technology',
+    query: '"Ben Gunning" "Stewart" email contact OR speaker OR conference OR interview' },
+  { industry: 'title_escrow', role: 'title_closer', tier: 'primary', title: 'Brad Rable — Stewart Title CIO',
+    query: '"Brad Rable" "Stewart" email contact OR speaker OR conference OR interview OR podcast' },
+  { industry: 'title_escrow', role: 'title_closer', tier: 'primary', title: 'Louis Pontani — Stewart Title Operations',
+    query: '"Louis Pontani" "Stewart" email contact OR speaker OR conference OR interview' },
+  // Scrape Stewart leadership pages directly
+  { industry: 'title_escrow', role: 'title_closer', tier: 'primary', title: 'Leadership emails — Stewart Title Canada',
+    query: 'site:stewart.ca "leadership-team" email contact' },
+  { industry: 'title_escrow', role: 'title_closer', tier: 'primary', title: 'Leadership emails — Stewart Title US',
+    query: 'site:investors.stewart.com "executive-team" email contact' },
+
+  // ════════════════════════════════════════════════════════
+  // COMMERCIAL REAL ESTATE — CBRE
+  // ════════════════════════════════════════════════════════
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Anuj Kadyan — CBRE CTO Transformation',
+    query: '"Anuj Kadyan" "CBRE" email contact OR speaker OR conference OR interview OR podcast' },
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Sandeep Dave — CBRE Chief Digital Officer',
+    query: '"Sandeep Dave" OR "Sandeep Davé" "CBRE" email contact OR speaker OR conference OR interview' },
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Umesh Patel — CBRE CIO',
+    query: '"Umesh Patel" "CBRE" email contact OR speaker OR conference OR interview OR podcast' },
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Alison Bell — CBRE Global Digital Strategy',
+    query: '"Alison Bell" "CBRE" email contact OR speaker OR conference OR interview' },
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Ampily Vijay — CBRE CDTO Operations',
+    query: '"Ampily Vijay" "CBRE" email contact OR speaker OR conference OR interview' },
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Chad Doellinger — CBRE Legal Governance',
+    query: '"Chad Doellinger" "CBRE" email contact OR speaker OR conference OR interview' },
+  // Scrape CBRE leadership pages
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Leadership emails — CBRE Executive',
+    query: 'site:ir.cbre.com "executive-leadership" email contact' },
+
+  // ════════════════════════════════════════════════════════
+  // COMMERCIAL REAL ESTATE — JLL
+  // ════════════════════════════════════════════════════════
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'George Thomas — JLL Global CIO',
+    query: '"George Thomas" "JLL" email contact OR speaker OR conference OR interview OR podcast' },
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Yao Morin — JLL CTO',
+    query: '"Yao Morin" "JLL" email contact OR speaker OR conference OR interview OR podcast' },
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Mihir Shah — JLL Technologies CEO',
+    query: '"Mihir Shah" "JLL" OR "JLL Technologies" email contact OR speaker OR conference OR interview' },
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Alan Tse — JLL Chief Legal Officer',
+    query: '"Alan Tse" "JLL" email contact OR speaker OR conference OR interview' },
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Sharad Rastogi — JLL Technology Transformation',
+    query: '"Sharad Rastogi" "JLL" email contact OR speaker OR conference OR interview' },
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Daniel Russo — JLL PropTech',
+    query: '"Daniel Russo" "JLL" email contact OR speaker OR conference OR interview' },
+  // Scrape JLL leadership pages
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Leadership emails — JLL Global',
+    query: 'site:jll.com "leadership" "bio-leader" email contact' },
+
+  // ════════════════════════════════════════════════════════
+  // TITLE INSURANCE — Fidelity National + Old Republic (role-based searches)
+  // ════════════════════════════════════════════════════════
+  { industry: 'title_escrow', role: 'title_closer', tier: 'primary', title: 'CDO / Fraud Prevention — Fidelity National Financial',
+    query: '"Fidelity National Financial" "Chief Digital Officer" OR "Head of Fraud Prevention" OR "Chief Underwriting Counsel" email contact site:linkedin.com OR site:fnf.com' },
+  { industry: 'title_escrow', role: 'title_closer', tier: 'primary', title: 'CIO / Claims — Old Republic Title',
+    query: '"Old Republic Title" "Chief Information Officer" OR "VP Claims" OR "Chief Underwriting Counsel" email contact site:linkedin.com OR site:oldrepublictitle.com' },
+
+  // ════════════════════════════════════════════════════════
+  // MORTGAGE — Rocket Mortgage, Mr. Cooper, Pennymac
+  // ════════════════════════════════════════════════════════
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Head of Mortgage Technology — Rocket Mortgage',
+    query: '"Rocket Mortgage" "Head of Mortgage Technology" OR "VP Digital Mortgage" OR "Document Management" director email contact site:linkedin.com' },
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Chief Risk Officer — Mr. Cooper',
+    query: '"Mr. Cooper" "Chief Risk Officer" OR "Head of Servicing Operations" OR "VP Enterprise Records" email contact site:linkedin.com OR site:mrcooper.com' },
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Chief Compliance Officer — Pennymac',
+    query: '"Pennymac" "Chief Compliance Officer" OR "VP Loan Operations" OR "Digital Transformation" director email contact site:linkedin.com OR site:pennymac.com' },
+
+  // ════════════════════════════════════════════════════════
   // CLINICALTRIALS.GOV — real PI/contact emails via direct API
   // source:'clinicaltrials' routes to searchLeadsViaClinicalTrials()
   // ════════════════════════════════════════════════════════
