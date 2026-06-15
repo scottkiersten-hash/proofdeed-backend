@@ -3391,6 +3391,9 @@ app.post(['/api/admin/import/csv', '/admin/import/csv'], authRateLimit, upload.s
       if (s.includes('education') || s.includes('university') || s.includes('college') || s.includes('credentialing') || s.includes('licensing board')) return 'education';
       if (s.includes('logistics') || s.includes('freight') || s.includes('transportation') || s.includes('supply chain')) return 'supply_chain';
       if (s.includes('blockchain') || s.includes('web3') || s.includes('crypto') || s.includes('defi')) return 'blockchain_tech';
+      if (s.includes('archives') || s.includes('records management') || s.includes('preservation')) return 'intl_archives';
+      if (s.includes('global legal') || s.includes('global law')) return 'global_legal';
+      if (s.includes('global insurance')) return 'global_insurance';
       if (s.includes('research') || s.includes('r&d') || s.includes('intellectual property') || s.includes('software')) return 'ip_research';
       if (s.includes('pharmaceutical') || s.includes('pharma') || s.includes('drug') || s.includes('biotech')) return 'pharma';
       if (s.includes('automotive manufacturing') || s.includes('auto manufacturing') || s.includes('motor vehicle') || s.includes('vehicle manufacturer')) return 'auto_oem';
@@ -3535,6 +3538,7 @@ app.post(['/api/admin/import/send-pending', '/admin/import/send-pending'], authR
             healthcare: 'healthcare', supply_chain: 'trade_docs',
             education: 'education', ip_research: 'ip_timestamp', insurance: 'claims',
             blockchain_tech: 'blockchain_partner', auto_oem: 'auto_oem', pharma: 'pharma_cco',
+            intl_archives: 'intl_archives', global_legal: 'global_law_firm', global_insurance: 'global_insurance',
           }[contact.industry] || 'compliance';
           const emailBody = isUAE
             ? UAE_EMAIL(contact.name, contact.company, contact.role || 'uae_redev')
@@ -5278,6 +5282,60 @@ Scott Kiersten
 Founder & CEO, ProofDeed
 info@proofdeed.com | proofdeed.com`;
 
+  // ── International Government Archives — vendor-independent preservation
+  const intl_archives = `Hi Team,
+
+Government records outlive the software they were created in. When a vendor changes platforms, loses a contract, or shuts down — the records remain, but the ability to independently verify their integrity often doesn't. Future courts, auditors, and citizens need proof that doesn't depend on your current system still being operational.
+
+ProofDeed creates a permanent, vendor-independent integrity layer for every record at the moment it's processed. Each document receives a cryptographic certificate anchored to a public blockchain — independently verifiable by any court, auditor, or records requester worldwide, regardless of what happens to your internal infrastructure over time. When systems migrate, the proof stays with the record permanently.
+
+Under $1 per record. Single API integration. Live in days.
+
+See it in 2 minutes: proofdeed.com/demo
+
+Worth a 20-minute conversation?
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+info@proofdeed.com | proofdeed.com`;
+
+  // ── Global Law Firms — eDiscovery chain of custody + AI document tampering
+  const global_law_firm = `Hi Team,
+
+Document authenticity disputes are becoming the defining issue in complex litigation. With AI tools now capable of altering signed contracts, executed agreements, and court-filed documents without a trace, opposing counsel has a new attack vector: allege the document was modified after execution and force the producing party to prove otherwise.
+
+Most firms have eDiscovery infrastructure for finding and producing documents. Very few have independent, tamper-proof chain of custody starting at the moment of document creation — the layer that shuts down authenticity challenges in seconds rather than defending them for months.
+
+ProofDeed creates a cryptographic certificate at the moment any document is processed — independently verifiable by any court globally without access to your internal systems. Under $1 per document. No system replacement. Can be white-labeled or recommended to clients as a document integrity standard.
+
+See it in 2 minutes: proofdeed.com/demo
+
+Worth a 20-minute call with your innovation or eDiscovery team?
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+info@proofdeed.com | proofdeed.com`;
+
+  // ── Global Insurance — international claims fraud + field adjuster fingerprinting
+  const global_insurance = `Hi Team,
+
+Insurance fraud schemes succeed because claim photos, damage estimates, and loss documentation are easy to alter before submission. By the time your investigation team reviews a claim, the original record may be unrecoverable. Inflated repair estimates, backdated reports, and photoshopped damage photos — the manipulation happens before the document reaches your desk.
+
+ProofDeed lets field adjusters cryptographically fingerprint claim photos and repair estimates at the moment they are created — making it impossible to alter values after the fact. Each document gets a tamper-proof certificate independently verifiable by any court or regulator worldwide. No app for claimants. Single API call for your adjusters.
+
+Under $1 per report. Live in days.
+
+See it in 2 minutes: proofdeed.com/demo
+
+Worth a 20-minute call with your claims or fraud team?
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+info@proofdeed.com | proofdeed.com`;
+
   // ── Blockchain/Tech Companies — partnership/integration angle
   const blockchain_partner = `Hi ${first},
 
@@ -5738,8 +5796,11 @@ info@proofdeed.com | proofdeed.com`;
     operations:     inst_compliance,
     education:         credentialing,
     ip_timestamp:      ip_timestamp,
-    blockchain_partner: blockchain_partner,
-    auto_oem:          auto_oem,
+    blockchain_partner:  blockchain_partner,
+    auto_oem:            auto_oem,
+    intl_archives:       intl_archives,
+    global_law_firm:     global_law_firm,
+    global_insurance:    global_insurance,
     financial:      inst_legal,
     healthcare:     inst_healthcare,
     // Title & Escrow
@@ -5833,6 +5894,9 @@ info@proofdeed.com | proofdeed.com`;
   if (industry === 'blockchain_tech') return blockchain_partner;
   if (industry === 'auto_oem') return auto_oem;
   if (industry === 'pharma') return pharma_cco;
+  if (industry === 'intl_archives') return intl_archives;
+  if (industry === 'global_legal') return global_law_firm;
+  if (industry === 'global_insurance') return global_insurance;
 
   return byRole[role] || recorder;
 };
