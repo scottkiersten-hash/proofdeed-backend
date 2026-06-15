@@ -3532,6 +3532,18 @@ app.post(['/api/admin/import/send-pending', '/admin/import/send-pending'], authR
       const resend = new Resend(process.env.RESEND_API_KEY);
       let sent = 0, failed = 0;
       for (const contact of contacts.rows) {
+        // Skip generic "Team [Company]" contacts — no real person, high bounce/spam risk
+        if (/^team\b/i.test((contact.name || '').trim())) {
+          await pool.query("UPDATE outreach_contacts SET status='suppressed', suppressed_reason='no_named_contact', suppressed_at=NOW() WHERE id=$1", [contact.id]);
+          failed++;
+          continue;
+        }
+        // Skip generic role email addresses that slipped through on import
+        if (SKIP_EMAIL_PATTERNS.test(contact.email)) {
+          await pool.query("UPDATE outreach_contacts SET status='suppressed', suppressed_reason='generic_email', suppressed_at=NOW() WHERE id=$1", [contact.id]);
+          failed++;
+          continue;
+        }
         try {
           const replyTag = crypto.randomBytes(8).toString('hex');
           const isUAE = ['uae_realestate','uae_auto'].includes(contact.industry);
@@ -3558,7 +3570,7 @@ app.post(['/api/admin/import/send-pending', '/admin/import/send-pending'], authR
 
           await resend.emails.send({
             from: fromAddr,
-            reply_to: `reply+${replyTag}@proofdeed.com`,
+            reply_to: fromAddr,
             to: contact.email,
             subject,
             text: emailBody,
@@ -5763,7 +5775,9 @@ info@proofdeed.com | proofdeed.com`;
 };
 
 const INITIAL_EMAIL = (name, company, industry, role) => {
-  const first = name.split(' ')[0];
+  const rawFirst = name.split(' ')[0];
+  // Guard: never greet as "Hi Team," — use title-cased first name only if it looks real
+  const first = /^(team|unknown|contact|info|null|undefined)$/i.test(rawFirst) ? company.split(' ')[0] : rawFirst;
 
   // ── Recorder / Clerk — "Prove document integrity when records are challenged"
   const recorder = `Hi ${first},
@@ -6054,7 +6068,7 @@ Founder & CEO, ProofDeed
 info@proofdeed.com | proofdeed.com`;
 
   // ── International Government Archives — vendor-independent preservation
-  const intl_archives = `Hi Team,
+  const intl_archives = `Hi ${first},
 
 Government records outlive the software they were created in. When a vendor changes platforms, loses a contract, or shuts down — the records remain, but the ability to independently verify their integrity often doesn't. Future courts, auditors, and citizens need proof that doesn't depend on your current system still being operational.
 
@@ -6072,7 +6086,7 @@ Founder & CEO, ProofDeed
 info@proofdeed.com | proofdeed.com`;
 
   // ── Global Law Firms — eDiscovery chain of custody + AI document tampering
-  const global_law_firm = `Hi Team,
+  const global_law_firm = `Hi ${first},
 
 Document authenticity disputes are becoming the defining issue in complex litigation. With AI tools now capable of altering signed contracts, executed agreements, and court-filed documents without a trace, opposing counsel has a new attack vector: allege the document was modified after execution and force the producing party to prove otherwise.
 
@@ -6090,7 +6104,7 @@ Founder & CEO, ProofDeed
 info@proofdeed.com | proofdeed.com`;
 
   // ── Global Insurance — international claims fraud + field adjuster fingerprinting
-  const global_insurance = `Hi Team,
+  const global_insurance = `Hi ${first},
 
 Insurance fraud schemes succeed because claim photos, damage estimates, and loss documentation are easy to alter before submission. By the time your investigation team reviews a claim, the original record may be unrecoverable. Inflated repair estimates, backdated reports, and photoshopped damage photos — the manipulation happens before the document reaches your desk.
 
@@ -6548,7 +6562,7 @@ Founder & CEO, ProofDeed
 info@proofdeed.com | proofdeed.com`;
 
   // ── Real Estate / PropTech — transaction document fraud, deed/agreement tampering
-  const real_estate = `Hi Team,
+  const real_estate = `Hi ${first},
 
 Property transaction fraud is surging. Forged deeds, altered purchase agreements, and backdated lease amendments are being used to challenge title, dispute valuations, and manufacture claims in commercial and residential disputes. When a document's authenticity is challenged in court, the producing party has to prove it wasn't altered — without a chain of custody that starts at creation, that defense is expensive and uncertain.
 
@@ -6566,7 +6580,7 @@ Founder & CEO, ProofDeed
 info@proofdeed.com | proofdeed.com`;
 
   // ── University / Research — research integrity, data fabrication, retraction risk
-  const university_research = `Hi Team,
+  const university_research = `Hi ${first},
 
 Research data fabrication and document tampering are behind the majority of high-profile retractions — and increasingly the target of federal investigation. IRB files, lab notebooks, clinical datasets, and grant applications can all be altered after the fact, with no independent record of what was originally submitted. When misconduct is alleged, the institution carries the burden of proof.
 
@@ -6584,7 +6598,7 @@ Founder & CEO, ProofDeed
 info@proofdeed.com | proofdeed.com`;
 
   // ── Government Regulators / Enforcement — evidence integrity, audit documentation
-  const gov_regulator = `Hi Team,
+  const gov_regulator = `Hi ${first},
 
 Enforcement actions fail when evidence integrity is challenged. Investigation documents, audit records, and regulatory findings can be questioned for authenticity — costing agencies years of litigation and, in some cases, entire prosecutions. The question is not whether your records are accurate. It is whether you can prove they were not altered after the fact.
 
@@ -6602,7 +6616,7 @@ Founder & CEO, ProofDeed
 gov@proofdeed.com | proofdeed.com`;
 
   // ── Construction / Engineering — contract dispute documentation, claims evidence
-  const construction_eng = `Hi Team,
+  const construction_eng = `Hi ${first},
 
 Construction disputes — change order fraud, backdated RFIs, altered scope-of-work documents — succeed because the producing party cannot prove what was in the document at the time it was issued. By the time arbitration or litigation begins, document integrity has been compromised and both sides are working from competing versions.
 
@@ -6784,7 +6798,7 @@ function priorityLabel(score) {
 
 // ── Google Custom Search lead finder (replaces Anthropic API) ──────────────
 const EMAIL_REGEX = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
-const SKIP_EMAIL_PATTERNS = /noreply|no-reply|donotreply|webmaster|postmaster|admin@|info@|support@|help@|contact@|office@|mail@|spam|abuse|privacy@|legal@|press@/i;
+const SKIP_EMAIL_PATTERNS = /noreply|no-reply|donotreply|webmaster|postmaster|admin@|info@|support@|help@|contact@|office@|mail@|spam|abuse|privacy@|legal@|press@|compliance@|team@|hello@|general@|enquiries@|service@|ops@|operations@|claims@|hr@|billing@|accounts@|media@/i;
 
 // Reject file-extension false-positives scraped from HTML (e.g. icon@2x.png, lib@1.0.min.js)
 const FAKE_EMAIL_TLD = /\.(png|jpg|jpeg|gif|svg|webp|ico|js|mjs|cjs|css|min|map|woff|woff2|ttf|eot|otf|json|xml|zip|gz|pdf|doc|docx|xls|xlsx|txt|md|ts|jsx|tsx|vue|py|rb|php|sh|env|lock|yaml|yml|toml)(\?.*)?$/i;
@@ -7120,7 +7134,7 @@ async function runLeadEngine(targetsPerRun = 3) {
               : 'Scott Kiersten <info@proofdeed.com>';
             const result = await resend.emails.send({
               from: fromAddr,
-              reply_to: `reply+${replyTag}@proofdeed.com`,
+              reply_to: fromAddr,
               to: lead.email,
               subject,
               text: emailBody,
@@ -7238,9 +7252,12 @@ app.post(['/api/admin/lead-engine/reset', '/admin/lead-engine/reset'], authRateL
 /* ---------------- Outreach Autopilot (daily 8am UTC) ---------------- */
 async function sendOutreachFollowUp(contact, day) {
   if (!process.env.RESEND_API_KEY) return;
+  // Skip generic "Team [Company]" contacts — no real person to follow up with
+  if (/^team\b/i.test(contact.name.trim())) return;
   const { Resend } = await import('resend');
   const resend = new Resend(process.env.RESEND_API_KEY);
-  const first = contact.name.split(' ')[0];
+  const rawFirst = contact.name.split(' ')[0];
+  const first = /^(team|unknown|contact|info|null)$/i.test(rawFirst) ? contact.company.split(' ')[0] : rawFirst;
 
   let text, subject;
   if (day === 7) {
@@ -7298,9 +7315,12 @@ info@proofdeed.com | proofdeed.com`;
   }
 
   const replyTag = crypto.randomBytes(8).toString('hex');
+  const followUpFrom = (contact.industry === 'government' || contact.industry === 'gov_regulator')
+    ? 'Scott Kiersten <gov@proofdeed.com>'
+    : 'Scott Kiersten <info@proofdeed.com>';
   await resend.emails.send({
-    from: 'Scott Kiersten <gov@proofdeed.com>',
-    reply_to: `reply+${replyTag}@proofdeed.com`,
+    from: followUpFrom,
+    reply_to: followUpFrom,
     to: contact.email,
     subject,
     text,
