@@ -4478,6 +4478,8 @@ const LEAD_TARGETS = [
     query: '"Guillaume Borie" "AXA" email contact OR speaker OR interview OR podcast' },
   { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Karima Silvent — AXA Compliance Governance',
     query: '"Karima Silvent" "AXA" email contact OR speaker OR conference OR interview' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Francoise Gilles — AXA Chief Risk Officer',
+    query: '"Francoise Gilles" OR "Françoise Gilles" "AXA" email contact OR speaker OR conference OR interview' },
   { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Helen Browne — AXA Legal Governance',
     query: '"Helen Browne" "AXA" email contact OR speaker OR conference OR interview' },
 
@@ -4802,19 +4804,29 @@ const LEAD_TARGETS = [
   { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'VP Digital Claims — Nationwide',
     query: '"Nationwide" insurance "VP Digital Claims" OR "Claims Innovation" director email contact site:linkedin.com OR site:nationwide.com' },
 
-  // CUSHMAN & WAKEFIELD — named role scrapes from leadership page
-  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'CIO — Cushman & Wakefield',
-    query: 'site:cushmanwakefield.com "Chief Information Officer" OR "Chief Digital Officer" email contact leadership' },
-  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Head Risk / General Counsel — Cushman & Wakefield',
-    query: '"Cushman Wakefield" "Chief Risk Officer" OR "General Counsel" OR "Head of Data" email contact site:linkedin.com' },
-  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Head Data Analytics — Cushman & Wakefield',
-    query: '"Cushman Wakefield" "Head of Data" OR "Chief Analytics Officer" OR "Head of Enterprise Risk" email speaker conference bio' },
+  // CUSHMAN & WAKEFIELD — named contacts
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Sal Companieh — Cushman Chief Digital & Information Officer',
+    query: '"Sal Companieh" "Cushman" email contact OR speaker OR conference OR interview OR podcast' },
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Payman Sadegh — Cushman Chief Data Officer',
+    query: '"Payman Sadegh" "Cushman" email contact OR speaker OR conference OR interview OR podcast' },
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Noelle Perkins — Cushman Chief Legal Officer',
+    query: '"Noelle Perkins" "Cushman" email contact OR speaker OR conference OR interview' },
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Nathaniel Robinson — Cushman Chief Strategy Officer',
+    query: '"Nathaniel Robinson" "Cushman Wakefield" email contact OR speaker OR conference OR interview' },
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Leadership page scrape — Cushman & Wakefield',
+    query: 'site:cushmanwakefield.com "leadership" email contact' },
 
-  // COLLIERS — named role scrapes
-  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'CIO / CTO — Colliers',
-    query: 'site:colliers.com "Chief Information Officer" OR "Chief Transformation Officer" OR "Chief Risk Officer" email contact leadership' },
-  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Head PropTech / General Counsel — Colliers',
-    query: '"Colliers" "Head of Property Technology" OR "General Counsel" OR "Chief Digital" email contact site:linkedin.com' },
+  // COLLIERS — named contacts
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Stuart McDonald — Colliers Global CIO',
+    query: '"Stuart McDonald" "Colliers" email contact OR speaker OR conference OR interview OR podcast' },
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Matthew Hawkins — Colliers SVP Legal',
+    query: '"Matthew Hawkins" "Colliers" email contact OR speaker OR conference OR interview' },
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Jay Hennick — Colliers CEO',
+    query: '"Jay Hennick" "Colliers" email contact OR speaker OR conference OR interview OR podcast' },
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Christian Mayer — Colliers COO',
+    query: '"Christian Mayer" "Colliers" email contact OR speaker OR conference OR interview' },
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Leadership page scrape — Colliers',
+    query: 'site:corporate.colliers.com "leadership" email contact' },
 
   // NEWMARK — named role scrapes
   { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'CIO / CTO — Newmark',
