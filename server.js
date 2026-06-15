@@ -4435,7 +4435,60 @@ const LEAD_TARGETS = [
   { industry: 'intl_archives', role: 'intl_archives', tier: 'primary', title: 'Director — National Archives UK',         query: 'site:nationalarchives.gov.uk "Director" "Records" OR "Digital Preservation" OR "Information" email contact' },
   { industry: 'intl_archives', role: 'intl_archives', tier: 'primary', title: 'Director — National Archives Australia',  query: 'site:naa.gov.au "Director" "Records" OR "Digital Preservation" OR "Information Management" email contact' },
   { industry: 'intl_archives', role: 'intl_archives', tier: 'primary', title: 'Director — Library and Archives Canada',  query: 'site:bac-lac.gc.ca OR site:lac-bac.gc.ca "Director" "Records" OR "Information Management" email contact' },
-  { industry: 'intl_archives', role: 'intl_archives', tier: 'primary', title: 'Director — National Archives Singapore',  query: 'site:nas.gov.sg "Director" "Archives" OR "Records" OR "Digital Preservation" email contact staff' },
+  { industry: 'intl_archives', role: 'intl_archives', tier: 'primary', title: 'Director — National Archives Singapore',  query: 'site:nas.gov.sg "Director" "Archives" OR "Digital Preservation" email contact staff' },
+
+  // ════════════════════════════════════════════════════════
+  // CLINICALTRIALS.GOV — real PI/contact emails via direct API
+  // source:'clinicaltrials' routes to searchLeadsViaClinicalTrials()
+  // ════════════════════════════════════════════════════════
+  { industry: 'pharma', role: 'pharma_cco', tier: 'primary', source: 'clinicaltrials', sponsor: 'Pfizer',                      company: 'Pfizer',                      title: 'Clinical PI — Pfizer' },
+  { industry: 'pharma', role: 'pharma_cco', tier: 'primary', source: 'clinicaltrials', sponsor: 'Johnson & Johnson',            company: 'Johnson & Johnson',            title: 'Clinical PI — J&J' },
+  { industry: 'pharma', role: 'pharma_cco', tier: 'primary', source: 'clinicaltrials', sponsor: 'Novartis',                     company: 'Novartis',                     title: 'Clinical PI — Novartis' },
+  { industry: 'pharma', role: 'pharma_cco', tier: 'primary', source: 'clinicaltrials', sponsor: 'Roche',                        company: 'Roche',                        title: 'Clinical PI — Roche' },
+  { industry: 'pharma', role: 'pharma_cco', tier: 'primary', source: 'clinicaltrials', sponsor: 'Merck',                        company: 'Merck',                        title: 'Clinical PI — Merck' },
+  { industry: 'pharma', role: 'pharma_cco', tier: 'primary', source: 'clinicaltrials', sponsor: 'AstraZeneca',                  company: 'AstraZeneca',                  title: 'Clinical PI — AstraZeneca' },
+  { industry: 'pharma', role: 'pharma_cco', tier: 'primary', source: 'clinicaltrials', sponsor: 'GlaxoSmithKline',              company: 'GSK',                          title: 'Clinical PI — GSK' },
+  { industry: 'pharma', role: 'pharma_cco', tier: 'primary', source: 'clinicaltrials', sponsor: 'Bayer',                        company: 'Bayer',                        title: 'Clinical PI — Bayer' },
+  { industry: 'pharma', role: 'pharma_cco', tier: 'primary', source: 'clinicaltrials', sponsor: 'AbbVie',                       company: 'AbbVie',                       title: 'Clinical PI — AbbVie' },
+  { industry: 'pharma', role: 'pharma_cco', tier: 'primary', source: 'clinicaltrials', sponsor: 'Eli Lilly',                    company: 'Eli Lilly',                    title: 'Clinical PI — Eli Lilly' },
+  { industry: 'pharma', role: 'pharma_cco', tier: 'primary', source: 'clinicaltrials', sponsor: 'Bristol-Myers Squibb',         company: 'Bristol-Myers Squibb',         title: 'Clinical PI — BMS' },
+  { industry: 'pharma', role: 'pharma_cco', tier: 'primary', source: 'clinicaltrials', sponsor: 'Sanofi',                       company: 'Sanofi',                       title: 'Clinical PI — Sanofi' },
+  { industry: 'pharma', role: 'pharma_cco', tier: 'primary', source: 'clinicaltrials', sponsor: 'Moderna',                      company: 'Moderna',                      title: 'Clinical PI — Moderna' },
+  { industry: 'pharma', role: 'pharma_cco', tier: 'primary', source: 'clinicaltrials', sponsor: 'Amgen',                        company: 'Amgen',                        title: 'Clinical PI — Amgen' },
+  { industry: 'pharma', role: 'pharma_cco', tier: 'primary', source: 'clinicaltrials', sponsor: 'Gilead Sciences',              company: 'Gilead Sciences',              title: 'Clinical PI — Gilead' },
+  { industry: 'healthcare', role: 'healthcare', tier: 'primary', source: 'clinicaltrials', sponsor: 'Mayo Clinic',              company: 'Mayo Clinic',                  title: 'Clinical PI — Mayo Clinic' },
+  { industry: 'healthcare', role: 'healthcare', tier: 'primary', source: 'clinicaltrials', sponsor: 'Cleveland Clinic',         company: 'Cleveland Clinic',             title: 'Clinical PI — Cleveland Clinic' },
+  { industry: 'healthcare', role: 'healthcare', tier: 'primary', source: 'clinicaltrials', sponsor: 'Johns Hopkins',            company: 'Johns Hopkins',                title: 'Clinical PI — Johns Hopkins' },
+  { industry: 'healthcare', role: 'healthcare', tier: 'primary', source: 'clinicaltrials', sponsor: 'Massachusetts General Hospital', company: 'Mass General Hospital',   title: 'Clinical PI — Mass General' },
+
+  // ════════════════════════════════════════════════════════
+  // PUBMED — corresponding author emails in research papers
+  // source:'pubmed' routes to searchLeadsViaPubMed()
+  // ════════════════════════════════════════════════════════
+  { industry: 'university_research', role: 'university_research', tier: 'primary', source: 'pubmed', company: 'Harvard University',  title: 'Research Author — Harvard',   pubmedQuery: 'Harvard[Affiliation] "data integrity" OR "research compliance" AND hasabstract[text]' },
+  { industry: 'university_research', role: 'university_research', tier: 'primary', source: 'pubmed', company: 'MIT',                 title: 'Research Author — MIT',       pubmedQuery: 'Massachusetts Institute of Technology[Affiliation] "data integrity" OR "reproducibility" AND hasabstract[text]' },
+  { industry: 'university_research', role: 'university_research', tier: 'primary', source: 'pubmed', company: 'Stanford University', title: 'Research Author — Stanford',  pubmedQuery: 'Stanford[Affiliation] "research compliance" OR "data integrity" AND hasabstract[text]' },
+  { industry: 'university_research', role: 'university_research', tier: 'primary', source: 'pubmed', company: 'Oxford University',   title: 'Research Author — Oxford',    pubmedQuery: 'Oxford[Affiliation] "research integrity" OR "data fabrication" AND hasabstract[text]' },
+  { industry: 'university_research', role: 'university_research', tier: 'primary', source: 'pubmed', company: 'Cambridge University',title: 'Research Author — Cambridge', pubmedQuery: 'Cambridge[Affiliation] "research integrity" OR "data compliance" AND hasabstract[text]' },
+  { industry: 'university_research', role: 'university_research', tier: 'primary', source: 'pubmed', company: 'University of Toronto', title: 'Research Author — U Toronto', pubmedQuery: 'Toronto[Affiliation] "research ethics" OR "data integrity" AND hasabstract[text]' },
+  { industry: 'university_research', role: 'university_research', tier: 'primary', source: 'pubmed', company: 'ETH Zurich',          title: 'Research Author — ETH Zurich', pubmedQuery: 'ETH Zurich[Affiliation] "research integrity" OR "data compliance" AND hasabstract[text]' },
+  { industry: 'pharma', role: 'pharma_cco', tier: 'primary', source: 'pubmed', company: 'Pfizer',      title: 'Research Author — Pfizer',   pubmedQuery: 'Pfizer[Affiliation] "clinical data" OR "regulatory compliance" AND hasabstract[text]' },
+  { industry: 'pharma', role: 'pharma_cco', tier: 'primary', source: 'pubmed', company: 'Novartis',    title: 'Research Author — Novartis', pubmedQuery: 'Novartis[Affiliation] "clinical data" OR "data integrity" AND hasabstract[text]' },
+
+  // ════════════════════════════════════════════════════════
+  // MARTINDALE — attorney emails via site:martindale.com Serper queries
+  // These use the standard Google search path
+  // ════════════════════════════════════════════════════════
+  { industry: 'global_legal', role: 'global_law_firm', tier: 'primary', title: 'Attorney — Kirkland Ellis eDiscovery',    query: 'site:martindale.com "Kirkland" "litigation" OR "eDiscovery" email' },
+  { industry: 'global_legal', role: 'global_law_firm', tier: 'primary', title: 'Attorney — Latham Watkins eDiscovery',   query: 'site:martindale.com "Latham" "litigation support" OR "eDiscovery" email' },
+  { industry: 'global_legal', role: 'global_law_firm', tier: 'primary', title: 'Attorney — Baker McKenzie eDiscovery',   query: 'site:martindale.com "Baker McKenzie" "litigation" OR "eDiscovery" email' },
+  { industry: 'global_legal', role: 'global_law_firm', tier: 'primary', title: 'Attorney — DLA Piper litigation',        query: 'site:martindale.com "DLA Piper" "litigation" OR "legal technology" email' },
+  { industry: 'global_legal', role: 'global_law_firm', tier: 'primary', title: 'Attorney — Skadden litigation',          query: 'site:martindale.com "Skadden" "litigation" OR "eDiscovery" email' },
+  { industry: 'global_legal', role: 'global_law_firm', tier: 'primary', title: 'Attorney — Jones Day litigation',        query: 'site:martindale.com "Jones Day" "litigation" OR "legal technology" email' },
+  { industry: 'global_legal', role: 'global_law_firm', tier: 'primary', title: 'Attorney — White Case litigation',       query: 'site:martindale.com "White Case" "litigation" OR "eDiscovery" email' },
+  { industry: 'global_legal', role: 'global_law_firm', tier: 'primary', title: 'Attorney — Gibson Dunn litigation',      query: 'site:martindale.com "Gibson Dunn" "litigation" OR "legal technology" email' },
+  { industry: 'global_legal', role: 'global_law_firm', tier: 'primary', title: 'Attorney — Norton Rose litigation',      query: 'site:martindale.com "Norton Rose" "litigation" OR "eDiscovery" email' },
+  { industry: 'global_legal', role: 'global_law_firm', tier: 'primary', title: 'Attorney — Sidley Austin litigation',    query: 'site:martindale.com "Sidley" "litigation" OR "legal technology" email' },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -6295,6 +6348,77 @@ async function searchLeadsViaGoogle(target) {
   console.log(`[LeadEngine] Google found ${leads.length} raw leads for "${target.title}"`);
   return leads;
 }
+
+// ── ClinicalTrials.gov — real pharma PI/contact emails via public API ─────────
+async function searchLeadsViaClinicalTrials(target) {
+  const leads = [];
+  const seenEmails = new Set();
+  try {
+    const query = encodeURIComponent(target.sponsor);
+    const url = `https://clinicaltrials.gov/api/v2/studies?query.spons=${query}&pageSize=40`;
+    const res = await fetch(url, {
+      headers: { 'Accept': 'application/json' },
+      signal: AbortSignal.timeout(12000),
+    });
+    if (!res.ok) { console.log(`[LeadEngine] ClinicalTrials API ${res.status}`); return []; }
+    const data = await res.json();
+    const studies = data.studies || [];
+    for (const study of studies) {
+      const mod = study.protocolSection?.contactsLocationsModule || {};
+      const contacts = [
+        ...(mod.centralContacts || []),
+        ...(mod.overallOfficials || []),
+      ];
+      for (const c of contacts) {
+        const email = c.centralContactEMail || c.overallOfficialEMail || null;
+        const name  = c.centralContactName  || c.officialName || target.title;
+        if (!email || !isLeadEmail(email) || seenEmails.has(email)) continue;
+        seenEmails.add(email);
+        leads.push({ name, title: target.title, email, company: target.company, industry: target.industry, source: 'https://clinicaltrials.gov' });
+      }
+    }
+  } catch (err) {
+    console.error('[LeadEngine] ClinicalTrials error:', err.message);
+  }
+  console.log(`[LeadEngine] ClinicalTrials found ${leads.length} leads for "${target.title}"`);
+  return leads;
+}
+
+// ── PubMed/NCBI — corresponding author emails from research papers ────────────
+async function searchLeadsViaPubMed(target) {
+  const leads = [];
+  const seenEmails = new Set();
+  try {
+    // Step 1: search for PMIDs
+    const searchRes = await fetch(
+      `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=${encodeURIComponent(target.pubmedQuery)}&retmax=20&retmode=json`,
+      { signal: AbortSignal.timeout(10000) }
+    );
+    if (!searchRes.ok) return [];
+    const searchData = await searchRes.json();
+    const pmids = searchData.esearchresult?.idlist || [];
+    if (!pmids.length) return [];
+
+    // Step 2: fetch abstracts which often contain author emails
+    const fetchRes = await fetch(
+      `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id=${pmids.join(',')}&retmode=text&rettype=abstract`,
+      { signal: AbortSignal.timeout(12000) }
+    );
+    if (!fetchRes.ok) return [];
+    const text = decodeHtmlEntities(await fetchRes.text());
+    const emails = text.match(EMAIL_REGEX) || [];
+    for (const email of emails) {
+      if (!isLeadEmail(email) || seenEmails.has(email)) continue;
+      seenEmails.add(email);
+      const name = extractNameFromContext(text, email) || target.title;
+      leads.push({ name, title: target.title, email, company: target.company, industry: target.industry, source: 'https://pubmed.ncbi.nlm.nih.gov' });
+    }
+  } catch (err) {
+    console.error('[LeadEngine] PubMed error:', err.message);
+  }
+  console.log(`[LeadEngine] PubMed found ${leads.length} leads for "${target.title}"`);
+  return leads;
+}
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function runLeadEngine(targetsPerRun = 3) {
@@ -6363,7 +6487,11 @@ async function runLeadEngine(targetsPerRun = 3) {
 
     const batchResults = await Promise.allSettled(batchTargets.map(async ({ target }) => {
       try {
-        const leads = await searchLeadsViaGoogle(target);
+        const leads = target.source === 'clinicaltrials'
+          ? await searchLeadsViaClinicalTrials(target)
+          : target.source === 'pubmed'
+            ? await searchLeadsViaPubMed(target)
+            : await searchLeadsViaGoogle(target);
         if (!leads.length) {
           console.log(`[LeadEngine] No leads found for ${target.title}`);
           return { sent: 0, skipped: 0 };
