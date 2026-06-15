@@ -4495,7 +4495,11 @@ const LEAD_TARGETS = [
   { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Rose Marie Glazer — AIG Legal Operations',
     query: '"Rose Marie Glazer" "AIG" email contact OR speaker OR conference OR interview' },
 
-  // CHUBB — named contacts (highest priority per research)
+  // CHUBB — named contacts
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Michael Jones — Chubb Global Operations Technology',
+    query: '"Michael Jones" "Chubb" "Operations" OR "Technology" email contact OR speaker OR conference OR interview' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Gordon Mackechnie — Chubb Global Head of Technology',
+    query: '"Gordon Mackechnie" "Chubb" email contact OR speaker OR conference OR interview OR podcast' },
   { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Kevin Rampe — Chubb Global Head of Claims',
     query: '"Kevin Rampe" "Chubb" email contact OR speaker OR conference OR interview OR podcast' },
   { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Sean Ringsted — Chubb Analytics Fraud AI',
@@ -4762,7 +4766,33 @@ const LEAD_TARGETS = [
   { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Bilal Ramadan — Munich Re CEO HealthTech',
     query: '"Bilal Ramadan" "Munich Re" email contact OR speaker OR conference OR interview' },
 
-  // SWISS RE, CNA, HARTFORD — enhanced role-based
+  // SWISS RE — named contacts
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Pravina Ladva — Swiss Re Group CDTO',
+    query: '"Pravina Ladva" "Swiss Re" email contact OR speaker OR conference OR interview OR podcast' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Bernhard Kaufmann — Swiss Re Group CRO',
+    query: '"Bernhard Kaufmann" "Swiss Re" email contact OR speaker OR conference OR interview' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Hermann Geiger — Swiss Re Group Legal',
+    query: '"Hermann Geiger" "Swiss Re" email contact OR speaker OR conference OR interview' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Henock Teklu — Swiss Re Transformation',
+    query: '"Henock Teklu" "Swiss Re" email contact OR speaker OR conference OR interview OR podcast' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Marc Scheidegger — Swiss Re Chief Claims Officer',
+    query: '"Marc Scheidegger" "Swiss Re" email contact OR speaker OR conference OR interview' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Annette Kurtzweil — Swiss Re CRO Corporate Solutions',
+    query: '"Annette Kurtzweil" "Swiss Re" email contact OR speaker OR conference OR interview' },
+
+  // THE HARTFORD — named contacts
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Steve Deane — Hartford Chief Claims Officer',
+    query: '"Steve Deane" "Hartford" email contact OR speaker OR conference OR interview OR podcast' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Prateek Chhabra — Hartford Chief Risk Officer',
+    query: '"Prateek Chhabra" "Hartford" email contact OR speaker OR conference OR interview' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Jeffery Hawkins — Hartford Chief Data AI Officer',
+    query: '"Jeffery Hawkins" "Hartford" email contact OR speaker OR conference OR interview OR podcast' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Shekar Pannala — Hartford CIO',
+    query: '"Shekar Pannala" "Hartford" email contact OR speaker OR conference OR interview OR podcast' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Don Hunt — Hartford General Counsel',
+    query: '"Don Hunt" "Hartford" insurance email contact OR speaker OR conference OR interview' },
+
+  // SWISS RE, CNA, HARTFORD — role-based fallbacks
   { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Global Head Claims Transformation — Swiss Re',
     query: '"Swiss Re" "Global Head" "Claims Transformation" OR "Digital Risk" OR "Chief Data Officer" OR "Fraud Analytics" email contact site:linkedin.com OR site:swissre.com' },
   { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Chief Claims Officer — CNA Financial',
@@ -4772,13 +4802,37 @@ const LEAD_TARGETS = [
   { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'VP Digital Claims — Nationwide',
     query: '"Nationwide" insurance "VP Digital Claims" OR "Claims Innovation" director email contact site:linkedin.com OR site:nationwide.com' },
 
-  // CUSHMAN, COLLIERS, NEWMARK — enhanced role-based
-  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'CIO / CDO — Cushman & Wakefield',
-    query: '"Cushman Wakefield" "Chief Information Officer" OR "Chief Digital Officer" OR "Head of Risk" OR "Information Governance" email contact site:linkedin.com OR site:cushmanwakefield.com' },
-  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'CIO / Enterprise Architecture — Colliers',
-    query: '"Colliers" "Chief Information Officer" OR "Enterprise Architecture" OR "Chief Risk Officer" email contact site:linkedin.com OR site:colliers.com' },
-  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'CIO / General Counsel — Newmark',
-    query: '"Newmark" "Chief Information Officer" OR "Head of Property Technology" OR "General Counsel" email contact site:linkedin.com OR site:nmrk.com' },
+  // CUSHMAN & WAKEFIELD — named role scrapes from leadership page
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'CIO — Cushman & Wakefield',
+    query: 'site:cushmanwakefield.com "Chief Information Officer" OR "Chief Digital Officer" email contact leadership' },
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Head Risk / General Counsel — Cushman & Wakefield',
+    query: '"Cushman Wakefield" "Chief Risk Officer" OR "General Counsel" OR "Head of Data" email contact site:linkedin.com' },
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Head Data Analytics — Cushman & Wakefield',
+    query: '"Cushman Wakefield" "Head of Data" OR "Chief Analytics Officer" OR "Head of Enterprise Risk" email speaker conference bio' },
+
+  // COLLIERS — named role scrapes
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'CIO / CTO — Colliers',
+    query: 'site:colliers.com "Chief Information Officer" OR "Chief Transformation Officer" OR "Chief Risk Officer" email contact leadership' },
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Head PropTech / General Counsel — Colliers',
+    query: '"Colliers" "Head of Property Technology" OR "General Counsel" OR "Chief Digital" email contact site:linkedin.com' },
+
+  // NEWMARK — named role scrapes
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'CIO / CTO — Newmark',
+    query: 'site:nmrk.com "Chief Information Officer" OR "Chief Technology Officer" OR "Chief Digital Officer" email contact leadership' },
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'General Counsel / Head Operations Tech — Newmark',
+    query: '"Newmark" "General Counsel" OR "Head of Operations Technology" OR "Compliance Director" email contact site:linkedin.com' },
+
+  // JPMORGAN — mortgage/real estate/compliance named role scrapes
+  { industry: 'banking', role: 'recorder', tier: 'primary', title: 'Head Mortgage Technology — JPMorgan Chase',
+    query: '"JPMorgan" OR "Chase" "Head of Mortgage Technology" OR "Head of Collateral Management" OR "Document Intelligence" director email contact site:linkedin.com' },
+  { industry: 'banking', role: 'recorder', tier: 'primary', title: 'MD Digital Assets — JPMorgan Chase leadership page',
+    query: 'site:jpmorganchase.com "Managing Director" "Digital" OR "Document" OR "Collateral" email contact leadership' },
+
+  // WELLS FARGO — home lending / enterprise records
+  { industry: 'banking', role: 'recorder', tier: 'primary', title: 'Head Home Lending Technology — Wells Fargo',
+    query: '"Wells Fargo" "Head of Home Lending Technology" OR "Head of Mortgage Operations" OR "Enterprise Records" email contact site:linkedin.com' },
+  { industry: 'banking', role: 'recorder', tier: 'primary', title: 'Head Financial Crimes Technology — Wells Fargo',
+    query: '"Wells Fargo" "Head of Financial Crimes Technology" OR "Chief Compliance Officer" director email contact site:linkedin.com OR site:wellsfargo.com' },
 
   // ════════════════════════════════════════════════════════
   // CLINICALTRIALS.GOV — real PI/contact emails via direct API
