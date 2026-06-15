@@ -4453,6 +4453,83 @@ const LEAD_TARGETS = [
   { industry: 'intl_archives', role: 'intl_archives', tier: 'primary', title: 'Director — National Archives Singapore',  query: 'site:nas.gov.sg "Director" "Archives" OR "Digital Preservation" email contact staff' },
 
   // ════════════════════════════════════════════════════════
+  // SINGAPORE LAND AUTHORITY — named contacts
+  // ════════════════════════════════════════════════════════
+  { industry: 'gov_regulator', role: 'gov_regulator', tier: 'primary', title: 'Calvin Phua — Singapore Land Authority CEO',
+    query: '"Calvin Phua" "Singapore Land Authority" email contact OR speaker OR conference OR interview' },
+  { industry: 'gov_regulator', role: 'gov_regulator', tier: 'primary', title: 'Yeoh Oon Jin — Singapore Land Authority Chairman',
+    query: '"Yeoh Oon Jin" "Singapore Land Authority" email contact OR speaker OR conference OR interview' },
+  { industry: 'gov_regulator', role: 'gov_regulator', tier: 'primary', title: 'Registrar of Titles — Singapore Land Authority',
+    query: '"Singapore Land Authority" "Registrar" "Titles" OR "Deeds" email contact site:sla.gov.sg' },
+
+  // ════════════════════════════════════════════════════════
+  // DUBAI LAND DEPARTMENT — named contacts
+  // ════════════════════════════════════════════════════════
+  { industry: 'gov_regulator', role: 'gov_regulator', tier: 'primary', title: 'Majid Al Marri — Dubai Land Dept CEO Registration',
+    query: '"Majid" "Al Marri" "Dubai Land" email contact OR speaker OR conference OR interview' },
+  { industry: 'gov_regulator', role: 'gov_regulator', tier: 'primary', title: 'Hend Al Marri — Dubai Land Department CEO',
+    query: '"Hend Al Marri" "Dubai Land" email contact OR speaker OR conference OR interview' },
+  { industry: 'gov_regulator', role: 'gov_regulator', tier: 'primary', title: 'Majida Ali Rashid — Dubai Land Dept Development CEO',
+    query: '"Majida Ali Rashid" "Dubai Land" email contact OR speaker OR conference OR interview' },
+  { industry: 'gov_regulator', role: 'gov_regulator', tier: 'primary', title: 'Blockchain/Innovation Director — Dubai Land Department',
+    query: 'site:dubailand.gov.ae "blockchain" OR "digital" OR "innovation" director email contact' },
+
+  // ════════════════════════════════════════════════════════
+  // HM LAND REGISTRY — enhanced role-based named searches
+  // ════════════════════════════════════════════════════════
+  { industry: 'gov_regulator', role: 'gov_regulator', tier: 'primary', title: 'Chief Executive — HM Land Registry',
+    query: '"HM Land Registry" "Chief Executive" email contact OR speaker OR conference OR interview' },
+  { industry: 'gov_regulator', role: 'gov_regulator', tier: 'primary', title: 'Chief Digital & Data Officer — HM Land Registry',
+    query: '"HM Land Registry" "Chief Digital" OR "Chief Data Officer" OR "Director Digital" email contact site:gov.uk OR site:linkedin.com' },
+  { industry: 'gov_regulator', role: 'gov_regulator', tier: 'primary', title: 'Director Land Registration — HM Land Registry',
+    query: '"HM Land Registry" "Director" "Land Registration" OR "Digital Services" OR "Transformation" email contact site:gov.uk' },
+
+  // ════════════════════════════════════════════════════════
+  // BAKER McKENZIE — named contact
+  // ════════════════════════════════════════════════════════
+  { industry: 'global_legal', role: 'global_law_firm', tier: 'primary', title: 'Ben Weinberger — Baker McKenzie Innovation',
+    query: '"Ben Weinberger" "Baker McKenzie" email contact OR speaker OR conference OR interview OR podcast' },
+
+  // ════════════════════════════════════════════════════════
+  // DLA PIPER — named contact
+  // ════════════════════════════════════════════════════════
+  { industry: 'global_legal', role: 'global_law_firm', tier: 'primary', title: 'David Cunningham — DLA Piper Innovation Technology',
+    query: '"David Cunningham" "DLA Piper" email contact OR speaker OR conference OR interview OR podcast' },
+
+  // ════════════════════════════════════════════════════════
+  // AMROCK / ROCKET MORTGAGE — named contacts
+  // ════════════════════════════════════════════════════════
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Nicole Beattie — Amrock CEO',
+    query: '"Nicole Beattie" "Amrock" email contact OR speaker OR conference OR interview OR podcast' },
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Shawn Malhotra — Rocket Mortgage CTO',
+    query: '"Shawn Malhotra" "Rocket" email contact OR speaker OR conference OR interview OR podcast' },
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Heather Lovier — Amrock COO',
+    query: '"Heather Lovier" "Amrock" email contact OR speaker OR conference OR interview' },
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Jay Jones — Rocket Chief Servicing Officer',
+    query: '"Jay Jones" "Rocket" "Servicing" email contact OR speaker OR conference OR interview' },
+
+  // ════════════════════════════════════════════════════════
+  // BIG FOUR ACCOUNTING — Forensic, Digital Risk, RegTech buyers
+  // These firms investigate fraud and document disputes daily
+  // ════════════════════════════════════════════════════════
+  { industry: 'legal', role: 'legal', tier: 'primary', title: 'Forensic Services Partner — Deloitte',
+    query: '"Deloitte" "Forensic Services" OR "Digital Risk" OR "Regulatory Technology" partner director email contact site:linkedin.com OR site:deloitte.com' },
+  { industry: 'legal', role: 'legal', tier: 'primary', title: 'Technology Risk Leader — Deloitte',
+    query: '"Deloitte" "Technology Risk" OR "Digital Forensics" OR "Document Intelligence" leader email contact site:linkedin.com' },
+  { industry: 'legal', role: 'legal', tier: 'primary', title: 'Forensic Services Partner — PwC',
+    query: '"PwC" "Forensic Services" OR "Digital Risk" OR "Regulatory Technology" partner director email contact site:linkedin.com OR site:pwc.com' },
+  { industry: 'legal', role: 'legal', tier: 'primary', title: 'Technology Risk Leader — PwC',
+    query: '"PwC" "Technology Risk" OR "Digital Forensics" OR "Document Intelligence" leader email contact site:linkedin.com' },
+  { industry: 'legal', role: 'legal', tier: 'primary', title: 'Forensic Services Partner — EY',
+    query: '"EY" OR "Ernst Young" "Forensic" OR "Digital Risk" OR "Fraud Investigation" partner director email contact site:linkedin.com OR site:ey.com' },
+  { industry: 'legal', role: 'legal', tier: 'primary', title: 'Technology Risk Leader — EY',
+    query: '"EY" OR "Ernst Young" "Technology Risk" OR "Digital Forensics" OR "RegTech" leader email contact site:linkedin.com' },
+  { industry: 'legal', role: 'legal', tier: 'primary', title: 'Forensic Services Partner — KPMG',
+    query: '"KPMG" "Forensic Services" OR "Digital Risk" OR "Regulatory Technology" partner director email contact site:linkedin.com OR site:kpmg.com' },
+  { industry: 'legal', role: 'legal', tier: 'primary', title: 'Technology Risk Leader — KPMG',
+    query: '"KPMG" "Technology Risk" OR "Digital Forensics" OR "Document Intelligence" leader email contact site:linkedin.com' },
+
+  // ════════════════════════════════════════════════════════
   // NAMED TARGETS — real identified decision-makers
   // Strategy: search by full name + company for published email
   // across conference bios, bylines, podcasts, patent filings
