@@ -3390,7 +3390,10 @@ app.post(['/api/admin/import/csv', '/admin/import/csv'], authRateLimit, upload.s
       if (s.includes('hospital') || s.includes('health') || s.includes('medical')) return 'healthcare';
       if (s.includes('education') || s.includes('university') || s.includes('college') || s.includes('credentialing') || s.includes('licensing board')) return 'education';
       if (s.includes('logistics') || s.includes('freight') || s.includes('transportation') || s.includes('supply chain')) return 'supply_chain';
+      if (s.includes('blockchain') || s.includes('web3') || s.includes('crypto') || s.includes('defi')) return 'blockchain_tech';
       if (s.includes('research') || s.includes('r&d') || s.includes('intellectual property') || s.includes('software')) return 'ip_research';
+      if (s.includes('pharmaceutical') || s.includes('pharma') || s.includes('drug') || s.includes('biotech')) return 'pharma';
+      if (s.includes('automotive manufacturing') || s.includes('auto manufacturing') || s.includes('motor vehicle') || s.includes('vehicle manufacturer')) return 'auto_oem';
       return 'institutional'; // default
     };
 
@@ -3531,6 +3534,7 @@ app.post(['/api/admin/import/send-pending', '/admin/import/send-pending'], authR
             auto: 'dealer', construction: 'lien', pe_ma: 'deal',
             healthcare: 'healthcare', supply_chain: 'trade_docs',
             education: 'education', ip_research: 'ip_timestamp', insurance: 'claims',
+            blockchain_tech: 'blockchain_partner', auto_oem: 'auto_oem', pharma: 'pharma_cco',
           }[contact.industry] || 'compliance';
           const emailBody = isUAE
             ? UAE_EMAIL(contact.name, contact.company, contact.role || 'uae_redev')
@@ -5274,6 +5278,42 @@ Scott Kiersten
 Founder & CEO, ProofDeed
 info@proofdeed.com | proofdeed.com`;
 
+  // ── Blockchain/Tech Companies — partnership/integration angle
+  const blockchain_partner = `Hi ${first},
+
+Your platform provides the infrastructure. The missing layer most enterprise clients ask for next is legal admissibility — the ability to prove a specific document or record is unchanged at a specific moment in time, in a way that holds up in US courts under FRE Rule 901 without requiring a judge to understand distributed ledgers.
+
+ProofDeed handles that last mile. We anchor documents to Polygon at the moment they're processed and issue a court-admissible certificate tied to that hash. It's a complement to what your platform does, not a competitor — and several of our conversations with enterprise buyers start because they already have blockchain infrastructure but need the legal proof layer on top of it.
+
+If there's a partnership, integration, or referral channel that makes sense, I'd like to explore it. Under $1 per certificate at volume.
+
+See it in 2 minutes: proofdeed.com/demo
+
+Worth a 20-minute call?
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+info@proofdeed.com | proofdeed.com`;
+
+  // ── Automotive OEM — supply chain parts traceability + recall documentation
+  const auto_oem = `Hi ${first},
+
+When a recall investigation, parts fraud claim, or autonomous vehicle incident goes to litigation, your supply chain documentation has to prove authenticity — not just that it's in your systems, but that it hasn't been altered since it was created. Falsified Certificates of Conformity, altered build sheets, and tampered OTA firmware version records all start with a document that couldn't be independently verified.
+
+ProofDeed anchors supply chain documents, parts certifications, and vehicle records to the Polygon blockchain at the moment they're generated — part number, supplier ID, conformity date, firmware hash, all individually locked. If any field is changed downstream, it's immediately detectable. Each record gets a public verification link. Court-admissible under FRE Rule 901.
+
+No system replacement. Single webhook into your existing document workflow. Under $1 per record.
+
+See it in 2 minutes: proofdeed.com/demo
+
+Worth a 20-minute call this week?
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+info@proofdeed.com | proofdeed.com`;
+
   // ── IP / R&D / Tech — "prior-art timestamp without revealing trade secrets"
   const ip_timestamp = `Hi ${first},
 
@@ -5696,8 +5736,10 @@ info@proofdeed.com | proofdeed.com`;
     // Institutional
     compliance:     inst_compliance,
     operations:     inst_compliance,
-    education:      credentialing,
-    ip_timestamp:   ip_timestamp,
+    education:         credentialing,
+    ip_timestamp:      ip_timestamp,
+    blockchain_partner: blockchain_partner,
+    auto_oem:          auto_oem,
     financial:      inst_legal,
     healthcare:     inst_healthcare,
     // Title & Escrow
@@ -5788,6 +5830,9 @@ info@proofdeed.com | proofdeed.com`;
   if (industry === 'ip_research') return ip_timestamp;
   if (industry === 'insurance') return insurance_gen;
   if (industry === 'education') return credentialing;
+  if (industry === 'blockchain_tech') return blockchain_partner;
+  if (industry === 'auto_oem') return auto_oem;
+  if (industry === 'pharma') return pharma_cco;
 
   return byRole[role] || recorder;
 };
