@@ -4576,10 +4576,29 @@ const LEAD_TARGETS = [
     query: 'site:jll.com "leadership" "bio-leader" email contact' },
 
   // ════════════════════════════════════════════════════════
-  // TITLE INSURANCE — Fidelity National Financial (role-based)
+  // TITLE INSURANCE — Fidelity National Financial (named — A+ priority)
+  // Jason Nadeau = CDO + Chief AI Officer — highest priority in entire list
   // ════════════════════════════════════════════════════════
-  { industry: 'title_escrow', role: 'title_closer', tier: 'primary', title: 'Head of Digital Title — Fidelity National Financial',
-    query: '"Fidelity National Financial" "Head of Digital Title" OR "VP Fraud Prevention" OR "Chief Underwriting Counsel" email contact site:linkedin.com OR site:fnf.com' },
+  { industry: 'title_escrow', role: 'title_closer', tier: 'primary', title: 'Jason Nadeau — FNF Chief Digital & AI Officer',
+    query: '"Jason Nadeau" "Fidelity National" OR "FNF" email contact OR speaker OR conference OR interview OR podcast' },
+  { industry: 'title_escrow', role: 'title_closer', tier: 'primary', title: 'John Crowley — FNF CIO',
+    query: '"John Crowley" "Fidelity National" OR "FNF" email contact OR speaker OR conference OR interview' },
+  { industry: 'title_escrow', role: 'title_closer', tier: 'primary', title: 'Patrick Rhodin — FNF Chief Risk Officer',
+    query: '"Patrick Rhodin" "Fidelity National" OR "FNF" email contact OR speaker OR conference OR interview' },
+  { industry: 'title_escrow', role: 'title_closer', tier: 'primary', title: 'Peter Sadowski — FNF Chief Legal Officer',
+    query: '"Peter Sadowski" "Fidelity National" OR "FNF" email contact OR speaker OR conference OR interview' },
+  { industry: 'title_escrow', role: 'title_closer', tier: 'primary', title: 'Paul Perez — FNF Chief Compliance Officer',
+    query: '"Paul Perez" "Fidelity National" OR "FNF" email contact OR speaker OR conference OR interview' },
+  { industry: 'title_escrow', role: 'title_closer', tier: 'primary', title: 'Katie Schmidt — FNF Chief Regulatory Officer',
+    query: '"Katie Schmidt" "Fidelity National" OR "FNF" email contact OR speaker OR conference OR interview' },
+  { industry: 'title_escrow', role: 'title_closer', tier: 'primary', title: 'Brian Maughan — FNF Chief Marketing & Innovation Officer',
+    query: '"Brian Maughan" "Fidelity National" OR "FNF" email contact OR speaker OR conference OR interview' },
+  { industry: 'title_escrow', role: 'title_closer', tier: 'primary', title: 'Elizabeth Reilly — FNF Chief Privacy Officer',
+    query: '"Elizabeth Reilly" "Fidelity National" OR "FNF" email contact OR speaker OR conference OR interview' },
+  { industry: 'title_escrow', role: 'title_closer', tier: 'primary', title: 'Mike Nolan — FNF CEO',
+    query: '"Mike Nolan" "Fidelity National" OR "FNF" email contact OR speaker OR conference OR interview OR podcast' },
+  { industry: 'title_escrow', role: 'title_closer', tier: 'primary', title: 'Leadership emails — FNF Investor page',
+    query: 'site:investor.fnf.com "leadership" OR "executive" email contact' },
 
   // ════════════════════════════════════════════════════════
   // TITLE INSURANCE — Old Republic Title (named contacts)
@@ -4698,16 +4717,67 @@ const LEAD_TARGETS = [
     query: '"Munich Re" "Head of Fraud" OR "Fraud Analytics" OR "Claims Innovation" director email contact site:linkedin.com OR site:munichre.com' },
   { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Digital Claims Leader — Swiss Re',
     query: '"Swiss Re" "Digital Claims" OR "Claims Innovation" director email contact site:linkedin.com OR site:swissre.com' },
-  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'VP SIU — Travelers',
-    query: '"Travelers" "VP" "Special Investigations" OR "SIU" OR "Fraud" director email contact site:linkedin.com OR site:travelers.com' },
-  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Director Claims Transformation — Liberty Mutual',
-    query: '"Liberty Mutual" "Director" "Claims Transformation" OR "Claims Innovation" email contact site:linkedin.com OR site:libertymutual.com' },
-  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Chief Compliance Officer — The Hartford',
-    query: '"The Hartford" "Chief Compliance Officer" OR "Head of Compliance" email contact site:linkedin.com OR site:thehartford.com' },
-  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Head Enterprise Risk — CNA Financial',
-    query: '"CNA Financial" "Head of Enterprise Risk" OR "Chief Risk Officer" email contact site:linkedin.com OR site:cna.com' },
+  // TRAVELERS — named contacts
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Nicholas Seminara — Travelers Chief Claim Officer',
+    query: '"Nicholas Seminara" "Travelers" email contact OR speaker OR conference OR interview OR podcast' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Kevin Smith — Travelers Chief Innovation Officer',
+    query: '"Kevin Smith" "Travelers" insurance email contact OR speaker OR conference OR interview OR podcast' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Mojgan Lefebvre — Travelers CTOO',
+    query: '"Mojgan Lefebvre" "Travelers" email contact OR speaker OR conference OR interview OR podcast' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Bruce Jones — Travelers Chief Risk Officer',
+    query: '"Bruce Jones" "Travelers" insurance email contact OR speaker OR conference OR interview' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Avrohom Kess — Travelers Chief Legal Officer',
+    query: '"Avrohom Kess" "Travelers" email contact OR speaker OR conference OR interview' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Gregory Toczydlowski — Travelers Business Insurance',
+    query: '"Gregory Toczydlowski" "Travelers" email contact OR speaker OR conference OR interview OR podcast' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Erik Roen — Travelers CIO Claim Technology',
+    query: '"Erik Roen" "Travelers" email contact OR speaker OR conference OR interview OR podcast' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Judy ONeill — Travelers VP Claims',
+    query: '"Judy" "ONeill" OR "O\'Neill" "Travelers" email contact OR speaker OR conference OR interview' },
+
+  // LIBERTY MUTUAL — named contacts
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Monica Caldas — Liberty Mutual EVP CIO',
+    query: '"Monica Caldas" "Liberty Mutual" email contact OR speaker OR conference OR interview OR podcast' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Matthew Moore — Liberty Mutual President Underwriting',
+    query: '"Matthew Moore" "Liberty Mutual" email contact OR speaker OR conference OR interview' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Susanne Figueredo Cook — Liberty Mutual COO',
+    query: '"Susanne Figueredo" OR "Susanne Cook" "Liberty Mutual" email contact OR speaker OR conference OR interview' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Neeti Bhalla Johnson — Liberty Mutual Global Risk',
+    query: '"Neeti Bhalla Johnson" "Liberty Mutual" email contact OR speaker OR conference OR interview OR podcast' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Tim Sweeney — Liberty Mutual CEO',
+    query: '"Tim Sweeney" "Liberty Mutual" email contact OR speaker OR conference OR interview OR podcast' },
+
+  // MUNICH RE — named contacts
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Declan ONeill — Munich Re Head Digital Innovation',
+    query: '"Declan" "ONeill" OR "O\'Neill" "Munich Re" email contact OR speaker OR conference OR interview' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Patrick Sullivan — Munich Re SVP Integrated Analytics',
+    query: '"Patrick Sullivan" "Munich Re" email contact OR speaker OR conference OR interview OR podcast' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Tobias Frenz — Munich Re Digital Solutions APAC',
+    query: '"Tobias Frenz" "Munich Re" email contact OR speaker OR conference OR interview' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Sven Erichsen — Munich Re Markets Digital',
+    query: '"Sven Erichsen" "Munich Re" email contact OR speaker OR conference OR interview' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Ross Mayne — Munich Re CEO Automation Solutions',
+    query: '"Ross Mayne" "Munich Re" email contact OR speaker OR conference OR interview OR podcast' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Bilal Ramadan — Munich Re CEO HealthTech',
+    query: '"Bilal Ramadan" "Munich Re" email contact OR speaker OR conference OR interview' },
+
+  // SWISS RE, CNA, HARTFORD — enhanced role-based
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Global Head Claims Transformation — Swiss Re',
+    query: '"Swiss Re" "Global Head" "Claims Transformation" OR "Digital Risk" OR "Chief Data Officer" OR "Fraud Analytics" email contact site:linkedin.com OR site:swissre.com' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Chief Claims Officer — CNA Financial',
+    query: '"CNA Financial" "Chief Claims Officer" OR "Head of Claims Innovation" OR "VP SIU" OR "Document Governance" email contact site:linkedin.com OR site:cna.com' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Head Claims Transformation — The Hartford',
+    query: '"The Hartford" "Head of Claims Transformation" OR "VP Fraud Analytics" OR "Chief Digital Officer" email contact site:linkedin.com OR site:thehartford.com' },
   { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'VP Digital Claims — Nationwide',
     query: '"Nationwide" insurance "VP Digital Claims" OR "Claims Innovation" director email contact site:linkedin.com OR site:nationwide.com' },
+
+  // CUSHMAN, COLLIERS, NEWMARK — enhanced role-based
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'CIO / CDO — Cushman & Wakefield',
+    query: '"Cushman Wakefield" "Chief Information Officer" OR "Chief Digital Officer" OR "Head of Risk" OR "Information Governance" email contact site:linkedin.com OR site:cushmanwakefield.com' },
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'CIO / Enterprise Architecture — Colliers',
+    query: '"Colliers" "Chief Information Officer" OR "Enterprise Architecture" OR "Chief Risk Officer" email contact site:linkedin.com OR site:colliers.com' },
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'CIO / General Counsel — Newmark',
+    query: '"Newmark" "Chief Information Officer" OR "Head of Property Technology" OR "General Counsel" email contact site:linkedin.com OR site:nmrk.com' },
 
   // ════════════════════════════════════════════════════════
   // CLINICALTRIALS.GOV — real PI/contact emails via direct API
