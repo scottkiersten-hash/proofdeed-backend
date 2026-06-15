@@ -4313,6 +4313,129 @@ const LEAD_TARGETS = [
   { industry: 'uae_auto', role: 'uae_autodev', tier: 'primary', title: 'CIO — AW Rostamani',                               query: '"AW Rostamani" "Chief Information Officer" OR "CIO" site:linkedin.com OR site:awrostamani.com contact email' },
   { industry: 'uae_auto', role: 'uae_autodev', tier: 'primary', title: 'Head of Business Development — Gargash Group',    query: '"Gargash Group" OR "Gargash Enterprises" "Head of Business Development" site:linkedin.com contact email' },
   { industry: 'uae_auto', role: 'uae_autodev', tier: 'primary', title: 'Director of Operations — Al Habtoor Motors',      query: '"Al Habtoor Motors" "Director of Operations" OR "Operations Director" site:linkedin.com contact email' },
+
+  // ════════════════════════════════════════════════════════
+  // ENTERPRISE INSURANCE — Claims, SIU, Fraud directors
+  // Strategy: industry press, regulatory filings, conference bios
+  // ════════════════════════════════════════════════════════
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Claims Director — Allianz',          query: '"Allianz" "Director" "Claims" OR "Head of Claims" email contact site:linkedin.com OR site:allianz.com' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'SIU Director — Allianz',             query: '"Allianz" "Special Investigations" OR "SIU" director contact email insurance fraud' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Claims Director — AXA',              query: '"AXA" "Head of Claims" OR "Claims Director" contact email site:linkedin.com OR site:axa.com' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Claims Director — Zurich Insurance', query: '"Zurich Insurance" "Director" "Claims" OR "Head of Claims" email contact site:linkedin.com OR site:zurich.com' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'SIU Director — AIG',                 query: '"AIG" "Special Investigations Unit" OR "SIU Director" OR "Claims Director" contact email site:linkedin.com' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Claims Director — Chubb',            query: '"Chubb" "Claims Director" OR "Head of Claims" OR "VP Claims" contact email site:linkedin.com OR site:chubb.com' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Claims Director — Travelers',        query: '"Travelers Insurance" "Claims Director" OR "VP Claims" OR "Head of Claims" contact email site:linkedin.com' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'SIU Director — Liberty Mutual',      query: '"Liberty Mutual" "SIU" OR "Special Investigations" OR "Fraud Director" director contact email site:linkedin.com' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'SIU Director — State Farm',          query: '"State Farm" "Special Investigations" OR "SIU" OR "Fraud" director email contact site:linkedin.com' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'SIU Director — Progressive',         query: '"Progressive Insurance" "Special Investigations" OR "SIU Director" OR "Fraud" director email contact site:linkedin.com' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Governance Director — Marsh McLennan', query: '"Marsh McLennan" "Risk" OR "Governance" OR "Compliance" director email contact site:linkedin.com OR site:marshmclennan.com' },
+
+  // ════════════════════════════════════════════════════════
+  // GLOBAL LAW FIRMS — eDiscovery, Litigation Support, Innovation
+  // Strategy: firm websites publish attorney emails directly
+  // ════════════════════════════════════════════════════════
+  { industry: 'global_legal', role: 'global_law_firm', tier: 'primary', title: 'eDiscovery Director — Kirkland & Ellis',        query: 'site:kirkland.com "eDiscovery" OR "Litigation Support" OR "Legal Technology" director email' },
+  { industry: 'global_legal', role: 'global_law_firm', tier: 'primary', title: 'Litigation Support — Latham & Watkins',         query: 'site:lw.com "eDiscovery" OR "Litigation Support" OR "Legal Operations" email contact' },
+  { industry: 'global_legal', role: 'global_law_firm', tier: 'primary', title: 'Innovation Director — Baker McKenzie',          query: 'site:bakermckenzie.com "Innovation" OR "Legal Technology" OR "Knowledge Management" director email' },
+  { industry: 'global_legal', role: 'global_law_firm', tier: 'primary', title: 'eDiscovery Director — DLA Piper',              query: 'site:dlapiper.com "eDiscovery" OR "Litigation Support" OR "Legal Operations" email contact' },
+  { industry: 'global_legal', role: 'global_law_firm', tier: 'primary', title: 'Innovation Director — Clifford Chance',        query: 'site:cliffordchance.com "Innovation" OR "Legal Technology" OR "Knowledge" director manager email' },
+  { industry: 'global_legal', role: 'global_law_firm', tier: 'primary', title: 'Legal Tech Director — Freshfields',            query: 'site:freshfields.com "Legal Technology" OR "Innovation" OR "eDiscovery" director email contact' },
+  { industry: 'global_legal', role: 'global_law_firm', tier: 'primary', title: 'Innovation — Allen Overy Shearman',            query: 'site:aoshearman.com "Innovation" OR "Legal Technology" OR "Knowledge" email contact director' },
+  { industry: 'global_legal', role: 'global_law_firm', tier: 'primary', title: 'eDiscovery Director — Skadden',               query: 'site:skadden.com "eDiscovery" OR "Litigation Technology" OR "Legal Operations" email director' },
+  { industry: 'global_legal', role: 'global_law_firm', tier: 'primary', title: 'Legal Tech — Hogan Lovells',                  query: 'site:hoganlovells.com "Legal Technology" OR "eDiscovery" OR "Innovation" director email' },
+  { industry: 'global_legal', role: 'global_law_firm', tier: 'primary', title: 'Knowledge Director — Jones Day',              query: 'site:jonesday.com "Knowledge Management" OR "Legal Operations" OR "Innovation" director email' },
+  { industry: 'global_legal', role: 'global_law_firm', tier: 'primary', title: 'eDiscovery — White & Case',                   query: 'site:whitecase.com "eDiscovery" OR "Litigation Support" OR "Legal Technology" director email' },
+  { industry: 'global_legal', role: 'global_law_firm', tier: 'primary', title: 'Innovation — Norton Rose Fulbright',          query: 'site:nortonrosefulbright.com "Innovation" OR "Legal Technology" OR "Knowledge" director email' },
+  { industry: 'global_legal', role: 'global_law_firm', tier: 'primary', title: 'eDiscovery — Gibson Dunn',                    query: 'site:gibsondunn.com "eDiscovery" OR "Litigation Support" OR "Legal Operations" email contact' },
+  { industry: 'global_legal', role: 'global_law_firm', tier: 'primary', title: 'Innovation — Linklaters',                     query: 'site:linklaters.com "Innovation" OR "Legal Technology" OR "Knowledge" director email' },
+  { industry: 'global_legal', role: 'global_law_firm', tier: 'primary', title: 'eDiscovery — Sidley Austin',                  query: 'site:sidley.com "eDiscovery" OR "Litigation Technology" OR "Legal Operations" email director' },
+
+  // ════════════════════════════════════════════════════════
+  // GOVERNMENT REGULATORS — Enforcement, Records, Digital Evidence
+  // Strategy: .gov sites publish staff directories with emails
+  // ════════════════════════════════════════════════════════
+  { industry: 'gov_regulator', role: 'gov_regulator', tier: 'primary', title: 'Enforcement Director — SEC',              query: 'site:sec.gov "Director" "Enforcement" OR "Digital Evidence" OR "Records" email contact staff' },
+  { industry: 'gov_regulator', role: 'gov_regulator', tier: 'primary', title: 'Records Director — IRS',                  query: 'site:irs.gov "Director" "Records" OR "Information Governance" OR "Compliance" email contact' },
+  { industry: 'gov_regulator', role: 'gov_regulator', tier: 'primary', title: 'Enforcement — FCA UK',                    query: 'site:fca.org.uk "Director" "Enforcement" OR "Compliance" OR "Records" email contact staff' },
+  { industry: 'gov_regulator', role: 'gov_regulator', tier: 'primary', title: 'Records — HMRC',                          query: 'site:gov.uk "HMRC" "Director" "Records Management" OR "Information Governance" email contact' },
+  { industry: 'gov_regulator', role: 'gov_regulator', tier: 'primary', title: 'Investigations Director — OLAF',          query: 'site:ec.europa.eu "OLAF" OR "anti-fraud" "Director" "Investigations" email contact' },
+  { industry: 'gov_regulator', role: 'gov_regulator', tier: 'primary', title: 'Cybersecurity Director — NIST',           query: 'site:nist.gov "Director" "Cybersecurity" OR "Digital" OR "Records" email contact staff' },
+  { industry: 'gov_regulator', role: 'gov_regulator', tier: 'primary', title: 'Information Assurance — DHS',             query: 'site:dhs.gov "Director" "Information Assurance" OR "Records" OR "Digital Evidence" email contact' },
+  { industry: 'gov_regulator', role: 'gov_regulator', tier: 'primary', title: 'Enforcement — MAS Singapore',             query: 'site:mas.gov.sg "Director" "Enforcement" OR "Compliance" OR "Records" email contact staff' },
+  { industry: 'gov_regulator', role: 'gov_regulator', tier: 'primary', title: 'Enforcement — ASIC Australia',            query: 'site:asic.gov.au "Director" "Enforcement" OR "Records" OR "Compliance" email contact staff' },
+
+  // ════════════════════════════════════════════════════════
+  // PHARMA / LIFE SCIENCES — Regulatory, Compliance, Clinical Data
+  // Strategy: FDA submissions, conference speaker bios, press releases
+  // ════════════════════════════════════════════════════════
+  { industry: 'pharma', role: 'pharma_cco', tier: 'primary', title: 'Regulatory Director — Pfizer',          query: '"Pfizer" "Director" "Regulatory Affairs" OR "Regulatory Compliance" email contact site:linkedin.com OR site:pfizer.com' },
+  { industry: 'pharma', role: 'pharma_cco', tier: 'primary', title: 'Compliance Director — J&J',             query: '"Johnson Johnson" OR "J&J" "Director" "Compliance" OR "Regulatory" OR "Clinical Data" email contact site:linkedin.com' },
+  { industry: 'pharma', role: 'pharma_cco', tier: 'primary', title: 'Compliance Director — Novartis',        query: '"Novartis" "Director" "Compliance" OR "Clinical Data Integrity" email contact site:linkedin.com OR site:novartis.com' },
+  { industry: 'pharma', role: 'pharma_cco', tier: 'primary', title: 'Compliance Director — Roche',           query: '"Roche" "Director" "Compliance" OR "Regulatory Affairs" email contact site:linkedin.com OR site:roche.com' },
+  { industry: 'pharma', role: 'pharma_cco', tier: 'primary', title: 'Regulatory Director — Merck',           query: '"Merck" "Director" "Regulatory Affairs" OR "Information Governance" email contact site:linkedin.com' },
+  { industry: 'pharma', role: 'pharma_cco', tier: 'primary', title: 'Clinical Ops Director — AstraZeneca',   query: '"AstraZeneca" "Director" "Clinical Operations" OR "Clinical Data" OR "Compliance" email site:linkedin.com' },
+  { industry: 'pharma', role: 'pharma_cco', tier: 'primary', title: 'Data Integrity Director — GSK',         query: '"GSK" "Director" "Data Integrity" OR "Compliance" OR "Regulatory" email contact site:linkedin.com OR site:gsk.com' },
+  { industry: 'pharma', role: 'pharma_cco', tier: 'primary', title: 'Compliance Director — Bayer',           query: '"Bayer" "Director" "Clinical Compliance" OR "Regulatory" OR "Data Integrity" email site:linkedin.com' },
+  { industry: 'pharma', role: 'pharma_cco', tier: 'primary', title: 'Clinical Director — AbbVie',            query: '"AbbVie" "Director" "Clinical Operations" OR "Compliance" OR "Regulatory Affairs" email site:linkedin.com' },
+  { industry: 'pharma', role: 'pharma_cco', tier: 'primary', title: 'Compliance Director — Eli Lilly',       query: '"Eli Lilly" OR "Lilly" "Director" "Compliance" OR "Clinical Records" email contact site:linkedin.com' },
+
+  // ════════════════════════════════════════════════════════
+  // HEALTHCARE SYSTEMS — HIM, Privacy, Compliance Directors
+  // Strategy: hospital websites publish department contacts
+  // ════════════════════════════════════════════════════════
+  { industry: 'healthcare', role: 'healthcare', tier: 'primary', title: 'HIM Director — Mayo Clinic',             query: 'site:mayoclinic.org "Director" "Health Information" OR "Medical Records" OR "HIM" email contact' },
+  { industry: 'healthcare', role: 'healthcare', tier: 'primary', title: 'HIM Director — Cleveland Clinic',        query: 'site:clevelandclinic.org "Director" "Health Information" OR "Medical Records" OR "Compliance" email' },
+  { industry: 'healthcare', role: 'healthcare', tier: 'primary', title: 'Privacy Officer — Kaiser Permanente',    query: 'site:kaiserpermanente.org "Privacy Officer" OR "Information Governance" OR "HIM Director" email contact' },
+  { industry: 'healthcare', role: 'healthcare', tier: 'primary', title: 'HIM Director — Mass General Brigham',   query: 'site:massgeneralbrigham.org "Health Information" OR "Medical Records" OR "HIM" director email' },
+  { industry: 'healthcare', role: 'healthcare', tier: 'primary', title: 'Compliance — Johns Hopkins',             query: 'site:hopkinsmedicine.org "Research Compliance" OR "Compliance Director" OR "HIM" email contact' },
+  { industry: 'healthcare', role: 'healthcare', tier: 'primary', title: 'IG Lead — NHS England',                 query: 'site:england.nhs.uk "Information Governance" OR "Digital Records" director email contact staff' },
+  { industry: 'healthcare', role: 'healthcare', tier: 'primary', title: 'HIM Director — SingHealth',              query: 'site:singhealth.com.sg "Health Information" OR "Medical Records" OR "HIM" director email contact' },
+
+  // ════════════════════════════════════════════════════════
+  // CONSTRUCTION & ENGINEERING — Claims, Project Controls, Contract Directors
+  // Strategy: project delivery firms list contacts in project profiles
+  // ════════════════════════════════════════════════════════
+  { industry: 'construction', role: 'lien', tier: 'primary', title: 'Contract Manager — Bechtel',              query: 'site:bechtel.com "Contract Manager" OR "Project Controls" OR "Claims" director email contact' },
+  { industry: 'construction', role: 'lien', tier: 'primary', title: 'Claims Manager — Fluor',                  query: 'site:fluor.com "Claims Manager" OR "Project Director" OR "Contract" director email contact' },
+  { industry: 'construction', role: 'lien', tier: 'primary', title: 'Program Director — Jacobs Engineering',   query: 'site:jacobs.com "Program Director" OR "Project Controls" OR "Document Control" email contact' },
+  { industry: 'construction', role: 'lien', tier: 'primary', title: 'Document Control — Turner Construction',  query: 'site:turnerconstruction.com "Document Control" OR "Project Controls" OR "Contract" director email' },
+  { industry: 'construction', role: 'lien', tier: 'primary', title: 'Contracts Director — Vinci',              query: 'site:vinci.com "Contracts Director" OR "Project Controls" OR "Claims" email contact director' },
+  { industry: 'construction', role: 'lien', tier: 'primary', title: 'Project Controls — AECOM',               query: 'site:aecom.com "Project Controls" OR "Contract Management" OR "Claims" director email contact' },
+  { industry: 'construction', role: 'lien', tier: 'primary', title: 'Project Controls — WSP Global',          query: 'site:wsp.com "Project Controls" OR "Contract Management" director email contact' },
+
+  // ════════════════════════════════════════════════════════
+  // REAL ESTATE — Transaction, Compliance, Asset Directors
+  // ════════════════════════════════════════════════════════
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Transaction Director — CBRE',           query: 'site:cbre.com "Transaction Director" OR "Compliance" OR "Lease Administration" director email contact' },
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Transaction Manager — JLL',             query: 'site:jll.com "Transaction" OR "Lease Administration" OR "Compliance" director email contact' },
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Lease Director — Cushman & Wakefield',  query: 'site:cushmanwakefield.com "Lease Administration" OR "Transaction" OR "Compliance" director email' },
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Compliance Director — Zillow',          query: 'site:zillow.com "Compliance" OR "Data Integrity" OR "Operations" director email contact' },
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Asset Manager — Prologis',              query: 'site:prologis.com "Asset Manager" OR "Lease" OR "Compliance" director email contact' },
+
+  // ════════════════════════════════════════════════════════
+  // UNIVERSITIES — Research Integrity, Compliance, Research Office
+  // Strategy: university staff directories are publicly searchable
+  // ════════════════════════════════════════════════════════
+  { industry: 'university_research', role: 'university_research', tier: 'primary', title: 'Research Integrity — Harvard',         query: 'site:harvard.edu "Research Integrity" OR "Research Compliance" director officer email contact staff' },
+  { industry: 'university_research', role: 'university_research', tier: 'primary', title: 'Research Compliance — MIT',             query: 'site:mit.edu "Research Compliance" OR "Research Administration" director email contact staff' },
+  { industry: 'university_research', role: 'university_research', tier: 'primary', title: 'Research Compliance — Stanford',        query: 'site:stanford.edu "Research Compliance" OR "Research Integrity" director officer email contact' },
+  { industry: 'university_research', role: 'university_research', tier: 'primary', title: 'Research Governance — Oxford',          query: 'site:ox.ac.uk "Research Integrity" OR "Research Governance" OR "Research Services" director email' },
+  { industry: 'university_research', role: 'university_research', tier: 'primary', title: 'Research Integrity — Cambridge',        query: 'site:cam.ac.uk "Research Integrity" OR "Research Governance" director officer email contact' },
+  { industry: 'university_research', role: 'university_research', tier: 'primary', title: 'Research Compliance — UC Berkeley',    query: 'site:berkeley.edu "Research Compliance" OR "Research Administration" director email contact' },
+  { industry: 'university_research', role: 'university_research', tier: 'primary', title: 'Research Integrity — ETH Zurich',      query: 'site:ethz.ch "Research Integrity" OR "Research Compliance" OR "Research Governance" director email' },
+  { industry: 'university_research', role: 'university_research', tier: 'primary', title: 'Research Governance — NUS Singapore',  query: 'site:nus.edu.sg "Research Integrity" OR "Research Compliance" director officer email contact' },
+  { industry: 'university_research', role: 'university_research', tier: 'primary', title: 'Research Compliance — U Melbourne',    query: 'site:unimelb.edu.au "Research Governance" OR "Research Integrity" director email contact staff' },
+  { industry: 'university_research', role: 'university_research', tier: 'primary', title: 'Research Integrity — U Toronto',       query: 'site:utoronto.ca "Research Integrity" OR "Research Ethics" director email contact staff' },
+
+  // ════════════════════════════════════════════════════════
+  // GOVERNMENT ARCHIVES — Records Directors, Digital Preservation
+  // Strategy: government websites always list staff with emails
+  // ════════════════════════════════════════════════════════
+  { industry: 'intl_archives', role: 'intl_archives', tier: 'primary', title: 'Records Director — NARA',                query: 'site:archives.gov "Director" "Records" OR "Digital Preservation" OR "Information Governance" email contact staff' },
+  { industry: 'intl_archives', role: 'intl_archives', tier: 'primary', title: 'Director — National Archives UK',         query: 'site:nationalarchives.gov.uk "Director" "Records" OR "Digital Preservation" OR "Information" email contact' },
+  { industry: 'intl_archives', role: 'intl_archives', tier: 'primary', title: 'Director — National Archives Australia',  query: 'site:naa.gov.au "Director" "Records" OR "Digital Preservation" OR "Information Management" email contact' },
+  { industry: 'intl_archives', role: 'intl_archives', tier: 'primary', title: 'Director — Library and Archives Canada',  query: 'site:bac-lac.gc.ca OR site:lac-bac.gc.ca "Director" "Records" OR "Information Management" email contact' },
+  { industry: 'intl_archives', role: 'intl_archives', tier: 'primary', title: 'Director — National Archives Singapore',  query: 'site:nas.gov.sg "Director" "Archives" OR "Records" OR "Digital Preservation" email contact staff' },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
