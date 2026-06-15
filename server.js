@@ -2815,7 +2815,7 @@ app.post(['/api/webhooks/resend-inbound', '/webhooks/resend-inbound'], async (re
     const inReplyTo = body.headers?.['in-reply-to'] || null;
 
     // ── Path 1: reply+tag (outbound follow-up reply) ──
-    const match = toField.match(/reply\+([^@\s<>]+)@send\.proofdeed\.com/i);
+    const match = toField.match(/reply\+([^@\s<>]+)@(?:send\.)?proofdeed\.com/i);
     if (!match) {
       // ── Path 2: direct inbox email (info@ or gov@) ──
       const isInbox = /info@proofdeed\.com|gov@proofdeed\.com/i.test(toField);
