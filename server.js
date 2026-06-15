@@ -4318,12 +4318,26 @@ const LEAD_TARGETS = [
   // ENTERPRISE INSURANCE — Claims, SIU, Fraud directors
   // Strategy: industry press, regulatory filings, conference bios
   // ════════════════════════════════════════════════════════
-  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Claims Director — Allianz',          query: '"Allianz" "Director" "Claims" OR "Head of Claims" email contact site:linkedin.com OR site:allianz.com' },
-  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'SIU Director — Allianz',             query: '"Allianz" "Special Investigations" OR "SIU" director contact email insurance fraud' },
-  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Claims Director — AXA',              query: '"AXA" "Head of Claims" OR "Claims Director" contact email site:linkedin.com OR site:axa.com' },
+  // Allianz — target Allianz Technology (internal tech wing) + Global P&C Claims
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Director — Allianz Technology Digital Claims',  query: '"Allianz Technology" "Director" OR "Head" "Claims" OR "Digital" OR "P&C" email contact site:linkedin.com' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Head of P&C — Allianz Global Claims',          query: '"Allianz" "Global P&C" OR "Property Casualty" "Head" OR "Director" email contact site:linkedin.com OR site:allianz.com/news' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Innovation Lead — Allianz Technology',         query: '"Allianz Technology" "blockchain" OR "digital property" OR "innovation" director speaker email conference' },
+
+  // AXA — target AXA Next (innovation) + AXA Group Operations
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Director — AXA Next Blockchain Innovation',    query: '"AXA Next" "Director" OR "Head" email contact site:linkedin.com OR site:axa.com/en/newsroom' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Head of Operations — AXA Group Operations',   query: '"AXA Group Operations" "Director" OR "Head" OR "VP" email contact site:linkedin.com' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Blockchain Lead — AXA parametric insurance',  query: '"AXA" "blockchain" OR "parametric" OR "smart contract" "director" OR "head" speaker email conference bio' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Claims Director — AXA',                       query: '"AXA" "Head of Claims" OR "Claims Director" contact email site:linkedin.com OR site:axa.com' },
   { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Claims Director — Zurich Insurance', query: '"Zurich Insurance" "Director" "Claims" OR "Head of Claims" email contact site:linkedin.com OR site:zurich.com' },
-  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'SIU Director — AIG',                 query: '"AIG" "Special Investigations Unit" OR "SIU Director" OR "Claims Director" contact email site:linkedin.com' },
-  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Claims Director — Chubb',            query: '"Chubb" "Claims Director" OR "Head of Claims" OR "VP Claims" contact email site:linkedin.com OR site:chubb.com' },
+  // AIG — target Commercial Underwriting + Legal Operations
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Director — AIG Commercial Underwriting',       query: '"AIG" "Commercial Underwriting" "Director" OR "VP" OR "Head" email contact site:linkedin.com' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'VP Legal Operations — AIG',                   query: '"AIG" "Legal Operations" OR "Legal Director" OR "General Counsel" email contact site:linkedin.com OR site:aig.com/about' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Real Estate Risk — AIG Global',               query: '"AIG" "global real estate" OR "complex risk" OR "corporate insurance" director speaker email conference bio' },
+
+  // Chubb — target North American/Global Claims + Information Security
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Claims Director — Chubb North America',       query: '"Chubb" "North America" "Claims Director" OR "Head of Claims" OR "VP Claims" email contact site:linkedin.com' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'CISO / InfoSec — Chubb Global',               query: '"Chubb" "Information Security" OR "CISO" OR "Cybersecurity" director email contact site:linkedin.com OR site:chubb.com' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Property Claims — Chubb luxury real estate',  query: '"Chubb" "high value" OR "luxury" OR "real estate title" "claims" director speaker email conference bio' },
   { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Claims Director — Travelers',        query: '"Travelers Insurance" "Claims Director" OR "VP Claims" OR "Head of Claims" contact email site:linkedin.com' },
   { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'SIU Director — Liberty Mutual',      query: '"Liberty Mutual" "SIU" OR "Special Investigations" OR "Fraud Director" director contact email site:linkedin.com' },
   { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'SIU Director — State Farm',          query: '"State Farm" "Special Investigations" OR "SIU" OR "Fraud" director email contact site:linkedin.com' },
