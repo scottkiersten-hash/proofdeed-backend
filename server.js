@@ -4452,6 +4452,64 @@ const LEAD_TARGETS = [
   { industry: 'intl_archives', role: 'intl_archives', tier: 'primary', title: 'Director — National Archives Singapore',  query: 'site:nas.gov.sg "Director" "Archives" OR "Digital Preservation" email contact staff' },
 
   // ════════════════════════════════════════════════════════
+  // NAMED TARGETS — real identified decision-makers
+  // Strategy: search by full name + company for published email
+  // across conference bios, bylines, podcasts, patent filings
+  // ════════════════════════════════════════════════════════
+
+  // ALLIANZ — named contacts
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Iain Briggs — Allianz Technology',
+    query: '"Iain Briggs" "Allianz" email contact OR speaker OR interview OR podcast' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Melissa Hill — Allianz Claims Transformation',
+    query: '"Melissa Hill" "Allianz" email contact OR speaker OR conference OR interview' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Thomas Sepp — Allianz Claims Leadership',
+    query: '"Thomas Sepp" "Allianz" email contact OR speaker OR interview' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Nick Kelsall — Allianz Digital Fraud',
+    query: '"Nick Kelsall" "Allianz" email contact OR speaker OR conference OR interview' },
+  // Scrape the Allianz press release pages directly — PR contacts listed at bottom
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'PR Contact — Allianz Commercial NA Claims',
+    query: 'site:commercial.allianz.com "new-na-head-of-claims" email contact press' },
+
+  // AXA — named contacts
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Matthieu Caillat — AXA Digital Transformation',
+    query: '"Matthieu Caillat" "AXA" email contact OR speaker OR conference OR interview' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Guillaume Borie — AXA Technology',
+    query: '"Guillaume Borie" "AXA" email contact OR speaker OR interview OR podcast' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Karima Silvent — AXA Compliance Governance',
+    query: '"Karima Silvent" "AXA" email contact OR speaker OR conference OR interview' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Helen Browne — AXA Legal Governance',
+    query: '"Helen Browne" "AXA" email contact OR speaker OR conference OR interview' },
+
+  // AIG — named contacts
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Roshan Navagamuwa — AIG CIO',
+    query: '"Roshan Navagamuwa" "AIG" email contact OR speaker OR conference OR interview OR podcast' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Scott Hallworth — AIG Digital Transformation',
+    query: '"Scott Hallworth" "AIG" email contact OR speaker OR conference OR interview' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Chris Schaper — AIG Risk Management',
+    query: '"Chris Schaper" "AIG" email contact OR speaker OR conference OR interview' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Christopher Flatt — AIG Commercial Underwriting',
+    query: '"Christopher Flatt" "AIG" email contact OR speaker OR conference OR interview' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Jon Hancock — AIG Claims Global',
+    query: '"Jon Hancock" "AIG" email contact OR speaker OR conference OR interview' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Rose Marie Glazer — AIG Legal Operations',
+    query: '"Rose Marie Glazer" "AIG" email contact OR speaker OR conference OR interview' },
+
+  // CHUBB — named contacts (highest priority per research)
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Kevin Rampe — Chubb Global Head of Claims',
+    query: '"Kevin Rampe" "Chubb" email contact OR speaker OR conference OR interview OR podcast' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Sean Ringsted — Chubb Analytics Fraud AI',
+    query: '"Sean Ringsted" "Chubb" email contact OR speaker OR conference OR interview OR podcast' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Frances OBrien — Chubb Risk',
+    query: '"Frances" "OBrien" "Chubb" email contact OR speaker OR conference OR interview' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Joseph Wayland — Chubb Legal Governance',
+    query: '"Joseph Wayland" "Chubb" email contact OR speaker OR conference OR interview' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Dennis Quinn — Chubb Compliance',
+    query: '"Dennis Quinn" "Chubb" email contact OR speaker OR conference OR interview' },
+  // Scrape Chubb press release directly for PR contact email
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'PR Contact — Chubb Kevin Rampe announcement',
+    query: 'site:news.chubb.com "Kevin-Rampe-Global-Head-of-Claims" email contact press media' },
+
+  // ════════════════════════════════════════════════════════
   // CLINICALTRIALS.GOV — real PI/contact emails via direct API
   // source:'clinicaltrials' routes to searchLeadsViaClinicalTrials()
   // ════════════════════════════════════════════════════════
