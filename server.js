@@ -3379,6 +3379,7 @@ app.post(['/api/admin/import/csv', '/admin/import/csv'], authRateLimit, upload.s
     const mapIndustry = (apolloIndustry) => {
       const s = (apolloIndustry || '').toLowerCase();
       if (s.includes('proptech') || s.includes('real estate services') || s.includes('real estate investment') || s.includes('reit') || s.includes('real estate technology')) return 'real_estate';
+      if (s.includes('title insurance') || s.includes('title company') || s.includes('title & escrow') || s.includes('escrow')) return 'title_escrow';
       if (s.includes('real estate') || s.includes('property')) return 'title_escrow';
       if (s.includes('government regulator') || s.includes('regulatory authority') || s.includes('tax authority') || s.includes('financial regulator') || s.includes('law enforcement') || s.includes('central bank') || s.includes('audit institution') || s.includes('anti-fraud') || s.includes('anti-corruption')) return 'gov_regulator';
       if (s.includes('government') || s.includes('public') || s.includes('municipal')) return 'government';
