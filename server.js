@@ -4576,22 +4576,138 @@ const LEAD_TARGETS = [
     query: 'site:jll.com "leadership" "bio-leader" email contact' },
 
   // ════════════════════════════════════════════════════════
-  // TITLE INSURANCE — Fidelity National + Old Republic (role-based searches)
+  // TITLE INSURANCE — Fidelity National Financial (role-based)
   // ════════════════════════════════════════════════════════
-  { industry: 'title_escrow', role: 'title_closer', tier: 'primary', title: 'CDO / Fraud Prevention — Fidelity National Financial',
-    query: '"Fidelity National Financial" "Chief Digital Officer" OR "Head of Fraud Prevention" OR "Chief Underwriting Counsel" email contact site:linkedin.com OR site:fnf.com' },
-  { industry: 'title_escrow', role: 'title_closer', tier: 'primary', title: 'CIO / Claims — Old Republic Title',
-    query: '"Old Republic Title" "Chief Information Officer" OR "VP Claims" OR "Chief Underwriting Counsel" email contact site:linkedin.com OR site:oldrepublictitle.com' },
+  { industry: 'title_escrow', role: 'title_closer', tier: 'primary', title: 'Head of Digital Title — Fidelity National Financial',
+    query: '"Fidelity National Financial" "Head of Digital Title" OR "VP Fraud Prevention" OR "Chief Underwriting Counsel" email contact site:linkedin.com OR site:fnf.com' },
 
   // ════════════════════════════════════════════════════════
-  // MORTGAGE — Rocket Mortgage, Mr. Cooper, Pennymac
+  // TITLE INSURANCE — Old Republic Title (named contacts)
   // ════════════════════════════════════════════════════════
-  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Head of Mortgage Technology — Rocket Mortgage',
-    query: '"Rocket Mortgage" "Head of Mortgage Technology" OR "VP Digital Mortgage" OR "Document Management" director email contact site:linkedin.com' },
+  { industry: 'title_escrow', role: 'title_closer', tier: 'primary', title: 'Joe Aperfine — Old Republic Title CIO',
+    query: '"Joe Aperfine" "Old Republic" email contact OR speaker OR conference OR interview' },
+  { industry: 'title_escrow', role: 'title_closer', tier: 'primary', title: 'Mark Budzinski — Old Republic Chief Legal Officer',
+    query: '"Mark Budzinski" "Old Republic" email contact OR speaker OR conference OR interview' },
+  { industry: 'title_escrow', role: 'title_closer', tier: 'primary', title: 'Kent Lewis — Old Republic EVP General Counsel',
+    query: '"Kent Lewis" "Old Republic" email contact OR speaker OR conference OR interview' },
+  { industry: 'title_escrow', role: 'title_closer', tier: 'primary', title: 'Rob Zellar — Old Republic Chief Strategy Officer',
+    query: '"Rob Zellar" "Old Republic" email contact OR speaker OR conference OR interview' },
+  { industry: 'title_escrow', role: 'title_closer', tier: 'primary', title: 'Carolyn Monroe — Old Republic CEO',
+    query: '"Carolyn Monroe" "Old Republic" email contact OR speaker OR conference OR interview OR podcast' },
+  { industry: 'title_escrow', role: 'title_closer', tier: 'primary', title: 'Bill Robinson — Old Republic EVP Enterprise Services',
+    query: '"Bill Robinson" "Old Republic" email contact OR speaker OR conference OR interview' },
+  { industry: 'title_escrow', role: 'title_closer', tier: 'primary', title: 'Leadership emails — Old Republic Title',
+    query: 'site:oldrepublictitle.com "leadership" email contact' },
+
+  // ════════════════════════════════════════════════════════
+  // TITLE / REAL ESTATE — Anywhere Real Estate, Compass
+  // ════════════════════════════════════════════════════════
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'SVP Transaction Services — Anywhere Real Estate',
+    query: '"Anywhere Real Estate" "SVP Transaction Services" OR "Transaction Services" director email contact site:linkedin.com OR site:anywhere.re' },
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'VP Compliance — Compass',
+    query: '"Compass" real estate "VP Compliance" OR "Chief Compliance Officer" email contact site:linkedin.com OR site:compass.com' },
+
+  // ════════════════════════════════════════════════════════
+  // MORTGAGE & LENDING — named + role-based
+  // ════════════════════════════════════════════════════════
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Nicole Beattie — Amrock CEO',
+    query: '"Nicole Beattie" "Amrock" OR "Rocket" email contact OR speaker OR conference OR interview OR podcast' },
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Shawn Malhotra — Rocket Mortgage CTO',
+    query: '"Shawn Malhotra" "Rocket" email contact OR speaker OR conference OR interview OR podcast' },
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Jay Jones — Rocket Chief Servicing Officer',
+    query: '"Jay Jones" "Rocket" email contact OR speaker OR conference OR interview' },
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Heather Lovier — Amrock COO',
+    query: '"Heather Lovier" "Amrock" email contact OR speaker OR conference OR interview' },
   { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Chief Risk Officer — Mr. Cooper',
-    query: '"Mr. Cooper" "Chief Risk Officer" OR "Head of Servicing Operations" OR "VP Enterprise Records" email contact site:linkedin.com OR site:mrcooper.com' },
+    query: '"Mr. Cooper" "Chief Risk Officer" OR "VP Enterprise Records" email contact site:linkedin.com OR site:mrcooper.com' },
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Chief Compliance Officer — loanDepot',
+    query: '"loanDepot" "Chief Compliance Officer" OR "VP Loan Operations" email contact site:linkedin.com OR site:loandepot.com' },
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Director Document Governance — Freedom Mortgage',
+    query: '"Freedom Mortgage" "Document Governance" OR "Chief Compliance" director email contact site:linkedin.com' },
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'VP Digital Transformation — UWM',
+    query: '"UWM" OR "United Wholesale Mortgage" "VP Digital" OR "Digital Transformation" director email contact site:linkedin.com' },
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Head of Enterprise Records — Newrez',
+    query: '"Newrez" "Enterprise Records" OR "Chief Compliance" OR "VP Operations" director email contact site:linkedin.com' },
   { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Chief Compliance Officer — Pennymac',
-    query: '"Pennymac" "Chief Compliance Officer" OR "VP Loan Operations" OR "Digital Transformation" director email contact site:linkedin.com OR site:pennymac.com' },
+    query: '"Pennymac" "Chief Compliance Officer" OR "VP Loan Operations" email contact site:linkedin.com OR site:pennymac.com' },
+
+  // ════════════════════════════════════════════════════════
+  // COMMERCIAL REAL ESTATE — Cushman & Wakefield, Colliers, Newmark
+  // ════════════════════════════════════════════════════════
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'CIO — Cushman & Wakefield',
+    query: '"Cushman Wakefield" "Chief Information Officer" OR "Director Information Governance" email contact site:linkedin.com OR site:cushmanwakefield.com' },
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Head Digital Transformation — Colliers',
+    query: '"Colliers" "Head of Digital Transformation" OR "Chief Digital Officer" email contact site:linkedin.com OR site:colliers.com' },
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Chief Risk Officer — Newmark',
+    query: '"Newmark" "Chief Risk Officer" OR "Head of Risk" email contact site:linkedin.com OR site:nmrk.com' },
+
+  // ════════════════════════════════════════════════════════
+  // TIER 4: GLOBAL BANKS
+  // ════════════════════════════════════════════════════════
+  { industry: 'banking', role: 'recorder', tier: 'primary', title: 'MD Digital Assets — JPMorgan Chase',
+    query: '"JPMorgan" "Managing Director" "Digital Assets" OR "Document Intelligence" email contact site:linkedin.com OR site:jpmorganchase.com' },
+  { industry: 'banking', role: 'recorder', tier: 'primary', title: 'Chief Data Officer — Bank of America',
+    query: '"Bank of America" "Chief Data Officer" OR "Head of Mortgage Technology" email contact site:linkedin.com OR site:bankofamerica.com' },
+  { industry: 'banking', role: 'recorder', tier: 'primary', title: 'VP Enterprise Records — Wells Fargo',
+    query: '"Wells Fargo" "VP Enterprise Records" OR "Head of Document Management" email contact site:linkedin.com OR site:wellsfargo.com' },
+  { industry: 'banking', role: 'recorder', tier: 'primary', title: 'Head of Operational Risk — Citigroup',
+    query: '"Citigroup" OR "Citi" "Head of Operational Risk" OR "Document Governance" director email contact site:linkedin.com' },
+  { industry: 'banking', role: 'recorder', tier: 'primary', title: 'Head Financial Crime Technology — HSBC',
+    query: '"HSBC" "Head of Financial Crime Technology" OR "Financial Crime" director email contact site:linkedin.com OR site:hsbc.com' },
+  { industry: 'banking', role: 'recorder', tier: 'primary', title: 'Head of Digital Trust — Standard Chartered',
+    query: '"Standard Chartered" "Head of Digital Trust" OR "Digital Compliance" director email contact site:linkedin.com OR site:sc.com' },
+
+  // ════════════════════════════════════════════════════════
+  // TIER 5: LEGAL — additional firms (Dentons)
+  // ════════════════════════════════════════════════════════
+  { industry: 'global_legal', role: 'global_law_firm', tier: 'primary', title: 'Head Knowledge Management — Dentons',
+    query: '"Dentons" "Head of Knowledge Management" OR "Chief Innovation Officer" OR "Legal Technology" director email contact site:linkedin.com OR site:dentons.com' },
+
+  // ════════════════════════════════════════════════════════
+  // TIER 6: LAND REGISTRIES (named searches)
+  // ════════════════════════════════════════════════════════
+  { industry: 'gov_regulator', role: 'gov_regulator', tier: 'primary', title: 'Head Digital Transformation — HM Land Registry',
+    query: 'site:gov.uk "HM Land Registry" "Head of Digital" OR "Digital Transformation" OR "CTO" email contact staff' },
+  { industry: 'gov_regulator', role: 'gov_regulator', tier: 'primary', title: 'Director Innovation — Dubai Land Department',
+    query: '"Dubai Land Department" "Director" "Innovation" OR "Digital" OR "Technology" email contact site:linkedin.com OR site:dubailand.gov.ae' },
+  { industry: 'gov_regulator', role: 'gov_regulator', tier: 'primary', title: 'CTO — Singapore Land Authority',
+    query: 'site:sla.gov.sg "Chief Technology Officer" OR "Director" "Digital" OR "Technology" email contact staff' },
+  { industry: 'gov_regulator', role: 'gov_regulator', tier: 'primary', title: 'Head Digital Trust — NSW Land Registry',
+    query: '"NSW Land Registry" OR "New South Wales Land Registry" "Head of Digital" OR "Director" email contact site:linkedin.com' },
+  { industry: 'gov_regulator', role: 'gov_regulator', tier: 'primary', title: 'Director Records Integrity — Ontario Land Registry',
+    query: '"Ontario Land Registry" "Director" "Records" OR "Digital" OR "Integrity" email contact site:ontario.ca OR site:linkedin.com' },
+  { industry: 'gov_regulator', role: 'gov_regulator', tier: 'primary', title: 'County Recorder CIO — US County Offices',
+    query: '"County Recorder" OR "Register of Deeds" "CIO" OR "Chief Information Officer" OR "Director Records" email contact site:linkedin.com' },
+
+  // ════════════════════════════════════════════════════════
+  // TIER 7: INSURANCE EXPANSION — Zurich (named), Munich Re, Swiss Re, Travelers, Liberty Mutual, Hartford, CNA, Nationwide
+  // ════════════════════════════════════════════════════════
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Ian Thompson — Zurich Group Chief Claims Officer',
+    query: '"Ian Thompson" "Zurich" email contact OR speaker OR conference OR interview OR podcast' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Annarita Roscino — Zurich Claims Analytics',
+    query: '"Annarita Roscino" "Zurich" email contact OR speaker OR conference OR interview' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Andrew Fairclough — Zurich Claims Excellence',
+    query: '"Andrew Fairclough" "Zurich" email contact OR speaker OR conference OR interview' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Delpha DiGiacomo — Zurich Head of Fraud',
+    query: '"Delpha DiGiacomo" "Zurich" email contact OR speaker OR conference OR interview' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Raffaello Consigli — Zurich SIU',
+    query: '"Raffaello Consigli" "Zurich" email contact OR speaker OR conference OR interview' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Aleksandar Vidovic — Zurich Fraud AI',
+    query: '"Aleksandar Vidovic" "Zurich" email contact OR speaker OR conference OR interview' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Head Fraud Analytics — Munich Re',
+    query: '"Munich Re" "Head of Fraud" OR "Fraud Analytics" OR "Claims Innovation" director email contact site:linkedin.com OR site:munichre.com' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Digital Claims Leader — Swiss Re',
+    query: '"Swiss Re" "Digital Claims" OR "Claims Innovation" director email contact site:linkedin.com OR site:swissre.com' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'VP SIU — Travelers',
+    query: '"Travelers" "VP" "Special Investigations" OR "SIU" OR "Fraud" director email contact site:linkedin.com OR site:travelers.com' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Director Claims Transformation — Liberty Mutual',
+    query: '"Liberty Mutual" "Director" "Claims Transformation" OR "Claims Innovation" email contact site:linkedin.com OR site:libertymutual.com' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Chief Compliance Officer — The Hartford',
+    query: '"The Hartford" "Chief Compliance Officer" OR "Head of Compliance" email contact site:linkedin.com OR site:thehartford.com' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Head Enterprise Risk — CNA Financial',
+    query: '"CNA Financial" "Head of Enterprise Risk" OR "Chief Risk Officer" email contact site:linkedin.com OR site:cna.com' },
+  { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'VP Digital Claims — Nationwide',
+    query: '"Nationwide" insurance "VP Digital Claims" OR "Claims Innovation" director email contact site:linkedin.com OR site:nationwide.com' },
 
   // ════════════════════════════════════════════════════════
   // CLINICALTRIALS.GOV — real PI/contact emails via direct API
