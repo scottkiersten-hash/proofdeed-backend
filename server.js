@@ -7815,6 +7815,62 @@ app.get(["/health-check", "/api/health-check"], async (req, res) => {
   });
 });
 
+/* ---------------- CRM Health Endpoint ---------------- */
+app.get(['/api/admin/crm-health', '/admin/crm-health'], authRateLimit, async (req, res) => {
+  if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS outreach_contacts (
+        id SERIAL PRIMARY KEY, name TEXT NOT NULL, email TEXT, company TEXT,
+        title TEXT, industry TEXT, county TEXT, state TEXT,
+        status TEXT DEFAULT 'sent', notes TEXT,
+        first_sent_at TIMESTAMPTZ, last_contact_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+
+    const [totals, byStatus, recentlySent, bounced, replied, followUpDue] = await Promise.all([
+      pool.query(`SELECT COUNT(*) AS total FROM outreach_contacts`),
+      pool.query(`SELECT status, COUNT(*) AS count FROM outreach_contacts GROUP BY status ORDER BY count DESC`),
+      pool.query(`SELECT COUNT(*) AS count FROM outreach_contacts WHERE first_sent_at >= NOW() - INTERVAL '24 hours'`),
+      pool.query(`SELECT COUNT(*) AS count FROM outreach_contacts WHERE status IN ('bounced','hard_bounce','suppressed')`),
+      pool.query(`SELECT COUNT(*) AS count FROM outreach_contacts WHERE status = 'replied'`),
+      pool.query(`
+        SELECT COUNT(*) AS count FROM outreach_contacts
+        WHERE status = 'sent'
+          AND first_sent_at IS NOT NULL
+          AND (
+            (last_contact_at IS NULL AND first_sent_at <= NOW() - INTERVAL '7 days')
+            OR last_contact_at <= NOW() - INTERVAL '7 days'
+          )
+      `),
+    ]);
+
+    const recentContacts = await pool.query(`
+      SELECT name, email, company, status, first_sent_at, last_contact_at, pipeline_stage
+      FROM outreach_contacts
+      ORDER BY last_contact_at DESC NULLS LAST, created_at DESC
+      LIMIT 10
+    `);
+
+    res.json({
+      timestamp: new Date().toISOString(),
+      summary: {
+        total_contacts: parseInt(totals.rows[0].total),
+        sent_last_24h: parseInt(recentlySent.rows[0].count),
+        bounced: parseInt(bounced.rows[0].count),
+        replied: parseInt(replied.rows[0].count),
+        follow_up_due: parseInt(followUpDue.rows[0].count),
+      },
+      by_status: byStatus.rows.map(r => ({ status: r.status, count: parseInt(r.count) })),
+      recent_contacts: recentContacts.rows,
+    });
+  } catch (err) {
+    console.error('CRM health error:', err);
+    res.status(500).json({ error: 'Failed to load CRM health.' });
+  }
+});
+
 /* ---------------- Start Server ---------------- */
 const server = app.listen(PORT, () => {
   console.log("ProofDeed backend running on port " + PORT);
