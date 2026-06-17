@@ -2138,8 +2138,10 @@ app.get(["/admin/stats", "/api/admin/stats"], authRateLimit, async (req, res) =>
 
 /* ---------------- ADMIN AUTH HELPER ---------------- */
 function verifyAdminAuth(req) {
-  const adminSecret = req.headers["x-admin-secret"];
-  if (adminSecret !== process.env.ADMIN_SECRET) return false;
+  const provided = req.headers["x-admin-secret"];
+  // Accept ADMIN_PASSWORD (simple login password) or ADMIN_SECRET (API secret) — whichever is set
+  const validPassword = process.env.ADMIN_PASSWORD || process.env.ADMIN_SECRET;
+  if (provided !== validPassword) return false;
 
   // If TOTP is configured, also verify the token
   if (process.env.ADMIN_TOTP_SECRET) {
