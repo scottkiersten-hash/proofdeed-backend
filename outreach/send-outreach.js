@@ -22,29 +22,15 @@ function buildEmail(contact) {
   const first = contact.name.split(' ')[0];
   return `Hi ${first},
 
-${contact.opening}
+Deed fraud is up across the country — and most county recording offices have no way to prove a document hasn't been altered after filing.
 
-ProofDeed certifies documents at the moment of recording — SHA-256 hash anchored permanently to the Polygon public blockchain — creating a tamper-evident, court-admissible timestamp that any court, auditor, or citizen can verify independently without contacting your office.
+We built ProofDeed to fix that. It takes one API call to add a permanent blockchain timestamp to any recorded document — court-admissible under FRE Rule 901, zero system replacement, live in days.
 
-What's relevant for ${contact.county} County:
+Would it be worth a 15-minute call to see if it fits ${contact.county} County?
 
-- Court-admissible under Federal Rules of Evidence Rule 901(b)(9) — the certification itself is authentication evidence
-- No system replacement — one API call added to your existing recording workflow, nothing disrupted
-- Any volume, one transaction — each document gets its own individual cryptographic Merkle proof
-- Zero document storage — hashing is client-side, originals never leave your control
-- Public verification — anyone can verify any document at verify.proofdeed.com, no account required
-
-See it live in 2 minutes: proofdeed.com/demo
-
-Or if you'd prefer a personal walkthrough, I'd be happy to connect for 20 minutes.
-
-Best,
 Scott Kiersten
-Founder & CEO, ProofDeed
-gov@proofdeed.com
-proofdeed.com
-
-P.S. I've attached a one-page overview of how ProofDeed certifications satisfy Federal Rules of Evidence Rule 901 for court admissibility.`;
+Founder, ProofDeed
+gov@proofdeed.com`;
 }
 
 async function sendOutreach() {

@@ -32,36 +32,18 @@ function buildSubject(contact) {
 
 function buildEmail(contact) {
   const first = contact.name.split(' ')[0];
-  const useCase = contact.use_case || '';
+  const useCase = contact.use_case || 'protecting critical documents from tampering and disputes';
   return `Hi ${first},
 
-I'm reaching out because ${contact.company}'s document workflow is a strong fit for what we've built at ProofDeed.
+Quick question — does ${contact.company} have a way to prove a document hasn't been altered after it was signed?
 
-${useCase}
+Most organizations don't. We built ProofDeed to solve that — it adds a permanent blockchain timestamp to any document at the moment of creation, court-admissible under FRE Rule 901. One API call, nothing replaced, live in days.
 
-ProofDeed certifies documents at the moment of creation — a SHA-256 hash anchored permanently to the Polygon public blockchain — creating a tamper-evident, court-admissible timestamp that any court, auditor, regulator, or counterparty can verify independently, with no ongoing dependency on ProofDeed's servers.
+Worth a 15-minute call?
 
-What makes it relevant for ${contact.company}:
-
-- Court-admissible under Federal Rules of Evidence Rule 901(b)(9) — the blockchain certification itself is authentication evidence
-- No system replacement — one lightweight API call added to your existing workflow, nothing disrupted
-- Scales to any volume — each document gets its own individual cryptographic Merkle proof
-- Zero document storage — SHA-256 hashing is client-side, originals never leave your control
-- Public verification — anyone can independently verify any certified document at verify.proofdeed.com
-
-The liability protection alone makes this worth a look — a single disputed document or fraudulent record can cost far more than the entire implementation.
-
-See it live in 2 minutes: proofdeed.com/demo
-
-Or if you'd prefer a walkthrough — I'm happy to show you exactly how it integrates into your current stack over a quick 20-minute call.
-
-Best,
 Scott Kiersten
-Founder & CEO, ProofDeed
-gov@proofdeed.com
-proofdeed.com
-
-P.S. I've attached a one-page overview of how ProofDeed certifications satisfy Federal Rules of Evidence Rule 901 for court admissibility — same standard used in federal litigation.`;
+Founder, ProofDeed
+gov@proofdeed.com`;
 }
 
 async function sendOutreach() {

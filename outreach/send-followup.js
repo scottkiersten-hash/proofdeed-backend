@@ -22,21 +22,15 @@ function buildFollowUp(contact) {
   const first = contact.name.split(' ')[0];
   return `Hi ${first},
 
-I wanted to follow up on my note from last week about blockchain document certification for ${contact.county} County.
+Just following up on my note from last week.
 
-Deed fraud cases are up significantly across the US in 2026 — and counties that have already anchored their recording workflow to blockchain certification are in the strongest position to protect property owners and satisfy court admissibility requirements under FRE Rule 901.
+I know this landed during a busy time — I'll keep it short. ProofDeed puts a permanent, court-admissible timestamp on any document your office records. One API call, no new systems, takes days to go live.
 
-ProofDeed requires no system replacement, certifies any volume of documents in a single blockchain transaction, and can be live in your office within days.
+Is there a better person on your team to talk to, or would a quick 15-minute call work for you?
 
-Would you have 20 minutes this week for a quick walkthrough? I'm happy to work around your schedule.
-
-Best,
 Scott Kiersten
-Founder & CEO, ProofDeed
-gov@proofdeed.com
-proofdeed.com
-
-P.S. Attaching our FRE Rule 901 admissibility overview again for reference.`;
+Founder, ProofDeed
+gov@proofdeed.com`;
 }
 
 async function sendFollowUps() {

@@ -23,23 +23,15 @@ function buildFollowUp(contact) {
   const first = contact.name.split(' ')[0];
   return `Hi ${first},
 
-Following up on my note from last week about blockchain document certification for ${contact.company}.
+Circling back on my note from last week.
 
-Document fraud and post-transaction disputes are rising across every industry that handles high-value records — and organizations that have already anchored their document workflows to blockchain certification are in the strongest position to protect themselves and satisfy court admissibility requirements under FRE Rule 901.
+One thing I didn't mention — if a document ever ends up in litigation, ProofDeed's blockchain certificate is admissible as authentication evidence under FRE Rule 901. Most legal and compliance teams find that's the part worth a conversation.
 
-ProofDeed requires no system replacement, integrates via a single lightweight API call, and can go live within days of a decision.
+Is there a better time or a better person at ${contact.company} to connect with?
 
-The liability exposure from a single disputed or fraudulent document typically dwarfs the entire cost of implementation — which is why this is usually an easy call for legal and compliance teams once they see how it works.
-
-Would you have 20 minutes this week for a quick walkthrough? I'm flexible on timing.
-
-Best,
 Scott Kiersten
-Founder & CEO, ProofDeed
-gov@proofdeed.com
-proofdeed.com
-
-P.S. Attaching our FRE Rule 901 admissibility overview again for easy reference.`;
+Founder, ProofDeed
+gov@proofdeed.com`;
 }
 
 async function sendFollowUps() {

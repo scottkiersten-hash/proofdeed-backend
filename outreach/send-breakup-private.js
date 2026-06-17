@@ -22,19 +22,13 @@ function buildBreakup(contact) {
   const first = contact.name.split(' ')[0];
   return `Hi ${first},
 
-I've reached out a couple of times about blockchain document certification for ${contact.company} and haven't heard back — so I'll assume the timing isn't right and close out my follow-ups.
+I've sent a couple of notes and haven't heard back — I'll take that as not the right time and won't follow up again.
 
-If that changes, I'm happy to reconnect. ProofDeed certifies documents on the Polygon blockchain with court-admissible proof under FRE Rule 901 — no system replacement, live in days.
+If anything changes or a document dispute ever comes up, we're at proofdeed.com.
 
-One last ask: if there's someone else at ${contact.company} better suited for this conversation, I'd appreciate a quick introduction.
-
-Either way, appreciate your time and wish you well.
-
-Best,
 Scott Kiersten
-Founder & CEO, ProofDeed
-gov@proofdeed.com
-proofdeed.com`;
+Founder, ProofDeed
+gov@proofdeed.com`;
 }
 
 async function sendBreakups() {
