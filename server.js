@@ -4282,6 +4282,28 @@ const LEAD_TARGETS = [
   { industry: 'title_escrow', role: 'alta',   tier: 'primary',    title: 'Title Insurance Underwriter',    query: '"title insurance" underwriter OR "underwriting counsel" USA contact email' },
   { industry: 'title_escrow', role: 'alta',   tier: 'primary',    title: 'Title Claims Manager',           query: '"title insurance" "claims manager" OR "claims director" USA contact email' },
 
+  // USDA 2026 National Lenders of the Year — top USDA Rural Housing guaranteed loan partners
+  { industry: 'title_escrow', role: 'mortgage_lender', tier: 'primary', title: 'HR Mortgage Corp — Compliance/Ops', query: '"HR Mortgage Corp" compliance OR operations OR "loan officer" director manager contact email' },
+  { industry: 'title_escrow', role: 'mortgage_lender', tier: 'primary', title: 'Gum Tree Mortgage — Leadership', query: '"Gum Tree Mortgage" contact email director manager OR loan officer' },
+  { industry: 'title_escrow', role: 'mortgage_lender', tier: 'primary', title: 'NVR Mortgage — Compliance/Ops', query: '"NVR Mortgage" compliance OR operations director manager contact email' },
+  { industry: 'title_escrow', role: 'mortgage_lender', tier: 'primary', title: 'Lower LLC — Compliance/Ops', query: '"Lower LLC" OR "Lower.com" mortgage compliance operations director contact email' },
+  { industry: 'title_escrow', role: 'mortgage_lender', tier: 'primary', title: 'Planet Home Lending — Compliance/Ops', query: '"Planet Home Lending" compliance OR operations director manager contact email' },
+  { industry: 'title_escrow', role: 'mortgage_lender', tier: 'primary', title: 'United Wholesale Mortgage — Compliance/Tech', query: '"United Wholesale Mortgage" OR "UWM" compliance technology operations director contact email' },
+  { industry: 'title_escrow', role: 'mortgage_lender', tier: 'primary', title: 'Click N Close — Leadership', query: '"Click N Close" OR "ClickNClose" mortgage director manager contact email' },
+  { industry: 'title_escrow', role: 'mortgage_lender', tier: 'primary', title: 'NewRez LLC — Compliance/Ops', query: '"NewRez" OR "New Rez" mortgage compliance operations director contact email' },
+  { industry: 'title_escrow', role: 'mortgage_lender', tier: 'primary', title: 'First Community Mortgage — Leadership', query: '"First Community Mortgage" director manager compliance contact email' },
+  { industry: 'title_escrow', role: 'mortgage_lender', tier: 'primary', title: 'Kind Lending — Leadership', query: '"Kind Lending" mortgage director manager compliance contact email' },
+  { industry: 'title_escrow', role: 'mortgage_lender', tier: 'primary', title: '1st Signature Lending — Leadership', query: '"1st Signature Lending" mortgage director manager compliance contact email' },
+  { industry: 'title_escrow', role: 'mortgage_lender', tier: 'primary', title: 'Idaho Housing & Finance Association — Leadership', query: '"Idaho Housing" "Finance Association" director manager compliance contact email' },
+  { industry: 'title_escrow', role: 'mortgage_lender', tier: 'primary', title: 'Virginia Housing Development Authority — Leadership', query: '"Virginia Housing Development Authority" OR "Virginia Housing" director manager compliance contact email' },
+  { industry: 'title_escrow', role: 'mortgage_lender', tier: 'primary', title: 'PennyMac — Compliance/Ops', query: '"PennyMac" OR "Penny Mac" mortgage compliance operations director contact email' },
+  { industry: 'title_escrow', role: 'mortgage_lender', tier: 'primary', title: 'Banco Popular de Puerto Rico — Mortgage Leadership', query: '"Banco Popular de Puerto Rico" mortgage director manager compliance contact email' },
+  { industry: 'title_escrow', role: 'mortgage_lender', tier: 'primary', title: 'Guild Mortgage — Compliance/Tech', query: '"Guild Mortgage" compliance technology operations director contact email' },
+  { industry: 'title_escrow', role: 'mortgage_lender', tier: 'primary', title: 'DHI Mortgage — Compliance/Ops', query: '"DHI Mortgage" compliance operations director manager contact email' },
+  { industry: 'title_escrow', role: 'mortgage_lender', tier: 'primary', title: 'Neighbors Bank — Leadership', query: '"Neighbors Bank" mortgage director manager compliance contact email' },
+  { industry: 'title_escrow', role: 'mortgage_lender', tier: 'primary', title: 'Flat Branch Mortgage — Leadership', query: '"Flat Branch Mortgage" director manager compliance contact email' },
+  { industry: 'title_escrow', role: 'mortgage_lender', tier: 'primary', title: 'CrossCountry Mortgage — Compliance/Ops', query: '"CrossCountry Mortgage" OR "Cross Country Mortgage" compliance operations director contact email' },
+
   // Attorney General — home title theft prosecution
   { industry: 'government', role: 'ag_fraud', tier: 'primary',    title: 'Attorney General Consumer Protection', query: '"Attorney General" "consumer protection" OR "real estate fraud" OR "deed fraud" director counsel USA contact email site:*.gov' },
   { industry: 'government', role: 'ag_fraud', tier: 'primary',    title: 'State AG Real Estate Fraud Unit', query: '"Attorney General" "real estate fraud" OR "mortgage fraud" investigator OR director USA site:*.gov contact email' },
