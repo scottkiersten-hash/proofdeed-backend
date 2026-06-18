@@ -312,6 +312,18 @@ app.get("/api/health", async (req, res) => {
   }
 });
 
+/* ---------------- Auth Health (for monitoring) ---------------- */
+app.get("/api/health/auth", async (req, res) => {
+  try {
+    await pool.query("SELECT COUNT(*) FROM magic_links WHERE expires_at > NOW()");
+    const testToken = jwt.sign({ health: true }, process.env.JWT_SECRET, { expiresIn: "1m" });
+    jwt.verify(testToken, process.env.JWT_SECRET);
+    res.json({ status: "ok", auth: "healthy", jwt: testToken });
+  } catch (error) {
+    res.status(500).json({ status: "error", error: error.message });
+  }
+});
+
 /* ---------------- Test Certification ---------------- */
 app.get("/api/test-cert", async (req, res) => {
   try {
