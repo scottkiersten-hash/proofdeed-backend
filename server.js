@@ -4304,6 +4304,17 @@ const LEAD_TARGETS = [
   { industry: 'title_escrow', role: 'mortgage_lender', tier: 'primary', title: 'Flat Branch Mortgage — Leadership', query: '"Flat Branch Mortgage" director manager compliance contact email' },
   { industry: 'title_escrow', role: 'mortgage_lender', tier: 'primary', title: 'CrossCountry Mortgage — Compliance/Ops', query: '"CrossCountry Mortgage" OR "Cross Country Mortgage" compliance operations director contact email' },
 
+  // DMS White-Label API targets — VP Product/Partnerships/BD at major document management platforms
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'DocuWare — VP Product/Partnerships', query: 'site:docuware.com OR "DocuWare" "VP Product" OR "VP Partnerships" OR "Business Development" director email contact' },
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'M-Files — VP Partnerships/Product', query: 'site:m-files.com OR "M-Files" "VP Partnerships" OR "VP Product" OR "Business Development" director email contact' },
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Laserfiche — VP Product/BD', query: 'site:laserfiche.com OR "Laserfiche" "VP Product" OR "Business Development" OR "VP Partnerships" director email contact' },
+  { industry: 'legal', role: 'transact', tier: 'primary', title: 'NetDocuments — VP Product/Partnerships', query: 'site:netdocuments.com OR "NetDocuments" "VP Product" OR "VP Partnerships" OR "Business Development" director email contact' },
+  { industry: 'legal', role: 'transact', tier: 'primary', title: 'iManage — VP Partnerships/BD', query: 'site:imanage.com OR "iManage" "VP Partnerships" OR "VP Product" OR "Business Development" director email contact' },
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'OpenText — BD Director/Partnerships', query: 'site:opentext.com OR "OpenText" "Business Development Director" OR "VP Partnerships" OR "Platform Partnerships" email contact' },
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'ShareFile (Citrix) — VP Product/Partnerships', query: '"ShareFile" OR "Citrix ShareFile" "VP Product" OR "VP Partnerships" OR "Business Development" director email contact' },
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Egnyte — VP Partnerships/BD', query: 'site:egnyte.com OR "Egnyte" "VP Partnerships" OR "VP Product" OR "Business Development" director email contact' },
+  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Box — VP Platform Partnerships', query: 'site:box.com "VP Platform" OR "VP Partnerships" OR "Platform Business Development" director email contact' },
+
   // Attorney General — home title theft prosecution
   { industry: 'government', role: 'ag_fraud', tier: 'primary',    title: 'Attorney General Consumer Protection', query: '"Attorney General" "consumer protection" OR "real estate fraud" OR "deed fraud" director counsel USA contact email site:*.gov' },
   { industry: 'government', role: 'ag_fraud', tier: 'primary',    title: 'State AG Real Estate Fraud Unit', query: '"Attorney General" "real estate fraud" OR "mortgage fraud" investigator OR director USA site:*.gov contact email' },
