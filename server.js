@@ -2580,6 +2580,72 @@ cron.schedule("0 0 1 * *", async () => {
   }
 });
 
+/* ---------------- DAILY SYSTEM HEALTH CHECK ---------------- */
+// Runs daily at 13:00 UTC (8am CT) — checks DB, auth, Stripe, Resend; emails alert on failure
+cron.schedule("0 13 * * *", async () => {
+  const checks = [];
+  let failed = false;
+
+  // 1. Database
+  try {
+    await pool.query("SELECT NOW()");
+    checks.push("✅ Database: OK");
+  } catch (e) {
+    checks.push(`❌ Database: FAILED — ${e.message}`);
+    failed = true;
+  }
+
+  // 2. Auth (JWT + magic_links table)
+  try {
+    await pool.query("SELECT COUNT(*) FROM magic_links WHERE expires_at > NOW()");
+    const tok = jwt.sign({ health: true }, process.env.JWT_SECRET, { expiresIn: "1m" });
+    jwt.verify(tok, process.env.JWT_SECRET);
+    checks.push("✅ Auth / JWT: OK");
+  } catch (e) {
+    checks.push(`❌ Auth / JWT: FAILED — ${e.message}`);
+    failed = true;
+  }
+
+  // 3. Stripe
+  try {
+    const Stripe = (await import("stripe")).default;
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+    await stripe.balance.retrieve();
+    checks.push("✅ Stripe: OK");
+  } catch (e) {
+    checks.push(`❌ Stripe: FAILED — ${e.message}`);
+    failed = true;
+  }
+
+  // 4. Resend
+  try {
+    const r = await resend.domains.list();
+    if (!r || r.error) throw new Error(r?.error?.message || "no response");
+    checks.push("✅ Resend: OK");
+  } catch (e) {
+    checks.push(`❌ Resend: FAILED — ${e.message}`);
+    failed = true;
+  }
+
+  const status = failed ? "🚨 ALERT — ProofDeed System Failure" : "✅ ProofDeed Daily Health Check — All Systems OK";
+  const body = checks.join("\n");
+
+  console.log(`[health-check] ${status}\n${body}`);
+
+  if (failed) {
+    try {
+      await resend.emails.send({
+        from: "ProofDeed System <info@proofdeed.com>",
+        to: "sjjk@pm.me",
+        subject: status,
+        text: `ProofDeed daily health check results:\n\n${body}\n\nTime: ${new Date().toISOString()}\n\nLog in to DigitalOcean to investigate: https://cloud.digitalocean.com/apps/753587e4-5e82-46af-a29e-a80b7dd60f87`,
+      });
+    } catch (emailErr) {
+      console.error("[health-check] Failed to send alert email:", emailErr.message);
+    }
+  }
+});
+
 /* ---------------- MAGIC LINK CLEANUP ---------------- */
 // Runs daily at 03:00 UTC — purges expired/used tokens older than 1 day
 cron.schedule("0 3 * * *", async () => {
