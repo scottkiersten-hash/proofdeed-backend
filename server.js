@@ -7817,17 +7817,17 @@ app.post(['/api/admin/send-articles', '/admin/send-articles'], authRateLimit, as
     {
       to: 'service@alta.org',
       subject: 'Article Pitch — How Blockchain Certification Closes the Gap in Deed Fraud Prevention',
-      text: `Dear TitleNews Editorial Team,\n\nI'm Scott Kiersten, Founder & CEO of ProofDeed LLC, a Veteran-Owned Small Business in Oshkosh, Wisconsin. We provide blockchain document certification for title companies and real estate attorneys — creating FRE Rule 901-admissible certificates at the moment of closing.\n\nI'd like to contribute an article for TitleNews: "Deed Fraud Is Happening After Closing — Here's the Technology That Stops It"\n\nThe piece is educational and objective. I can limit or remove any mention of ProofDeed per your guidelines. Full article below.\n\nScott Kiersten | Founder & CEO | ProofDeed LLC | VOSB\ninfo@proofdeed.com | 727-619-4592 | proofdeed.com\n\n---\n\n${altaArticle}`
+      text: `Dear TitleNews Editorial Team,\n\nI'm Scott Kiersten, Founder & CEO of ProofDeed LLC, a Veteran-Owned Small Business in Oshkosh, Wisconsin. We provide blockchain document certification for title companies and real estate attorneys — creating FRE Rule 901-admissible certificates at the moment of closing.\n\nI'd like to contribute an article for TitleNews: "Deed Fraud Is Happening After Closing — Here's the Technology That Stops It"\n\nThe piece is educational and objective. I can limit or remove any mention of ProofDeed per your guidelines. Full article below.\n\nScott Kiersten | Founder & CEO | ProofDeed LLC | VOSB\ninfo@proofdeed.com | proofdeed.com\n\n---\n\n${altaArticle}`
     },
     {
       to: 'lkinkade@govtech.com',
       subject: 'Guest Commentary Pitch — County Recorders Have a Document Fraud Problem. Blockchain Fixes It.',
-      text: `Dear Lauren,\n\nI'm Scott Kiersten, Founder & CEO of ProofDeed LLC, a VOSB providing blockchain document certification for county recorder offices and government agencies.\n\nPitching a guest commentary for Govtech.com — policy and technology focused, not a product pitch. My company has submitted proposals to NSF SBIR and DHS LRBAA for this technology. Full article below.\n\nScott Kiersten | Founder & CEO | ProofDeed LLC | VOSB\ngov@proofdeed.com | 727-619-4592 | proofdeed.com\n\n---\n\n${govtechArticle}`
+      text: `Dear Lauren,\n\nI'm Scott Kiersten, Founder & CEO of ProofDeed LLC, a VOSB providing blockchain document certification for county recorder offices and government agencies.\n\nPitching a guest commentary for Govtech.com — policy and technology focused, not a product pitch. My company has submitted proposals to NSF SBIR and DHS LRBAA for this technology. Full article below.\n\nScott Kiersten | Founder & CEO | ProofDeed LLC | VOSB\ngov@proofdeed.com | proofdeed.com\n\n---\n\n${govtechArticle}`
     },
     {
       to: 'kim@iaogo.org',
       subject: 'Article for iGO Newsletter — After the FBI Warning on Deed Fraud: What Recorder Offices Can Do Right Now',
-      text: `Dear Kim,\n\nI'm Scott Kiersten, Founder & CEO of ProofDeed LLC — blockchain document certification for county recorder offices.\n\nAsking if iGO's newsletter accepts contributed articles. Written a piece specifically for recorder audiences on closing the deed fraud gap the FBI warned about. Full article below.\n\nScott Kiersten | Founder & CEO | ProofDeed LLC | VOSB\ngov@proofdeed.com | 727-619-4592 | proofdeed.com\n\n---\n\n${igoArticle}`
+      text: `Dear Kim,\n\nI'm Scott Kiersten, Founder & CEO of ProofDeed LLC — blockchain document certification for county recorder offices.\n\nAsking if iGO's newsletter accepts contributed articles. Written a piece specifically for recorder audiences on closing the deed fraud gap the FBI warned about. Full article below.\n\nScott Kiersten | Founder & CEO | ProofDeed LLC | VOSB\ngov@proofdeed.com | proofdeed.com\n\n---\n\n${igoArticle}`
     }
   ];
 

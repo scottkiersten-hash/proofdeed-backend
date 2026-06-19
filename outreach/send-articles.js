@@ -32,7 +32,7 @@ The piece covers:
 The article is educational and objective. I can limit or remove any mention of ProofDeed per your guidelines. The full article is below for your review.
 
 Scott Kiersten | Founder & CEO | ProofDeed LLC | VOSB
-info@proofdeed.com | 727-619-4592 | proofdeed.com
+info@proofdeed.com | proofdeed.com
 
 ---
 
@@ -59,7 +59,7 @@ The piece covers:
 The commentary is policy and technology focused — not a product pitch. My company has submitted proposals to NSF SBIR and DHS LRBAA for this technology. The full article is below.
 
 Scott Kiersten | Founder & CEO | ProofDeed LLC | VOSB
-gov@proofdeed.com | 727-619-4592 | proofdeed.com
+gov@proofdeed.com | proofdeed.com
 
 ---
 
@@ -81,7 +81,7 @@ I've written a piece specifically for county recorder audiences:
 The article is educational and non-promotional. It covers the technology that closes the deed fraud gap the FBI warned about — and what recorder offices can implement right now without changing existing systems. Full article below.
 
 Scott Kiersten | Founder & CEO | ProofDeed LLC | VOSB
-gov@proofdeed.com | 727-619-4592 | proofdeed.com
+gov@proofdeed.com | proofdeed.com
 
 ---
 
