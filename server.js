@@ -7181,12 +7181,14 @@ async function runLeadEngine(targetsPerRun = 3) {
             const fromAddr = target.industry === 'government'
               ? 'Scott Kiersten <gov@proofdeed.com>'
               : 'Scott Kiersten <info@proofdeed.com>';
+            const emailHtml = `<div style="font-family:sans-serif;font-size:15px;line-height:1.6;color:#222;max-width:600px">${emailBody.replace(/\n\n/g,'</p><p>').replace(/\n/g,'<br>')}</div>`;
             const result = await resend.emails.send({
               from: fromAddr,
               reply_to: fromAddr,
               to: lead.email,
               subject,
               text: emailBody,
+              html: emailHtml,
             });
 
             const pscore = calcPriorityScore(lead.title, lead.industry || target.industry, target.role);
