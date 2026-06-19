@@ -2433,8 +2433,10 @@ async function ensureIndexes() {
       ALTER TABLE outreach_contacts ADD COLUMN IF NOT EXISTS intent TEXT DEFAULT 'unknown';
       ALTER TABLE outreach_contacts ADD COLUMN IF NOT EXISTS sentiment TEXT DEFAULT 'neutral';
       ALTER TABLE outreach_contacts ADD COLUMN IF NOT EXISTS last_inbound_at TIMESTAMPTZ;
-      ALTER TABLE outreach_contacts ADD COLUMN IF NOT EXISTS requires_human BOOLEAN DEFAULT true;
+      ALTER TABLE outreach_contacts ADD COLUMN IF NOT EXISTS requires_human BOOLEAN DEFAULT false;
       ALTER TABLE outreach_contacts ADD COLUMN IF NOT EXISTS auto_replied BOOLEAN DEFAULT false;
+      -- Fix existing contacts incorrectly flagged requires_human=true by the column default
+      UPDATE outreach_contacts SET requires_human = false WHERE requires_human = true AND last_inbound_at IS NULL;
 
       -- Inbound email inbox (agent-ready)
       CREATE TABLE IF NOT EXISTS inbound_emails (
@@ -7190,8 +7192,8 @@ async function runLeadEngine(targetsPerRun = 3) {
             const pscore = calcPriorityScore(lead.title, lead.industry || target.industry, target.role);
             const useCase = `${target.title} — ${(lead.industry || target.industry).replace(/_/g,' ')}`;
             await pool.query(
-              `INSERT INTO outreach_contacts (name, email, company, title, industry, tier, priority_score, pipeline_stage, pain_status, use_case, status, reply_to_tag, resend_message_id, first_sent_at, last_contact_at)
-               VALUES ($1,$2,$3,$4,$5,$6,$7,'contacted','unaware',$8,'sent',$9,$10,NOW(),NOW())`,
+              `INSERT INTO outreach_contacts (name, email, company, title, industry, tier, priority_score, pipeline_stage, pain_status, use_case, status, reply_to_tag, resend_message_id, requires_human, first_sent_at, last_contact_at)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,'contacted','unaware',$8,'sent',$9,$10,FALSE,NOW(),NOW())`,
               [lead.name, lead.email.toLowerCase(), lead.company, lead.title, lead.industry || target.industry, target.tier || 'primary', pscore, useCase, replyTag, result.data?.id || null]
             );
             await pool.query(
@@ -7245,7 +7247,7 @@ async function runLeadEngine(targetsPerRun = 3) {
 }
 
 // Lead engine — Mon-Fri once daily at 8am Chicago (keeps total sends well under free-tier 100/day cap)
-cron.schedule('0 8 * * 1-5', () => runLeadEngine(4), { timezone: 'America/Chicago' });
+cron.schedule('0 8 * * 1-5', () => runLeadEngine(15), { timezone: 'America/Chicago' });
 
 /* ---------------- Lead Engine API ----------------  */
 app.get(['/api/admin/lead-engine', '/admin/lead-engine'], authRateLimit, async (req, res) => {
