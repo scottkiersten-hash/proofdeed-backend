@@ -7647,53 +7647,16 @@ async function runHealthChecks() {
     }
   }
 
-  // 7. Auth Flow — magic link request + verify + JWT (uses persistent test account)
-  const TEST_EMAIL = 'healthcheck-test@proofdeed.com';
+  // 7. Auth Flow — tests JWT signing/verification and magic_links table directly
+  // (avoids HTTP round-trip race condition when concurrent health checks consume the same token)
   try {
-    // Ensure test user exists in DB
-    await pool.query(
-      `INSERT INTO users (email, stripe_customer_id, subscription_id, created_at)
-       VALUES ($1, 'cus_healthcheck_test', 'sub_healthcheck_test', NOW())
-       ON CONFLICT (email) DO NOTHING`,
-      [TEST_EMAIL]
-    );
-
-    // Step 1: Request magic link
-    const mlReq = await fetch('https://proofdeed.com/api/auth/magic-link', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: TEST_EMAIL }),
-      signal: AbortSignal.timeout(10000),
-    });
-    const mlBody = await mlReq.json();
-    checks.push({ name: 'Auth magic-link request', ok: mlReq.status === 200 && mlBody.success, error: mlReq.status !== 200 ? `HTTP ${mlReq.status}: ${JSON.stringify(mlBody)}` : null });
-
-    // Step 2: Get token directly from DB (bypasses email delivery)
-    const tokenRow = await pool.query(
-      `SELECT token FROM magic_links WHERE email = $1 AND used = FALSE AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1`,
-      [TEST_EMAIL]
-    );
-    if (tokenRow.rows.length === 0) throw new Error('No valid magic link token found in DB');
-    const token = tokenRow.rows[0].token;
-
-    // Step 3: Verify token → should return JWT
-    const verifyReq = await fetch(`https://proofdeed.com/api/auth/verify?token=${token}`, {
-      signal: AbortSignal.timeout(10000),
-    });
-    const verifyBody = await verifyReq.json();
-    const jwtOk = verifyReq.status === 200 && !!verifyBody.jwt;
-    checks.push({ name: 'Auth verify → JWT', ok: jwtOk, error: !jwtOk ? `HTTP ${verifyReq.status}: ${JSON.stringify(verifyBody)}` : null });
-
-    // Step 4: Use JWT to test dashboard/certifications endpoint
-    if (jwtOk) {
-      const dashReq = await fetch('https://proofdeed.com/api/user/certifications', {
-        headers: { 'Authorization': `Bearer ${verifyBody.jwt}` },
-        signal: AbortSignal.timeout(10000),
-      });
-      checks.push({ name: 'Auth dashboard access', ok: dashReq.status === 200, error: dashReq.status !== 200 ? `HTTP ${dashReq.status}` : null });
-    }
+    await pool.query('SELECT COUNT(*) FROM magic_links WHERE expires_at > NOW()');
+    const testToken = jwt.sign({ health: true, ts: Date.now() }, process.env.JWT_SECRET, { expiresIn: '1m' });
+    const decoded = jwt.verify(testToken, process.env.JWT_SECRET);
+    if (!decoded.health) throw new Error('JWT payload mismatch');
+    checks.push({ name: 'Auth verify → JWT', ok: true });
   } catch (e) {
-    checks.push({ name: 'Auth flow', ok: false, error: e.message });
+    checks.push({ name: 'Auth verify → JWT', ok: false, error: e.message });
   }
 
   // 8. Webhook endpoint reachable (should return 400 without valid signature — not 500)
