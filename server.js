@@ -2634,13 +2634,54 @@ cron.schedule("0 13 * * *", async () => {
     failed = true;
   }
 
-  // 4. Resend
+  // 4. Resend API
   try {
     const r = await resend.domains.list();
     if (!r || r.error) throw new Error(r?.error?.message || "no response");
-    checks.push("✅ Resend: OK");
+    checks.push("✅ Resend API: OK");
   } catch (e) {
-    checks.push(`❌ Resend: FAILED — ${e.message}`);
+    checks.push(`❌ Resend API: FAILED — ${e.message}`);
+    failed = true;
+  }
+
+  // 5. MX records — verify inbound.resend.com is set (not a dead provider)
+  try {
+    const { promises: dns } = await import('dns');
+    const mx = await dns.resolveMx('proofdeed.com');
+    const hasResend = mx.some(r => r.exchange.includes('resend'));
+    const hasZoho = mx.some(r => r.exchange.includes('zoho'));
+    const hasOldProvider = mx.some(r => r.exchange.includes('zoho') || r.exchange.includes('google') || r.exchange.includes('outlook'));
+    if (!hasResend) throw new Error(`MX not pointing to Resend — found: ${mx.map(r=>r.exchange).join(', ')}`);
+    if (hasOldProvider) throw new Error(`Old MX still present: ${mx.filter(r=>hasOldProvider).map(r=>r.exchange).join(', ')}`);
+    checks.push(`✅ MX Records: inbound.resend.com (priority ${mx.find(r=>r.exchange.includes('resend'))?.priority})`);
+  } catch (e) {
+    checks.push(`❌ MX Records: FAILED — ${e.message}`);
+    failed = true;
+  }
+
+  // 6. Resend domain receiving enabled
+  try {
+    const domainRes = await fetch('https://api.resend.com/domains/3e78f4d1-e142-4156-9bb1-cc3ef5039cbe', {
+      headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}` }
+    });
+    const domain = await domainRes.json();
+    if (domain.capabilities?.receiving !== 'enabled') throw new Error(`receiving is ${domain.capabilities?.receiving}`);
+    checks.push("✅ Resend Inbound Receiving: enabled");
+  } catch (e) {
+    checks.push(`❌ Resend Inbound Receiving: FAILED — ${e.message}`);
+    failed = true;
+  }
+
+  // 7. Outreach pipeline — confirm lead engine is running (sent something in last 48h on a weekday)
+  try {
+    const sent = await pool.query(`SELECT COUNT(*) FROM outreach_contacts WHERE first_sent_at >= NOW() - INTERVAL '48 hours'`);
+    const count = parseInt(sent.rows[0].count);
+    const day = new Date().getDay();
+    const isWeekday = day >= 1 && day <= 5;
+    if (isWeekday && count === 0) throw new Error('No outreach sent in 48h — lead engine may be stalled');
+    checks.push(`✅ Lead Engine: ${count} contacts reached in last 48h`);
+  } catch (e) {
+    checks.push(`❌ Lead Engine: ${e.message}`);
     failed = true;
   }
 
