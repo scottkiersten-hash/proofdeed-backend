@@ -2958,7 +2958,18 @@ app.post(['/api/webhooks/resend-inbound', '/webhooks/resend-inbound'], async (re
       await pool.query(`INSERT INTO outreach_events (contact_id,event_type,event_source,metadata,occurred_at) VALUES ($1,'replied','resend_inbound',$2,NOW())`,
         [contact.id, JSON.stringify({ from: fromEmail, subject, snippet: bodyText.substring(0,200), intent })]);
 
-      console.log(`📥 Inbox email: ${fromEmail} → ${toEmail} | ${intent}`);
+      // Forward to ProtonMail so Scott sees it in his inbox
+      const { Resend: ResendFwd } = await import('resend');
+      const resendFwd = new ResendFwd(process.env.RESEND_API_KEY);
+      await resendFwd.emails.send({
+        from: `${fromName} via ProofDeed <info@proofdeed.com>`,
+        to: 'sjjk@pm.me',
+        reply_to: fromEmail,
+        subject: subject,
+        text: `From: ${fromField}\nTo: ${toField}\n\n${bodyText}`,
+      }).catch(() => {});
+
+      console.log(`📥 Inbox email: ${fromEmail} → ${toEmail} | ${intent} — forwarded to ProtonMail`);
       return;
     }
 
@@ -2989,6 +3000,17 @@ app.post(['/api/webhooks/resend-inbound', '/webhooks/resend-inbound'], async (re
     `, [newPipelineStage, newPainStatus, contact.id]);
 
     console.log(`✅ Reply detected from ${fromField} → contact #${contact.id} (${contact.name}) — intent: ${isHighIntent ? 'HIGH 🔥' : 'standard'}`);
+
+    // Forward to ProtonMail so Scott sees the reply
+    const { Resend: ResendReply } = await import('resend');
+    const resendReply = new ResendReply(process.env.RESEND_API_KEY);
+    await resendReply.emails.send({
+      from: `${contact.name} via ProofDeed <info@proofdeed.com>`,
+      to: 'sjjk@pm.me',
+      reply_to: contact.email,
+      subject: `Re: ${subject}`,
+      text: `From: ${fromField}\nCompany: ${contact.company}\nIntent: ${isHighIntent ? '🔥 HIGH' : 'standard'}\n\n${textSnippet}`,
+    }).catch(() => {});
 
     // Alert on high-intent reply
     if (isHighIntent) {
