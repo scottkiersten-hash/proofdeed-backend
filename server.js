@@ -140,7 +140,7 @@ const pool = new Pool({
 /* ---------------- Middleware ---------------- */
 // Exclude stripe + resend webhooks from global JSON parsing — they need raw body
 app.use((req, res, next) => {
-  const raw = ['/api/stripe-webhook', '/stripe-webhook', '/api/webhooks/resend'];
+  const raw = ['/api/stripe-webhook', '/stripe-webhook', '/api/webhooks/resend', '/webhooks/resend', '/api/webhooks/resend-inbound', '/webhooks/resend-inbound'];
   if (raw.includes(req.originalUrl)) {
     next();
   } else {
