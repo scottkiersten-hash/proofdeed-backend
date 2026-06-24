@@ -7196,8 +7196,8 @@ async function runLeadEngine(targetsPerRun = 3) {
   const { Resend } = await import('resend');
   const resend = new Resend(process.env.RESEND_API_KEY);
 
-  // Hard daily send cap — Resend paid tier, no daily limit
-  const DAILY_SEND_CAP = 500;
+  // Hard daily send cap — 50,000/month Resend paid tier ÷ 30 days
+  const DAILY_SEND_CAP = 1667;
   const todayStart = new Date(); todayStart.setHours(0,0,0,0);
   const sentTodayRow = await pool.query(
     `SELECT COUNT(*) FROM outreach_contacts WHERE first_sent_at >= $1`,
@@ -7331,8 +7331,9 @@ async function runLeadEngine(targetsPerRun = 3) {
   ).catch(() => {});
 }
 
-// Lead engine — Mon-Fri once daily at 8am Chicago (keeps total sends well under free-tier 100/day cap)
-cron.schedule('0 8 * * 1-5', () => runLeadEngine(100), { timezone: 'America/Chicago' });
+// Lead engine — 7 days/week, twice daily at 8am and 2pm Chicago, 200 targets per run
+cron.schedule('0 8 * * *', () => runLeadEngine(200), { timezone: 'America/Chicago' });
+cron.schedule('0 14 * * *', () => runLeadEngine(200), { timezone: 'America/Chicago' });
 
 /* ---------------- Lead Engine API ----------------  */
 app.get(['/api/admin/lead-engine', '/admin/lead-engine'], authRateLimit, async (req, res) => {
