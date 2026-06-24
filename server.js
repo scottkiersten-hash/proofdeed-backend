@@ -7179,8 +7179,8 @@ async function runLeadEngine(targetsPerRun = 3) {
   const { Resend } = await import('resend');
   const resend = new Resend(process.env.RESEND_API_KEY);
 
-  // Hard daily send cap — stay safely under Resend free-tier 100/day limit
-  const DAILY_SEND_CAP = 80;
+  // Hard daily send cap — leave headroom for transactional emails
+  const DAILY_SEND_CAP = 60;
   const todayStart = new Date(); todayStart.setHours(0,0,0,0);
   const sentTodayRow = await pool.query(
     `SELECT COUNT(*) FROM outreach_contacts WHERE first_sent_at >= $1`,
@@ -7457,8 +7457,8 @@ info@proofdeed.com | proofdeed.com`;
 cron.schedule('0 8 * * *', async () => {
   console.log('[Autopilot] Running daily follow-up check...');
   try {
-    // Global daily cap — shared with lead engine, never exceed 80 total sends/day
-    const AUTOPILOT_DAILY_CAP = 30; // max follow-ups per day
+    // Global daily cap — shared with lead engine, leave room for transactional emails
+    const AUTOPILOT_DAILY_CAP = 15; // max follow-ups per day
     const todayStart = new Date(); todayStart.setHours(0,0,0,0);
     const newSentToday = parseInt((await pool.query(
       `SELECT COUNT(*) FROM outreach_contacts WHERE first_sent_at >= $1`, [todayStart]
