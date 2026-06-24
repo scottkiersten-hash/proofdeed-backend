@@ -108,8 +108,25 @@ app.options("*", cors({
 }));
 
 /* ---------------- REQUIRED FOR DIGITALOCEAN ---------------- */
-app.get("/health", (req, res) => {
-  res.status(200).json({ status: "ok" });
+// DigitalOcean strips /api prefix — these are the routes that actually get hit externally
+app.get("/health", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT NOW()");
+    res.status(200).json({ status: "ok", database: result.rows[0] });
+  } catch (e) {
+    res.status(500).json({ status: "error", error: e.message });
+  }
+});
+
+app.get("/health/auth", async (req, res) => {
+  try {
+    await pool.query("SELECT COUNT(*) FROM magic_links WHERE expires_at > NOW()");
+    const testToken = jwt.sign({ health: true }, process.env.JWT_SECRET, { expiresIn: "1m" });
+    jwt.verify(testToken, process.env.JWT_SECRET);
+    res.json({ status: "ok", auth: "healthy" });
+  } catch (e) {
+    res.status(500).json({ status: "error", error: e.message });
+  }
 });
 
 const PORT = process.env.PORT || 8080;
