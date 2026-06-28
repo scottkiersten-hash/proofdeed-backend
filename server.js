@@ -7226,11 +7226,17 @@ async function runLeadEngine(targetsPerRun = 3) {
     return;
   }
 
-  // Prevent overlapping runs
-  const runningRow = await pool.query(`SELECT value FROM lead_engine_state WHERE key='is_running'`).catch(() => ({ rows: [] }));
+  // Prevent overlapping runs — but auto-reset if stuck for more than 3 hours
+  const runningRow = await pool.query(`SELECT value, updated_at FROM lead_engine_state WHERE key='is_running'`).catch(() => ({ rows: [] }));
   if (runningRow.rows[0]?.value === 'true') {
-    console.log('[LeadEngine] Already running — skipping duplicate trigger.');
-    return;
+    const stuckSince = runningRow.rows[0]?.updated_at;
+    const stuckHours = stuckSince ? (Date.now() - new Date(stuckSince).getTime()) / 3600000 : 0;
+    if (stuckHours < 3) {
+      console.log('[LeadEngine] Already running — skipping duplicate trigger.');
+      return;
+    }
+    console.log(`[LeadEngine] is_running stuck for ${stuckHours.toFixed(1)}h — auto-resetting.`);
+    await pool.query(`INSERT INTO lead_engine_state (key,value,updated_at) VALUES ('is_running','false',NOW()) ON CONFLICT (key) DO UPDATE SET value='false',updated_at=NOW()`).catch(() => {});
   }
 
   // Mark as running
