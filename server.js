@@ -2672,14 +2672,32 @@ cron.schedule("0 13 * * *", async () => {
     failed = true;
   }
 
-  // 7. Outreach pipeline — confirm lead engine is running (sent something in last 48h on a weekday)
+  // 7. Lead engine — self-healing check: auto-reset stuck flag + auto-restart if stalled
   try {
-    const sent = await pool.query(`SELECT COUNT(*) FROM outreach_contacts WHERE first_sent_at >= NOW() - INTERVAL '48 hours'`);
+    // Auto-reset stuck is_running flag
+    const leRow = await pool.query(`SELECT value, updated_at FROM lead_engine_state WHERE key='is_running'`).catch(() => ({ rows: [] }));
+    if (leRow.rows[0]?.value === 'true') {
+      const stuckHours = leRow.rows[0]?.updated_at
+        ? (Date.now() - new Date(leRow.rows[0].updated_at).getTime()) / 3600000
+        : 99;
+      if (stuckHours >= 3) {
+        await pool.query(`INSERT INTO lead_engine_state (key,value,updated_at) VALUES ('is_running','false',NOW()) ON CONFLICT (key) DO UPDATE SET value='false',updated_at=NOW()`).catch(() => {});
+        console.log(`[health-check] Auto-reset stuck is_running (stuck ${stuckHours.toFixed(1)}h)`);
+      }
+    }
+
+    // Check recent send volume
+    const sent = await pool.query(`SELECT COUNT(*) FROM outreach_contacts WHERE first_sent_at >= NOW() - INTERVAL '25 hours'`);
     const count = parseInt(sent.rows[0].count);
     const day = new Date().getDay();
     const isWeekday = day >= 1 && day <= 5;
-    if (isWeekday && count === 0) throw new Error('No outreach sent in 48h — lead engine may be stalled');
-    checks.push(`✅ Lead Engine: ${count} contacts reached in last 48h`);
+
+    if (isWeekday && count === 0) {
+      // Auto-restart the engine
+      runLeadEngine(200).catch(() => {});
+      throw new Error(`No new outreach in 25h — auto-restarted engine. Check DO logs.`);
+    }
+    checks.push(`✅ Lead Engine: ${count} new contacts in last 25h`);
   } catch (e) {
     checks.push(`❌ Lead Engine: ${e.message}`);
     failed = true;
