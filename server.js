@@ -7237,6 +7237,47 @@ async function searchLeadsViaPubMed(target) {
   return leads;
 }
 // ─────────────────────────────────────────────────────────────────────────────
+// Email deliverability pre-check — filters bad addresses before sending
+const _mxCache = new Map(); // domain → bool, cached per process lifetime
+
+async function isEmailDeliverable(email) {
+  if (!email || typeof email !== 'string') return false;
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return false;
+
+  const [localRaw, domainRaw] = email.toLowerCase().split('@');
+
+  // Block role-based / generic prefixes that never reach a decision-maker
+  const blockedPrefixes = [
+    'noreply','no-reply','donotreply','do-not-reply','bounce','mailer-daemon',
+    'postmaster','abuse','spam','junk','unsubscribe','webmaster','root',
+    'lossrun','loss-run','claimsnotice','paperworkreductionact',
+    'notifications','alerts','automated','no_reply','bounces',
+    'accounts','accountsreceivable','accountspayable','invoices',
+    'jobs','careers','recruiting','humanresources',
+  ];
+  if (blockedPrefixes.some(p => localRaw === p || localRaw.startsWith(p))) return false;
+
+  // Block known catch-all gov addresses that always bounce or never reply
+  const blockedExact = new Set(['paperworkreductionact@sec.gov','license@tdi.texas.gov']);
+  if (blockedExact.has(email.toLowerCase())) return false;
+
+  // DNS MX check — domain must have a mail server
+  const domain = domainRaw;
+  if (_mxCache.has(domain)) return _mxCache.get(domain);
+  try {
+    const { promises: dns } = await import('dns');
+    const mx = await Promise.race([
+      dns.resolveMx(domain),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('dns timeout')), 3000)),
+    ]);
+    const valid = Array.isArray(mx) && mx.length > 0;
+    _mxCache.set(domain, valid);
+    return valid;
+  } catch {
+    _mxCache.set(domain, false);
+    return false;
+  }
+}
 
 async function runLeadEngine(targetsPerRun = 3) {
   if (!process.env.SERPER_API_KEY || !process.env.RESEND_API_KEY) {
@@ -7300,8 +7341,8 @@ async function runLeadEngine(targetsPerRun = 3) {
     return;
   }
 
-  // Process targets in parallel batches of 3 to avoid timeouts
-  const PARALLEL = 3;
+  // Process targets sequentially (not parallel) to keep daily cap accurate
+  const PARALLEL = 1;
   for (let batch = 0; batch < TARGETS_PER_RUN; batch += PARALLEL) {
     const batchTargets = Array.from({ length: Math.min(PARALLEL, TARGETS_PER_RUN - batch) }, (_, j) =>
       ({ target: ALL_TARGETS[(currentIdx + batch + j) % ALL_TARGETS.length], idx: batch + j })
@@ -7324,6 +7365,8 @@ async function runLeadEngine(targetsPerRun = 3) {
         for (const lead of leads) {
           if (dailySentSoFar + totalSent >= DAILY_SEND_CAP) { skipped++; continue; } // daily cap guard
           if (!lead.email || !lead.name || !lead.company) { skipped++; continue; }
+          const deliverable = await isEmailDeliverable(lead.email);
+          if (!deliverable) { skipped++; console.log(`[LeadEngine] Skipped (undeliverable): ${lead.email}`); continue; }
           const exists = await pool.query('SELECT id, pipeline_stage FROM outreach_contacts WHERE email=$1', [lead.email.toLowerCase()]);
           if (exists.rows.length > 0) { skipped++; continue; } // already contacted or suppressed
 
