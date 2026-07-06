@@ -83,3 +83,62 @@ CREATE INDEX IF NOT EXISTS idx_certifications_hash      ON certifications(hash);
 CREATE INDEX IF NOT EXISTS idx_certifications_user_id   ON certifications(user_id);
 CREATE INDEX IF NOT EXISTS idx_api_keys_key             ON api_keys(api_key);
 CREATE INDEX IF NOT EXISTS idx_magic_links_token        ON magic_links(token);
+
+-- ============================================================
+-- Trust Infrastructure Platform — Core Objects
+-- ============================================================
+
+-- Trust Records (primary object — replaces certifications as the conceptual center)
+-- Existing certifications rows can be migrated here; certifications table stays for now.
+CREATE TABLE IF NOT EXISTS trust_records (
+  id               SERIAL PRIMARY KEY,
+  trust_id         TEXT UNIQUE NOT NULL,          -- human-readable: PD-XXXX-XXXX
+  record_type      TEXT NOT NULL DEFAULT 'document',  -- document | asset | identity | contract | title | license | other
+  status           TEXT NOT NULL DEFAULT 'active',    -- active | revoked | expired | pending
+  hash             TEXT NOT NULL,                 -- SHA-256 of original document
+  polygon_tx       TEXT,                          -- blockchain anchor tx hash
+  user_id          INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  issuer_name      TEXT,
+  issuer_email     TEXT,
+  owner_name       TEXT,
+  owner_email      TEXT,
+  document_data    TEXT,                          -- base64 or metadata JSON
+  visibility       TEXT NOT NULL DEFAULT 'public',   -- public | private | organization | government
+  current_version  INTEGER NOT NULL DEFAULT 1,
+  expires_at       TIMESTAMPTZ,                   -- null = never expires
+  created_at       TIMESTAMPTZ DEFAULT NOW(),
+  updated_at       TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Version history — each update creates a new snapshot; prior versions are immutable
+CREATE TABLE IF NOT EXISTS record_versions (
+  id              SERIAL PRIMARY KEY,
+  trust_record_id INTEGER NOT NULL REFERENCES trust_records(id) ON DELETE CASCADE,
+  version_number  INTEGER NOT NULL,
+  hash            TEXT NOT NULL,
+  polygon_tx      TEXT,
+  document_data   TEXT,
+  notes           TEXT,                           -- reason for update
+  created_by      TEXT,                           -- email of who made the update
+  created_at      TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (trust_record_id, version_number)
+);
+
+-- Audit trail — append-only log of every action on a Trust Record
+CREATE TABLE IF NOT EXISTS record_events (
+  id              SERIAL PRIMARY KEY,
+  trust_record_id INTEGER NOT NULL REFERENCES trust_records(id) ON DELETE CASCADE,
+  event_type      TEXT NOT NULL,                  -- created | updated | verified | viewed | shared | revoked | renewed | transferred
+  actor           TEXT,                           -- email or 'anonymous' for public verifications
+  metadata        JSONB,                          -- any additional context (IP, user agent, etc.)
+  created_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Trust Record indexes
+CREATE INDEX IF NOT EXISTS idx_trust_records_trust_id      ON trust_records(trust_id);
+CREATE INDEX IF NOT EXISTS idx_trust_records_user_id       ON trust_records(user_id);
+CREATE INDEX IF NOT EXISTS idx_trust_records_hash          ON trust_records(hash);
+CREATE INDEX IF NOT EXISTS idx_trust_records_status        ON trust_records(status);
+CREATE INDEX IF NOT EXISTS idx_record_versions_record_id   ON record_versions(trust_record_id);
+CREATE INDEX IF NOT EXISTS idx_record_events_record_id     ON record_events(trust_record_id);
+CREATE INDEX IF NOT EXISTS idx_record_events_type          ON record_events(event_type);
