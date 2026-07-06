@@ -1641,11 +1641,16 @@ app.post(["/create-checkout-session", "/api/create-checkout-session"], async (re
     const { plan, success_url, cancel_url, referral } = req.body;
 
     const subscriptionPlans = {
-      "starter-monthly": process.env.PRICE_STARTER_MONTHLY,
-      "starter-annual":  process.env.PRICE_STARTER_YEARLY,
-      "pro-monthly":     process.env.PRICE_PRO_MONTHLY,
-      "pro-annual":      process.env.PRICE_PRO_YEARLY,
-      "enterprise":      process.env.PRICE_ENTERPRISE,
+      "starter-monthly":       process.env.PRICE_STARTER_MONTHLY,
+      "starter-annual":        process.env.PRICE_STARTER_YEARLY,
+      "pro-monthly":           process.env.PRICE_PRO_MONTHLY,
+      "pro-annual":            process.env.PRICE_PRO_YEARLY,
+      "enterprise":            process.env.PRICE_ENTERPRISE,
+      "professional-monthly":  process.env.PRICE_PROFESSIONAL_MONTHLY,
+      "business-monthly":      process.env.PRICE_BUSINESS_MONTHLY,
+      "enterprise-monthly":    process.env.PRICE_ENTERPRISE_MONTHLY,
+      "government-monthly":    process.env.PRICE_GOVERNMENT_MONTHLY,
+      "api-monthly":           process.env.PRICE_API_MONTHLY,
     };
 
     const oneTimePlans = {
