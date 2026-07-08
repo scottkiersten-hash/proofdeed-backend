@@ -7082,7 +7082,37 @@ function domainToCompany(domain) {
           .replace(/\b\w/g, c => c.toUpperCase());
 }
 
-async function searchLeadsViaGoogle(target) {
+// US states rotated per-run so the same query targets a different geography each time,
+// producing fresh results instead of the same top-10 pages already in the DB.
+const US_STATES = [
+  'Alabama','Alaska','Arizona','Arkansas','California','Colorado','Connecticut',
+  'Delaware','Florida','Georgia','Hawaii','Idaho','Illinois','Indiana','Iowa',
+  'Kansas','Kentucky','Louisiana','Maine','Maryland','Massachusetts','Michigan',
+  'Minnesota','Mississippi','Missouri','Montana','Nebraska','Nevada',
+  'New Hampshire','New Jersey','New Mexico','New York','North Carolina',
+  'North Dakota','Ohio','Oklahoma','Oregon','Pennsylvania','Rhode Island',
+  'South Carolina','South Dakota','Tennessee','Texas','Utah','Vermont',
+  'Virginia','Washington','West Virginia','Wisconsin','Wyoming',
+];
+
+// Pick a state based on day-of-year + a per-target offset so different targets
+// don't all hit the same state on the same day.
+function pickState(targetIndex = 0) {
+  const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0)) / 86400000);
+  return US_STATES[(dayOfYear + targetIndex) % US_STATES.length];
+}
+
+// Queries that already contain a specific state/city/country shouldn't get a second one appended.
+function queryNeedsGeo(query) {
+  const q = query.toLowerCase();
+  // Skip if query already has a US state name, country, or geo-specific site: operator
+  if (US_STATES.some(s => q.includes(s.toLowerCase()))) return false;
+  if (/\bsite:\S+\.(gov|us)\b/.test(q)) return false; // gov site searches are already geo-specific
+  if (/\b(uae|dubai|canada|uk|australia|india|global|international)\b/.test(q)) return false;
+  return true;
+}
+
+async function searchLeadsViaGoogle(target, targetIndex = 0) {
   const apiKey = process.env.SERPER_API_KEY;
   if (!apiKey) {
     console.log('[LeadEngine] Missing SERPER_API_KEY — skipping');
@@ -7092,13 +7122,18 @@ async function searchLeadsViaGoogle(target) {
   const leads = [];
   const seenEmails = new Set();
 
+  // Append a rotating state to non-geo-specific queries to get fresh results each cycle
+  const geoSuffix = queryNeedsGeo(target.query) ? ` ${pickState(targetIndex)}` : '';
+  const query = target.query + geoSuffix;
+  if (geoSuffix) console.log(`[LeadEngine] Geo-rotated query: "${query}"`);
+
   try {
     // 2 pages of Serper results = up to 20 URLs to mine
     for (let page = 1; page <= 2; page++) {
       const res = await fetch('https://google.serper.dev/search', {
         method: 'POST',
         headers: { 'X-API-KEY': apiKey, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ q: target.query, num: 10, page }),
+        body: JSON.stringify({ q: query, num: 10, page }),
       });
       if (!res.ok) { console.log(`[LeadEngine] Serper API error ${res.status}`); break; }
       const data = await res.json();
@@ -7351,13 +7386,13 @@ async function runLeadEngine(targetsPerRun = 3) {
     );
     console.log(`[LeadEngine] Batch ${Math.floor(batch/PARALLEL)+1} — ${batchTargets.map(b => b.target.title).join(', ')}`);
 
-    const batchResults = await Promise.allSettled(batchTargets.map(async ({ target }) => {
+    const batchResults = await Promise.allSettled(batchTargets.map(async ({ target, idx }) => {
       try {
         const leads = target.source === 'clinicaltrials'
           ? await searchLeadsViaClinicalTrials(target)
           : target.source === 'pubmed'
             ? await searchLeadsViaPubMed(target)
-            : await searchLeadsViaGoogle(target);
+            : await searchLeadsViaGoogle(target, currentIdx + idx);
         if (!leads.length) {
           console.log(`[LeadEngine] No leads found for ${target.title}`);
           return { sent: 0, skipped: 0 };
