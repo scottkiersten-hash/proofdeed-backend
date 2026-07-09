@@ -3266,7 +3266,8 @@ app.post(['/api/admin/domain-reputation/seed', '/admin/domain-reputation/seed'],
       const bounceCount = parseInt(row.bounce_count);
       const deliverCount = deliverMap[domain] || 0;
       const total = bounceCount + deliverCount;
-      const shouldSuppress = total >= 5 && (bounceCount / total) >= 0.5;
+      const shouldSuppress = (bounceCount >= 2 && deliverCount === 0) ||
+                             (total >= 4 && (bounceCount / total) >= 0.4);
       await pool.query(`
         INSERT INTO domain_reputation (domain, bounce_count, deliver_count, suppressed, last_seen)
         VALUES ($1, $2, $3, $4, NOW())
@@ -7488,14 +7489,16 @@ async function recordEmailEvent(email, event) {
           bounce_count = domain_reputation.bounce_count + 1,
           last_seen = NOW()
       `, [domain]);
-      // If domain has bounced 5+ times and bounce rate > 50%, suppress it
+      // Suppress if: 2+ bounces with zero delivers, OR 4+ total with 40%+ bounce rate
       const row = await pool.query(`SELECT bounce_count, deliver_count FROM domain_reputation WHERE domain=$1`, [domain]);
       if (row.rows[0]) {
         const { bounce_count, deliver_count } = row.rows[0];
         const total = bounce_count + deliver_count;
-        if (total >= 5 && bounce_count / total >= 0.5) {
+        const shouldSuppress = (bounce_count >= 2 && deliver_count === 0) ||
+                               (total >= 4 && bounce_count / total >= 0.4);
+        if (shouldSuppress) {
           await pool.query(`UPDATE domain_reputation SET suppressed=true WHERE domain=$1`, [domain]);
-          console.log(`[DomainRep] Suppressed domain ${domain} — bounce rate ${Math.round(bounce_count/total*100)}%`);
+          console.log(`[DomainRep] Suppressed domain ${domain} — ${bounce_count}/${total} bounced`);
         }
       }
     } else if (event === 'deliver') {
