@@ -2558,6 +2558,15 @@ async function ensureIndexes() {
         updated_at TIMESTAMPTZ DEFAULT NOW()
       );
 
+      CREATE TABLE IF NOT EXISTS domain_reputation (
+        domain         TEXT PRIMARY KEY,
+        bounce_count   INT NOT NULL DEFAULT 0,
+        deliver_count  INT NOT NULL DEFAULT 0,
+        is_catch_all   BOOLEAN NOT NULL DEFAULT false,
+        suppressed     BOOLEAN NOT NULL DEFAULT false,
+        last_seen      TIMESTAMPTZ DEFAULT NOW()
+      );
+
       CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
       CREATE INDEX IF NOT EXISTS idx_certifications_hash ON certifications(hash);
       CREATE INDEX IF NOT EXISTS idx_certifications_user_id ON certifications(user_id);
@@ -2947,7 +2956,13 @@ app.post(['/api/webhooks/resend', '/webhooks/resend'], express.raw({ type: '*/*'
         `UPDATE outreach_contacts SET status='bounced', pipeline_stage='suppressed', suppressed_at=NOW(), suppressed_reason='hard_bounce' WHERE id=$1`,
         [contact.id]
       );
+      await recordEmailEvent(contact.email, 'bounce');
       console.log(`[Resend Webhook] Hard bounce suppressed: ${contact.email}`);
+    } else if (newStatus === 'bounced') {
+      await recordEmailEvent(contact.email, 'bounce');
+    }
+    if (newStatus === 'delivered') {
+      await recordEmailEvent(contact.email, 'deliver');
     }
     if (newStatus === 'complained') {
       await pool.query(
@@ -3216,6 +3231,58 @@ app.post(['/api/webhooks/mailgun-inbound', '/webhooks/mailgun-inbound'], async (
 });
 
 // ---------- Admin: Outreach Stats ----------
+// Domain reputation viewer
+app.get(['/api/admin/domain-reputation', '/admin/domain-reputation'], authRateLimit, async (req, res) => {
+  if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
+  try {
+    const suppressed = await pool.query(`SELECT domain, bounce_count, deliver_count, last_seen FROM domain_reputation WHERE suppressed=true ORDER BY bounce_count DESC LIMIT 100`);
+    const risky = await pool.query(`SELECT domain, bounce_count, deliver_count, is_catch_all, last_seen FROM domain_reputation WHERE suppressed=false AND bounce_count > 0 ORDER BY bounce_count DESC LIMIT 100`);
+    const totals = await pool.query(`SELECT COUNT(*) as total, SUM(bounce_count) as bounces, SUM(deliver_count) as delivers FROM domain_reputation`);
+    res.json({ totals: totals.rows[0], suppressed: suppressed.rows, risky: risky.rows });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Seed domain_reputation from existing bounce history in outreach_contacts
+app.post(['/api/admin/domain-reputation/seed', '/admin/domain-reputation/seed'], authRateLimit, async (req, res) => {
+  if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
+  try {
+    // Aggregate existing bounces by domain
+    const bounces = await pool.query(`
+      SELECT split_part(email,'@',2) AS domain, COUNT(*) AS bounce_count
+      FROM outreach_contacts WHERE status IN ('bounced','hard_bounce')
+      GROUP BY domain HAVING COUNT(*) > 0
+    `);
+    const delivers = await pool.query(`
+      SELECT split_part(email,'@',2) AS domain, COUNT(*) AS deliver_count
+      FROM outreach_contacts WHERE status IN ('delivered','opened','clicked','replied')
+      GROUP BY domain HAVING COUNT(*) > 0
+    `);
+    const deliverMap = {};
+    delivers.rows.forEach(r => { deliverMap[r.domain] = parseInt(r.deliver_count); });
+
+    let seeded = 0, suppressed = 0;
+    for (const row of bounces.rows) {
+      const domain = row.domain;
+      const bounceCount = parseInt(row.bounce_count);
+      const deliverCount = deliverMap[domain] || 0;
+      const total = bounceCount + deliverCount;
+      const shouldSuppress = total >= 5 && (bounceCount / total) >= 0.5;
+      await pool.query(`
+        INSERT INTO domain_reputation (domain, bounce_count, deliver_count, suppressed, last_seen)
+        VALUES ($1, $2, $3, $4, NOW())
+        ON CONFLICT (domain) DO UPDATE SET
+          bounce_count = EXCLUDED.bounce_count,
+          deliver_count = EXCLUDED.deliver_count,
+          suppressed = EXCLUDED.suppressed,
+          last_seen = NOW()
+      `, [domain, bounceCount, deliverCount, shouldSuppress]);
+      seeded++;
+      if (shouldSuppress) suppressed++;
+    }
+    res.json({ seeded, suppressed, message: `Seeded ${seeded} domains, suppressed ${suppressed} high-bounce domains.` });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.get(['/api/admin/outreach/stats', '/admin/outreach/stats'], authRateLimit, async (req, res) => {
   if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
   try {
@@ -7274,45 +7341,180 @@ async function searchLeadsViaPubMed(target) {
   return leads;
 }
 // ─────────────────────────────────────────────────────────────────────────────
-// Email deliverability pre-check — filters bad addresses before sending
-const _mxCache = new Map(); // domain → bool, cached per process lifetime
+// Internal email scoring system — no third-party APIs
+// Scores every email 0–100 before send. Minimum score to send: 45.
+// Domain reputation tracked in DB and updated on every bounce/deliver event.
 
-async function isEmailDeliverable(email) {
-  if (!email || typeof email !== 'string') return false;
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return false;
+const _dnsCache = new Map(); // domain → { mx, spf, dmarc, ts }
+const DNS_CACHE_TTL = 6 * 3600 * 1000; // 6 hours
 
-  const [localRaw, domainRaw] = email.toLowerCase().split('@');
+const BLOCKED_PREFIXES = new Set([
+  'noreply','no-reply','no_reply','donotreply','do-not-reply','do_not_reply',
+  'bounce','bounces','mailer-daemon','postmaster','abuse','spam','junk',
+  'unsubscribe','webmaster','root','lossrun','loss-run','claimsnotice',
+  'paperworkreductionact','notifications','notification','alerts','alert',
+  'automated','auto','automailer','newsletter','news','press','media',
+  'accounts','accountsreceivable','accountspayable','invoices','billing',
+  'jobs','careers','recruiting','humanresources','hr','helpdesk','support',
+  'info','contact','hello','hi','team','office','general','admin','administrator',
+  'enquiries','enquiry','mail','email','listserv','listserve','mailbox',
+  'feedback','reply','replies','donotrespond','do-not-respond',
+  'customerservice','customer-service','service','sales','marketing',
+  'webmaster','hostmaster','dmarc','security','privacy','legal',
+  'training','education','test','testing','demo','sandbox',
+]);
 
-  // Block role-based / generic prefixes that never reach a decision-maker
-  const blockedPrefixes = [
-    'noreply','no-reply','donotreply','do-not-reply','bounce','mailer-daemon',
-    'postmaster','abuse','spam','junk','unsubscribe','webmaster','root',
-    'lossrun','loss-run','claimsnotice','paperworkreductionact',
-    'notifications','alerts','automated','no_reply','bounces',
-    'accounts','accountsreceivable','accountspayable','invoices',
-    'jobs','careers','recruiting','humanresources',
-  ];
-  if (blockedPrefixes.some(p => localRaw === p || localRaw.startsWith(p))) return false;
+const BLOCKED_EXACT = new Set([
+  'paperworkreductionact@sec.gov','license@tdi.texas.gov',
+]);
 
-  // Block known catch-all gov addresses that always bounce or never reply
-  const blockedExact = new Set(['paperworkreductionact@sec.gov','license@tdi.texas.gov']);
-  if (blockedExact.has(email.toLowerCase())) return false;
+// Patterns that suggest a real person (firstname.lastname or firstinitial.lastname)
+const PERSONAL_PATTERN = /^[a-z]{2,}[._-][a-z]{2,}(\d{0,3})?$/;
+const FIRSTNAME_ONLY = /^[a-z]{3,12}(\d{0,2})?$/;
 
-  // DNS MX check — domain must have a mail server
-  const domain = domainRaw;
-  if (_mxCache.has(domain)) return _mxCache.get(domain);
+async function getDnsInfo(domain) {
+  const cached = _dnsCache.get(domain);
+  if (cached && (Date.now() - cached.ts) < DNS_CACHE_TTL) return cached;
+
+  const { promises: dns } = await import('dns');
+  const result = { mx: false, spf: false, dmarc: false, ts: Date.now() };
+
+  await Promise.allSettled([
+    Promise.race([dns.resolveMx(domain), new Promise((_, r) => setTimeout(() => r(new Error('timeout')), 4000))])
+      .then(mx => { result.mx = Array.isArray(mx) && mx.length > 0; }).catch(() => {}),
+    Promise.race([dns.resolveTxt(domain), new Promise((_, r) => setTimeout(() => r(new Error('timeout')), 4000))])
+      .then(txt => { result.spf = txt.flat().some(r => r.startsWith('v=spf1')); }).catch(() => {}),
+    Promise.race([dns.resolveTxt(`_dmarc.${domain}`), new Promise((_, r) => setTimeout(() => r(new Error('timeout')), 4000))])
+      .then(txt => { result.dmarc = txt.flat().some(r => r.startsWith('v=DMARC1')); }).catch(() => {}),
+  ]);
+
+  _dnsCache.set(domain, result);
+  return result;
+}
+
+async function getDomainReputation(domain) {
   try {
-    const { promises: dns } = await import('dns');
-    const mx = await Promise.race([
-      dns.resolveMx(domain),
-      new Promise((_, rej) => setTimeout(() => rej(new Error('dns timeout')), 3000)),
-    ]);
-    const valid = Array.isArray(mx) && mx.length > 0;
-    _mxCache.set(domain, valid);
-    return valid;
-  } catch {
-    _mxCache.set(domain, false);
-    return false;
+    const row = await pool.query(
+      `SELECT bounce_count, deliver_count, is_catch_all, suppressed FROM domain_reputation WHERE domain=$1`,
+      [domain]
+    );
+    return row.rows[0] || null;
+  } catch { return null; }
+}
+
+async function scoreEmail(email) {
+  if (!email || typeof email !== 'string') return { score: 0, reason: 'invalid_format' };
+  const clean = email.toLowerCase().trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(clean)) return { score: 0, reason: 'invalid_format' };
+
+  const atIdx = clean.lastIndexOf('@');
+  const local = clean.slice(0, atIdx);
+  const domain = clean.slice(atIdx + 1);
+
+  if (BLOCKED_EXACT.has(clean)) return { score: 0, reason: 'blocked_exact' };
+
+  // Check blocked prefixes — exact match or starts-with for compound prefixes
+  const localBase = local.split(/[._+]/)[0];
+  if (BLOCKED_PREFIXES.has(local) || BLOCKED_PREFIXES.has(localBase)) return { score: 0, reason: 'role_address' };
+
+  // Check domain reputation from DB
+  const rep = await getDomainReputation(domain);
+  if (rep?.suppressed) return { score: 0, reason: 'domain_suppressed' };
+  if (rep) {
+    const total = (rep.bounce_count || 0) + (rep.deliver_count || 0);
+    if (total >= 5) {
+      const bounceRate = rep.bounce_count / total;
+      if (bounceRate >= 0.5) return { score: 0, reason: 'domain_high_bounce' };
+    }
+  }
+
+  // DNS checks
+  const dns = await getDnsInfo(domain);
+  if (!dns.mx) return { score: 0, reason: 'no_mx' };
+
+  let score = 30; // base for passing MX
+
+  // DNS quality signals
+  if (dns.spf) score += 15;
+  if (dns.dmarc) score += 10;
+
+  // Domain type bonuses
+  const tld = domain.split('.').pop();
+  if (domain.endsWith('.gov') || domain.endsWith('.mil')) score += 25;
+  else if (domain.endsWith('.edu')) score += 15;
+  else if (domain.endsWith('.org')) score += 5;
+  else if (['com','net','biz'].includes(tld)) score += 0;
+
+  // Catch-all penalty — domain delivers everything but most inboxes don't exist
+  if (rep?.is_catch_all) score -= 20;
+
+  // Email format scoring
+  if (PERSONAL_PATTERN.test(local)) score += 15; // firstname.lastname
+  else if (FIRSTNAME_ONLY.test(local)) score += 5;
+  else if (/\d{3,}/.test(local)) score -= 10; // lots of numbers = auto-generated
+  else if (local.length > 30) score -= 10; // suspiciously long
+
+  // Penalize if domain has prior bounces (but not suppressed)
+  if (rep) {
+    const total = (rep.bounce_count || 0) + (rep.deliver_count || 0);
+    if (total >= 3) {
+      const bounceRate = rep.bounce_count / total;
+      if (bounceRate >= 0.3) score -= 15;
+      else if (bounceRate >= 0.15) score -= 5;
+    }
+  }
+
+  score = Math.max(0, Math.min(100, score));
+  return { score, reason: score >= 45 ? 'ok' : 'low_score', is_catch_all: rep?.is_catch_all || false };
+}
+
+// Backward-compat wrapper used by existing send logic
+async function isEmailDeliverable(email) {
+  const { score, reason } = await scoreEmail(email);
+  if (score < 45) console.log(`[EmailScore] Skip ${email} — score ${score} (${reason})`);
+  return score >= 45;
+}
+
+// Called by bounce webhook to keep domain_reputation current
+async function recordEmailEvent(email, event) {
+  try {
+    const domain = email.toLowerCase().split('@')[1];
+    if (!domain) return;
+    if (event === 'bounce') {
+      await pool.query(`
+        INSERT INTO domain_reputation (domain, bounce_count, deliver_count, last_seen)
+        VALUES ($1, 1, 0, NOW())
+        ON CONFLICT (domain) DO UPDATE SET
+          bounce_count = domain_reputation.bounce_count + 1,
+          last_seen = NOW()
+      `, [domain]);
+      // If domain has bounced 5+ times and bounce rate > 50%, suppress it
+      const row = await pool.query(`SELECT bounce_count, deliver_count FROM domain_reputation WHERE domain=$1`, [domain]);
+      if (row.rows[0]) {
+        const { bounce_count, deliver_count } = row.rows[0];
+        const total = bounce_count + deliver_count;
+        if (total >= 5 && bounce_count / total >= 0.5) {
+          await pool.query(`UPDATE domain_reputation SET suppressed=true WHERE domain=$1`, [domain]);
+          console.log(`[DomainRep] Suppressed domain ${domain} — bounce rate ${Math.round(bounce_count/total*100)}%`);
+        }
+      }
+    } else if (event === 'deliver') {
+      await pool.query(`
+        INSERT INTO domain_reputation (domain, bounce_count, deliver_count, last_seen)
+        VALUES ($1, 0, 1, NOW())
+        ON CONFLICT (domain) DO UPDATE SET
+          deliver_count = domain_reputation.deliver_count + 1,
+          last_seen = NOW()
+      `, [domain]);
+    } else if (event === 'catch_all') {
+      await pool.query(`
+        INSERT INTO domain_reputation (domain, bounce_count, deliver_count, is_catch_all, last_seen)
+        VALUES ($1, 0, 0, true, NOW())
+        ON CONFLICT (domain) DO UPDATE SET is_catch_all=true, last_seen=NOW()
+      `, [domain]);
+    }
+  } catch (err) {
+    console.error('[DomainRep] recordEmailEvent error:', err.message);
   }
 }
 
