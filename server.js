@@ -7770,13 +7770,13 @@ async function sendOutreachFollowUp(contact, day) {
   if (day === 7) {
     text = `Hi ${first},
 
-Following up on my note from last week about blockchain document certification for ${contact.company}.
+Following up on my note from last week about proving record authenticity for ${contact.company}.
 
-Document fraud and post-transaction disputes are rising across every industry that handles high-value records — and organizations that have anchored their document workflows to blockchain certification are in the strongest position to protect themselves and satisfy court admissibility requirements under FRE Rule 901.
+Document fraud is rising — altered contracts, disputed titles, falsified records. The organizations best protected are those that can prove what's real: that a record existed, was unaltered, and is exactly what they say it is.
 
-ProofDeed requires no system replacement, integrates via a single lightweight API call, and can go live within days of a decision.
+ProofDeed creates permanent Trust Records that provide independently verifiable proof of authenticity, history, and ownership. No system replacement required — live via API in days.
 
-See it live in 2 minutes: proofdeed.com/demo
+See it in 2 minutes: proofdeed.com/demo
 
 Would you have 20 minutes this week for a quick walkthrough?
 
@@ -7788,15 +7788,17 @@ info@proofdeed.com | proofdeed.com`;
   } else if (day === 14) {
     text = `Hi ${first},
 
-I wanted to reach out one more time regarding blockchain document certification for ${contact.company}.
+One more note on this — a simple question:
 
-A quick question: is document authenticity and fraud prevention something on your radar for this year, or is the timing simply not right?
+Can ${contact.company} prove that its most important records are authentic, unaltered, and exactly what you say they are?
 
-Either answer helps me — I don't want to keep following up if it's not relevant. But if it is, I'd love to show you how organizations like yours are using ProofDeed to anchor their most critical documents to the blockchain in under a minute.
+If the answer isn't an immediate yes, that's the gap ProofDeed fills. We create permanent Trust Records — independently verifiable proof of authenticity, ownership, and history that holds up long after the original system changes.
 
-See it live: proofdeed.com/demo
+Is this on your radar for this year, or is the timing simply not right?
 
-Happy to work around your schedule if a 15-minute call makes sense.
+Either answer helps. If it is relevant, I'd love 15 minutes to show you how it works.
+
+proofdeed.com/demo
 
 Best,
 Scott Kiersten
@@ -7806,13 +7808,13 @@ info@proofdeed.com | proofdeed.com`;
   } else {
     text = `Hi ${first},
 
-I've reached out a couple of times about blockchain document certification for ${contact.company} and haven't heard back — so I'll assume the timing isn't right and close out my follow-ups.
+I've reached out a couple of times about record authenticity and trust infrastructure for ${contact.company} — haven't heard back, so I'll assume the timing isn't right and close out my follow-ups.
 
-If that changes, I'm happy to reconnect. ProofDeed creates Trust Records on the Polygon blockchain, legally defensible under FRE Rule 901 — no system replacement, live in days.
+If that changes, I'm easy to reach. ProofDeed helps organizations prove what's real — permanent, independently verifiable Trust Records for documents, assets, and ownership history. Legally defensible under FRE Rule 901. No system replacement required.
 
 One last ask: if there's someone else at ${contact.company} better suited for this conversation, I'd appreciate a quick introduction.
 
-Either way, appreciate your time and wish you well.
+Either way, appreciate your time.
 
 Best,
 Scott Kiersten
@@ -7834,13 +7836,13 @@ info@proofdeed.com | proofdeed.com`;
   });
 
   await pool.query(
-    `UPDATE outreach_contacts SET status='sent', last_contact_at=NOW(), reply_to_tag=$1 WHERE id=$2`,
+    `UPDATE outreach_contacts SET status='sent', last_contact_at=NOW(), reply_to_tag=$1, auto_replied=true WHERE id=$2`,
     [replyTag, contact.id]
   );
   await pool.query(
     `INSERT INTO outreach_events (contact_id, event_type, event_source, metadata, occurred_at)
      VALUES ($1, $2, 'autopilot', $3, NOW())`,
-    [contact.id, day === 7 ? 'follow_up_1' : 'breakup', JSON.stringify({ subject, day })]
+    [contact.id, day === 7 ? 'follow_up_1' : day === 14 ? 'follow_up_2' : 'breakup', JSON.stringify({ subject, day })]
   );
 }
 
@@ -7864,66 +7866,70 @@ cron.schedule('0 8 * * *', async () => {
       return;
     }
 
-    // Day 7: no reply, first_sent_at between 7-8 days ago — skip dead/lost
-    const day7 = await pool.query(`
-      SELECT * FROM outreach_contacts
-      WHERE status NOT IN ('replied','in_talks','closed_won','closed_lost','bounced','complained','unsubscribed')
-      AND pipeline_stage NOT IN ('pilot_discussed','pilot_sent','pilot_approved','closed','qualified')
-      AND first_sent_at <= NOW() - INTERVAL '7 days'
-      AND first_sent_at > NOW() - INTERVAL '8 days'
+    // Base filter shared across all follow-up tiers
+    const BASE_FILTER = `
+      status NOT IN ('replied','in_talks','closed_won','closed_lost','bounced','complained','unsubscribed')
+      AND pipeline_stage NOT IN ('pilot_discussed','pilot_sent','pilot_approved','closed','qualified','suppressed')
+      AND auto_replied = false
       AND company NOT LIKE '[PDF]%'
       AND length(split_part(email, '@', 1)) > 3
-      LIMIT 10
-    `);
-    for (const c of day7.rows) {
-      if (autopilotSent >= remainingBudget) break;
-      try { await sendOutreachFollowUp(c, 7); autopilotSent++; console.log(`[Autopilot] Day 7 → ${c.name}`); }
-      catch (e) { console.error(`[Autopilot] Day 7 fail ${c.email}:`, e.message); }
-      await new Promise(r => setTimeout(r, 3000));
-    }
+    `;
 
-    // Day 14: second follow-up — no reply, first_sent_at between 14-15 days ago
-    const day14 = await pool.query(`
-      SELECT * FROM outreach_contacts
-      WHERE status NOT IN ('replied','in_talks','closed_won','closed_lost','bounced','complained','unsubscribed')
-      AND pipeline_stage NOT IN ('pilot_discussed','pilot_sent','pilot_approved','closed','qualified')
-      AND first_sent_at <= NOW() - INTERVAL '14 days'
-      AND first_sent_at > NOW() - INTERVAL '15 days'
-      AND company NOT LIKE '[PDF]%'
-      AND length(split_part(email, '@', 1)) > 3
-      LIMIT 10
-    `);
-    for (const c of day14.rows) {
-      if (autopilotSent >= remainingBudget) break;
-      try { await sendOutreachFollowUp(c, 14); autopilotSent++; console.log(`[Autopilot] Day 14 → ${c.name}`); }
-      catch (e) { console.error(`[Autopilot] Day 14 fail ${c.email}:`, e.message); }
-      await new Promise(r => setTimeout(r, 3000));
-    }
-
-    // Day 21: breakup — no reply, first_sent_at between 21-22 days ago
+    // Day 21 breakup first — highest priority, closes the loop
+    // Window: 21+ days since first send, no follow-up yet
     const day21 = await pool.query(`
       SELECT * FROM outreach_contacts
-      WHERE status NOT IN ('replied','in_talks','closed_won','closed_lost','bounced','complained','unsubscribed')
-      AND pipeline_stage NOT IN ('pilot_discussed','pilot_sent','pilot_approved','closed','qualified')
+      WHERE ${BASE_FILTER}
       AND first_sent_at <= NOW() - INTERVAL '21 days'
-      AND first_sent_at > NOW() - INTERVAL '22 days'
-      AND company NOT LIKE '[PDF]%'
-      AND length(split_part(email, '@', 1)) > 3
-      LIMIT 10
+      AND first_sent_at > NOW() - INTERVAL '60 days'
+      ORDER BY first_sent_at ASC
+      LIMIT 30
     `);
     for (const c of day21.rows) {
       if (autopilotSent >= remainingBudget) break;
       try {
         await sendOutreachFollowUp(c, 21);
         autopilotSent++;
-        await pool.query(`UPDATE outreach_contacts SET status='closed_lost' WHERE id=$1`, [c.id]);
+        await pool.query(`UPDATE outreach_contacts SET status='closed_lost', auto_replied=true WHERE id=$1`, [c.id]);
         console.log(`[Autopilot] Day 21 breakup → ${c.name}`);
       }
       catch (e) { console.error(`[Autopilot] Day 21 fail ${c.email}:`, e.message); }
-      await new Promise(r => setTimeout(r, 3000));
+      await new Promise(r => setTimeout(r, 2000));
     }
 
-    console.log(`[Autopilot] Done. Sent: ${autopilotSent}. Day7: ${day7.rows.length}, Day14: ${day14.rows.length}, Day21: ${day21.rows.length}`);
+    // Day 14: second follow-up — 14–20 days since first send, no follow-up yet
+    const day14 = await pool.query(`
+      SELECT * FROM outreach_contacts
+      WHERE ${BASE_FILTER}
+      AND first_sent_at <= NOW() - INTERVAL '14 days'
+      AND first_sent_at > NOW() - INTERVAL '21 days'
+      ORDER BY first_sent_at ASC
+      LIMIT 30
+    `);
+    for (const c of day14.rows) {
+      if (autopilotSent >= remainingBudget) break;
+      try { await sendOutreachFollowUp(c, 14); autopilotSent++; console.log(`[Autopilot] Day 14 → ${c.name}`); }
+      catch (e) { console.error(`[Autopilot] Day 14 fail ${c.email}:`, e.message); }
+      await new Promise(r => setTimeout(r, 2000));
+    }
+
+    // Day 7: first follow-up — 7–13 days since first send, no follow-up yet
+    const day7 = await pool.query(`
+      SELECT * FROM outreach_contacts
+      WHERE ${BASE_FILTER}
+      AND first_sent_at <= NOW() - INTERVAL '7 days'
+      AND first_sent_at > NOW() - INTERVAL '14 days'
+      ORDER BY first_sent_at ASC
+      LIMIT 30
+    `);
+    for (const c of day7.rows) {
+      if (autopilotSent >= remainingBudget) break;
+      try { await sendOutreachFollowUp(c, 7); autopilotSent++; console.log(`[Autopilot] Day 7 → ${c.name}`); }
+      catch (e) { console.error(`[Autopilot] Day 7 fail ${c.email}:`, e.message); }
+      await new Promise(r => setTimeout(r, 2000));
+    }
+
+    console.log(`[Autopilot] Done. Sent: ${autopilotSent}. Day7 eligible: ${day7.rows.length}, Day14 eligible: ${day14.rows.length}, Day21 eligible: ${day21.rows.length}`);
   } catch (err) {
     console.error('[Autopilot] Cron error:', err.message);
   }
