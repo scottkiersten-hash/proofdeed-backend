@@ -5426,70 +5426,71 @@ const AFFILIATE_EMAIL = (name, company, role) => {
 
 I work with independent brokers and agents who want to offer clients something that actually differentiates them — not another rate comparison, but real document protection.
 
-ProofDeed uses blockchain to create tamper-proof, timestamped proof of any document — deeds, closing disclosures, inspection reports. When a client questions what was signed or when, there's an immutable record.
+ProofDeed creates permanent Trust Records for any document — deeds, closing disclosures, inspection reports. When a client questions what was signed or when, there's independently verifiable proof that the record is authentic and unaltered.
 
-I'm looking for a small group of agents and brokers to join our affiliate program. You'd get a co-branded landing page, a referral commission on every client who signs up, and a simple way to position yourself as the agent who protects clients after closing.
+I'm looking for a small group of agents and brokers to join our affiliate program. You'd get a co-branded landing page, a referral commission on every client who signs up, and a simple way to position yourself as the agent who proves what's real after closing.
 
 Would a quick call make sense? I can walk you through the commission structure and the "Closing Gift" framing that's working well for other agents.
 
 Scott Kiersten
-Founder, ProofDeed
-proofdeed.com`;
+Founder & CEO, ProofDeed
+info@proofdeed.com | proofdeed.com`;
 
   if (role === 'aff_marketplace') return `Hi ${first},
 
-Fraud and disputes are an operational cost for every marketplace. ProofDeed solves the verification problem — sellers can certify any document (provenance, authenticity, title) on the blockchain, and buyers see a "Verified by ProofDeed" badge they can trust.
+Fraud and disputes are an operational cost for every marketplace. ProofDeed solves the verification problem — sellers create permanent Trust Records for any document (provenance, authenticity, title), and buyers see a "Verified by ProofDeed" badge they can independently confirm.
 
-I'm offering marketplace owners a revenue share on every verification fee generated through their platform. You solve a trust problem for your sellers, reduce dispute volume, and earn a passive commission.
+I'm offering marketplace owners a revenue share on every Trust Record generated through their platform. You solve a trust problem for your sellers, reduce dispute volume, and earn a passive commission.
 
 Would it be worth a 20-minute call to see if this fits ${company}?
 
 Scott Kiersten
-Founder, ProofDeed
-proofdeed.com`;
+Founder & CEO, ProofDeed
+info@proofdeed.com | proofdeed.com`;
 
   if (role === 'aff_legaltech') return `Hi ${first},
 
-Your audience trusts your recommendations on tools that actually protect clients. ProofDeed is one of those — blockchain-certified document proof that holds up when documents are disputed, questioned, or need to prove their timeline.
+Your audience trusts your recommendations on tools that actually protect clients. ProofDeed is one of those — permanent Trust Records that prove a document is authentic, unaltered, and exactly what it says it is, even when it's disputed years later.
 
-I'd like to offer you a high-commission affiliate arrangement and a "Case Study Kit" — pre-written content showing real scenarios where timestamped proof made the difference. Something your audience can act on immediately.
+I'd like to offer you a high-commission affiliate arrangement and a "Case Study Kit" — pre-written content showing real scenarios where independently verifiable proof made the difference. Something your audience can act on immediately.
 
 Happy to send the kit and commission details if you're open to it.
 
 Scott Kiersten
-Founder, ProofDeed
-proofdeed.com`;
+Founder & CEO, ProofDeed
+info@proofdeed.com | proofdeed.com`;
 
   if (role === 'aff_saas') return `Hi ${first},
 
-${company} helps users create and manage documents — ProofDeed closes the loop by certifying them on the blockchain the moment they're finalized. It's the missing "Secure this document" button at the end of your workflow.
+${company} helps users create and manage documents — ProofDeed closes the loop by creating a permanent Trust Record the moment they're finalized. It's the missing "Prove this document" button at the end of your workflow.
 
-I'm looking for integration partners. The model is simple: an affiliate widget or API integration, and you earn a revenue share on every certification your users run through ProofDeed.
+I'm looking for integration partners. The model is simple: an affiliate widget or API integration, and you earn a revenue share on every Trust Record your users create through ProofDeed.
 
 Worth a quick call to explore if there's a fit?
 
 Scott Kiersten
-Founder, ProofDeed
-proofdeed.com`;
+Founder & CEO, ProofDeed
+info@proofdeed.com | proofdeed.com`;
 
   if (role === 'aff_estate') return `Hi ${first},
 
-Estate and succession planning creates the documents that matter most — and the ones most often disputed years later. ProofDeed gives your clients a blockchain-verified record of every critical document: wills, trust amendments, deeds, asset transfers.
+Estate and succession planning creates the documents that matter most — and the ones most often disputed years later. ProofDeed gives your clients permanent Trust Records for every critical document: wills, trust amendments, deeds, asset transfers. Independently verifiable proof that what was signed is exactly what exists today.
 
 I'm building a referral network of estate professionals. You'd introduce ProofDeed to clients as part of your planning process and earn a commission on every account. We can co-brand a "Digital Legacy" page for your practice.
 
 Would a brief call make sense to walk through the program?
 
 Scott Kiersten
-Founder, ProofDeed
-proofdeed.com`;
+Founder & CEO, ProofDeed
+info@proofdeed.com | proofdeed.com`;
 
   return `Hi ${first},
 
-I'm Scott, founder of ProofDeed — trust infrastructure for governments, enterprises, and high-value assets. I'd love to explore whether there's a fit for a referral partnership with ${company}.
+I'm Scott, founder of ProofDeed — trust infrastructure for governments, enterprises, and high-value assets. We help organizations prove that their records are authentic, unaltered, and exactly what they say they are. I'd love to explore whether there's a fit for a referral partnership with ${company}.
 
 Scott Kiersten
-proofdeed.com`;
+Founder & CEO, ProofDeed
+info@proofdeed.com | proofdeed.com`;
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
