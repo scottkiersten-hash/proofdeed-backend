@@ -4041,7 +4041,7 @@ app.get(['/api/partner/:code', '/partner/:code'], async (req, res) => {
 
     const brandName    = aff.brand_name    || aff.company || 'Document Certification';
     const brandColor   = aff.brand_color   || '#1a3a8e';
-    const brandTagline = aff.brand_tagline || 'Tamper-proof blockchain document certification for your organization.';
+    const brandTagline = aff.brand_tagline || 'Permanent, independently verifiable Trust Records for your organization.';
     const brandLogo    = aff.brand_logo_url;
     const brandWebsite = aff.brand_website || '#';
     const refCode      = aff.referral_code;
@@ -4113,7 +4113,7 @@ app.get(['/api/partner/:code', '/partner/:code'], async (req, res) => {
       <p>Every document is anchored to the Polygon blockchain the moment it's certified. Any alteration is immediately detectable — permanently.</p>
     </div>
     <div class="feature">
-      <h3>Court-Admissible</h3>
+      <h3>Legally Defensible</h3>
       <p>Certificates satisfy Federal Rules of Evidence Rule 901. Independently verifiable by any court, auditor, or regulator without access to internal systems.</p>
     </div>
     <div class="feature">
@@ -5486,7 +5486,7 @@ proofdeed.com`;
 
   return `Hi ${first},
 
-I'm Scott, founder of ProofDeed — blockchain document certification. I'd love to explore whether there's a fit for a referral partnership with ${company}.
+I'm Scott, founder of ProofDeed — trust infrastructure for governments, enterprises, and high-value assets. I'd love to explore whether there's a fit for a referral partnership with ${company}.
 
 Scott Kiersten
 proofdeed.com`;
@@ -8176,17 +8176,17 @@ app.post(['/api/admin/send-articles', '/admin/send-articles'], authRateLimit, as
     {
       to: 'service@alta.org',
       subject: 'Article Pitch — How Blockchain Certification Closes the Gap in Deed Fraud Prevention',
-      text: `Dear TitleNews Editorial Team,\n\nI'm Scott Kiersten, Founder & CEO of ProofDeed LLC, a Veteran-Owned Small Business in Oshkosh, Wisconsin. We provide blockchain document certification for title companies and real estate attorneys — creating FRE Rule 901-admissible certificates at the moment of closing.\n\nI'd like to contribute an article for TitleNews: "Deed Fraud Is Happening After Closing — Here's the Technology That Stops It"\n\nThe piece is educational and objective. I can limit or remove any mention of ProofDeed per your guidelines. Full article below.\n\nScott Kiersten | Founder & CEO | ProofDeed LLC | VOSB\ninfo@proofdeed.com | proofdeed.com\n\n---\n\n${altaArticle}`
+      text: `Dear TitleNews Editorial Team,\n\nI'm Scott Kiersten, Founder & CEO of ProofDeed LLC, a Veteran-Owned Small Business in Oshkosh, Wisconsin. ProofDeed is a Trust Infrastructure Platform — we create permanent, legally defensible Trust Records for title companies, government agencies, and real estate attorneys at the moment of closing.\n\nI'd like to contribute an article for TitleNews: "Deed Fraud Is Happening After Closing — Here's the Technology That Stops It"\n\nThe piece is educational and objective. I can limit or remove any mention of ProofDeed per your guidelines. Full article below.\n\nScott Kiersten | Founder & CEO | ProofDeed LLC | VOSB\ninfo@proofdeed.com | proofdeed.com\n\n---\n\n${altaArticle}`
     },
     {
       to: 'lkinkade@govtech.com',
       subject: 'Guest Commentary Pitch — County Recorders Have a Document Fraud Problem. Blockchain Fixes It.',
-      text: `Dear Lauren,\n\nI'm Scott Kiersten, Founder & CEO of ProofDeed LLC, a VOSB providing blockchain document certification for county recorder offices and government agencies.\n\nPitching a guest commentary for Govtech.com — policy and technology focused, not a product pitch. My company has submitted proposals to NSF SBIR and DHS LRBAA for this technology. Full article below.\n\nScott Kiersten | Founder & CEO | ProofDeed LLC | VOSB\ngov@proofdeed.com | proofdeed.com\n\n---\n\n${govtechArticle}`
+      text: `Dear Lauren,\n\nI'm Scott Kiersten, Founder & CEO of ProofDeed LLC, a VOSB providing trust infrastructure for county recorder offices and government agencies — permanent, independently verifiable Trust Records for public records and high-value documents.\n\nPitching a guest commentary for Govtech.com — policy and technology focused, not a product pitch. My company has submitted proposals to NSF SBIR and DHS LRBAA for this technology. Full article below.\n\nScott Kiersten | Founder & CEO | ProofDeed LLC | VOSB\ngov@proofdeed.com | proofdeed.com\n\n---\n\n${govtechArticle}`
     },
     {
       to: 'kim@iaogo.org',
       subject: 'Article for iGO Newsletter — After the FBI Warning on Deed Fraud: What Recorder Offices Can Do Right Now',
-      text: `Dear Kim,\n\nI'm Scott Kiersten, Founder & CEO of ProofDeed LLC — blockchain document certification for county recorder offices.\n\nAsking if iGO's newsletter accepts contributed articles. Written a piece specifically for recorder audiences on closing the deed fraud gap the FBI warned about. Full article below.\n\nScott Kiersten | Founder & CEO | ProofDeed LLC | VOSB\ngov@proofdeed.com | proofdeed.com\n\n---\n\n${igoArticle}`
+      text: `Dear Kim,\n\nI'm Scott Kiersten, Founder & CEO of ProofDeed LLC — trust infrastructure for county recorder offices, providing permanent Trust Records and publicly verifiable proof of document authenticity.\n\nAsking if iGO's newsletter accepts contributed articles. Written a piece specifically for recorder audiences on closing the deed fraud gap the FBI warned about. Full article below.\n\nScott Kiersten | Founder & CEO | ProofDeed LLC | VOSB\ngov@proofdeed.com | proofdeed.com\n\n---\n\n${igoArticle}`
     }
   ];
 
