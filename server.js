@@ -5432,6 +5432,8 @@ I'm looking for a small group of agents and brokers to join our affiliate progra
 
 Would a quick call make sense? I can walk you through the commission structure and the "Closing Gift" framing that's working well for other agents.
 
+See the platform in 2 minutes: proofdeed.com/demo
+
 Scott Kiersten
 Founder & CEO, ProofDeed
 info@proofdeed.com | proofdeed.com`;
@@ -5441,6 +5443,8 @@ info@proofdeed.com | proofdeed.com`;
 Fraud and disputes are an operational cost for every marketplace. ProofDeed solves the verification problem — sellers create permanent Trust Records for any document (provenance, authenticity, title), and buyers see a "Verified by ProofDeed" badge they can independently confirm.
 
 I'm offering marketplace owners a revenue share on every Trust Record generated through their platform. You solve a trust problem for your sellers, reduce dispute volume, and earn a passive commission.
+
+See the platform in 2 minutes: proofdeed.com/demo
 
 Would it be worth a 20-minute call to see if this fits ${company}?
 
@@ -5454,6 +5458,8 @@ Your audience trusts your recommendations on tools that actually protect clients
 
 I'd like to offer you a high-commission affiliate arrangement and a "Case Study Kit" — pre-written content showing real scenarios where independently verifiable proof made the difference. Something your audience can act on immediately.
 
+See the platform in 2 minutes: proofdeed.com/demo
+
 Happy to send the kit and commission details if you're open to it.
 
 Scott Kiersten
@@ -5465,6 +5471,8 @@ info@proofdeed.com | proofdeed.com`;
 ${company} helps users create and manage documents — ProofDeed closes the loop by creating a permanent Trust Record the moment they're finalized. It's the missing "Prove this document" button at the end of your workflow.
 
 I'm looking for integration partners. The model is simple: an affiliate widget or API integration, and you earn a revenue share on every Trust Record your users create through ProofDeed.
+
+See the platform in 2 minutes: proofdeed.com/demo
 
 Worth a quick call to explore if there's a fit?
 
@@ -5478,6 +5486,8 @@ Estate and succession planning creates the documents that matter most — and th
 
 I'm building a referral network of estate professionals. You'd introduce ProofDeed to clients as part of your planning process and earn a commission on every account. We can co-brand a "Digital Legacy" page for your practice.
 
+See the platform in 2 minutes: proofdeed.com/demo
+
 Would a brief call make sense to walk through the program?
 
 Scott Kiersten
@@ -5487,6 +5497,8 @@ info@proofdeed.com | proofdeed.com`;
   return `Hi ${first},
 
 I'm Scott, founder of ProofDeed — trust infrastructure for governments, enterprises, and high-value assets. We help organizations prove that their records are authentic, unaltered, and exactly what they say they are. I'd love to explore whether there's a fit for a referral partnership with ${company}.
+
+See the platform in 2 minutes: proofdeed.com/demo
 
 Scott Kiersten
 Founder & CEO, ProofDeed
@@ -7816,6 +7828,8 @@ If that changes, I'm easy to reach. ProofDeed helps organizations prove what's r
 One last ask: if there's someone else at ${contact.company} better suited for this conversation, I'd appreciate a quick introduction.
 
 Either way, appreciate your time.
+
+proofdeed.com/demo
 
 Best,
 Scott Kiersten
