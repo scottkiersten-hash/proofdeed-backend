@@ -7717,8 +7717,8 @@ async function runLeadEngine(targetsPerRun = 3) {
 }
 
 // Lead engine — 7 days/week, twice daily at 8am and 2pm Chicago, 200 targets per run
-cron.schedule('0 8 * * *', () => runLeadEngine(200), { timezone: 'America/Chicago' });
-cron.schedule('0 14 * * *', () => runLeadEngine(200), { timezone: 'America/Chicago' });
+cron.schedule('0 8 * * 1-5', () => runLeadEngine(200), { timezone: 'America/Chicago' });
+cron.schedule('0 14 * * 1-5', () => runLeadEngine(200), { timezone: 'America/Chicago' });
 
 /* ---------------- Lead Engine API ----------------  */
 app.get(['/api/admin/lead-engine', '/admin/lead-engine'], authRateLimit, async (req, res) => {
@@ -7861,7 +7861,7 @@ info@proofdeed.com | proofdeed.com`;
   );
 }
 
-cron.schedule('0 8 * * *', async () => {
+cron.schedule('0 8 * * 1-5', async () => {
   console.log('[Autopilot] Running daily follow-up check...');
   try {
     // Global daily cap — Resend paid tier, no daily limit
