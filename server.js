@@ -7579,8 +7579,8 @@ async function runLeadEngine(targetsPerRun = 3) {
   const { Resend } = await import('resend');
   const resend = new Resend(process.env.RESEND_API_KEY);
 
-  // Hard daily send cap — 50,000/month Resend paid tier ÷ 30 days
-  const DAILY_SEND_CAP = 1667;
+  // Hard daily send cap — 50,000/month Resend paid tier ÷ 22 weekdays
+  const DAILY_SEND_CAP = 2000;
   const todayStart = new Date(); todayStart.setHours(0,0,0,0);
   const sentTodayRow = await pool.query(
     `SELECT COUNT(*) FROM outreach_contacts WHERE first_sent_at >= $1`,
@@ -7717,8 +7717,12 @@ async function runLeadEngine(targetsPerRun = 3) {
 }
 
 // Lead engine — 7 days/week, twice daily at 8am and 2pm Chicago, 200 targets per run
-cron.schedule('0 8 * * 1-5', () => runLeadEngine(200), { timezone: 'America/Chicago' });
-cron.schedule('0 14 * * 1-5', () => runLeadEngine(200), { timezone: 'America/Chicago' });
+// Lead engine — Mon-Fri, every 2 hours 8am-4pm CT (5 runs × 400 targets = 2,000/day max)
+cron.schedule('0 8 * * 1-5',  () => runLeadEngine(400), { timezone: 'America/Chicago' });
+cron.schedule('0 10 * * 1-5', () => runLeadEngine(400), { timezone: 'America/Chicago' });
+cron.schedule('0 12 * * 1-5', () => runLeadEngine(400), { timezone: 'America/Chicago' });
+cron.schedule('0 14 * * 1-5', () => runLeadEngine(400), { timezone: 'America/Chicago' });
+cron.schedule('0 16 * * 1-5', () => runLeadEngine(400), { timezone: 'America/Chicago' });
 
 /* ---------------- Lead Engine API ----------------  */
 app.get(['/api/admin/lead-engine', '/admin/lead-engine'], authRateLimit, async (req, res) => {
@@ -7865,7 +7869,7 @@ cron.schedule('0 8 * * 1-5', async () => {
   console.log('[Autopilot] Running daily follow-up check...');
   try {
     // Global daily cap — Resend paid tier, no daily limit
-    const AUTOPILOT_DAILY_CAP = 100; // max follow-ups per day
+    const AUTOPILOT_DAILY_CAP = 200; // max follow-ups per day
     const todayStart = new Date(); todayStart.setHours(0,0,0,0);
     const newSentToday = parseInt((await pool.query(
       `SELECT COUNT(*) FROM outreach_contacts WHERE first_sent_at >= $1`, [todayStart]
