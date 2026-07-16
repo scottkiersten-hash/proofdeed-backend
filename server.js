@@ -50,7 +50,23 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 
 
 dotenv.config();
 
-/* ---------------- EMAIL HELPER ---------------- */
+/* ---------------- EMAIL HELPER (Resend — single source of truth for all transactional email) ---------------- */
+async function sendEmail({ to, from, subject, text, html }) {
+  if (!to || !process.env.RESEND_API_KEY) return;
+  try {
+    const { Resend } = await import('resend');
+    const resend = new Resend(process.env.RESEND_API_KEY);
+    await resend.emails.send({
+      from: from || 'ProofDeed <info@proofdeed.com>',
+      to,
+      subject,
+      ...(html ? { html } : { text: text || '' }),
+    });
+  } catch (err) {
+    console.error('sendEmail failed (non-fatal):', subject, err.message);
+  }
+}
+
 async function sendAnchorConfirmationEmail({ to, proofId, txHash, fileName, verifyUrl }) {
   if (!to || !process.env.RESEND_API_KEY) return;
   try {
@@ -273,67 +289,47 @@ async function authenticateApiKeyNoLimit(req, res, next) {
 async function checkAndNotifyUsage(keyData) {
   const { email, api_key, used_this_month, monthly_limit, notified_80, notified_100 } = keyData;
   const pct = used_this_month / monthly_limit;
-  const mailgunDomain = process.env.MAILGUN_DOMAIN;
-  const mailgunApiKey = process.env.MAILGUN_API_KEY;
-  if (!mailgunDomain || !mailgunApiKey) return;
-
-  const upgradeUrl = `https://proofdeed.com/api-dashboard`;
+  const upgradeUrl = 'https://proofdeed.com/api-dashboard';
 
   if (pct >= 1.0 && !notified_100) {
     await pool.query("UPDATE api_keys SET notified_100 = TRUE WHERE api_key = $1", [api_key]);
-    fetch("https://api.mailgun.net/v3/" + mailgunDomain + "/messages", {
-      method: "POST",
-      headers: {
-        "Authorization": "Basic " + Buffer.from("api:" + mailgunApiKey).toString("base64"),
-        "Content-Type": "application/x-www-form-urlencoded"
-      },
-      body: new URLSearchParams({
-        from: process.env.MAIL_FROM || "ProofDeed <noreply@" + mailgunDomain + ">",
-        to: email,
-        subject: "ProofDeed — Monthly limit reached. Your API is paused.",
-        text: [
-          "Your ProofDeed account has reached its monthly certification limit.",
-          "",
-          `Used: ${used_this_month.toLocaleString()} of ${monthly_limit.toLocaleString()} certifications`,
-          "",
-          "Your API will return 429 errors until you add more credits or upgrade your plan.",
-          "",
-          "Add more credits or upgrade now:",
-          upgradeUrl,
-          "",
-          "Options:",
-          "  • Buy 1,000 more credits — available in your dashboard",
-          "  • Upgrade to a higher plan — increases your monthly limit permanently",
-          "",
-          "ProofDeed\nhttps://proofdeed.com"
-        ].join("\n")
-      })
+    sendEmail({
+      to: email,
+      subject: "ProofDeed — Monthly limit reached. Your API is paused.",
+      text: [
+        "Your ProofDeed account has reached its monthly certification limit.",
+        "",
+        `Used: ${used_this_month.toLocaleString()} of ${monthly_limit.toLocaleString()} certifications`,
+        "",
+        "Your API will return 429 errors until you add more credits or upgrade your plan.",
+        "",
+        "Add more credits or upgrade now:",
+        upgradeUrl,
+        "",
+        "Options:",
+        "  • Buy 1,000 more credits — available in your dashboard",
+        "  • Upgrade to a higher plan — increases your monthly limit permanently",
+        "",
+        "ProofDeed\nhttps://proofdeed.com"
+      ].join("\n")
     }).catch(err => console.error("Usage 100% email failed:", err.message));
   } else if (pct >= 0.8 && !notified_80) {
     await pool.query("UPDATE api_keys SET notified_80 = TRUE WHERE api_key = $1", [api_key]);
-    fetch("https://api.mailgun.net/v3/" + mailgunDomain + "/messages", {
-      method: "POST",
-      headers: {
-        "Authorization": "Basic " + Buffer.from("api:" + mailgunApiKey).toString("base64"),
-        "Content-Type": "application/x-www-form-urlencoded"
-      },
-      body: new URLSearchParams({
-        from: process.env.MAIL_FROM || "ProofDeed <noreply@" + mailgunDomain + ">",
-        to: email,
-        subject: "ProofDeed — You've used 80% of your monthly certifications",
-        text: [
-          "Heads up — your ProofDeed account is approaching its monthly limit.",
-          "",
-          `Used: ${used_this_month.toLocaleString()} of ${monthly_limit.toLocaleString()} certifications (80%+)`,
-          "",
-          "To avoid interruption, consider adding more credits or upgrading your plan before you hit the limit.",
-          "",
-          "Manage your plan:",
-          upgradeUrl,
-          "",
-          "ProofDeed\nhttps://proofdeed.com"
-        ].join("\n")
-      })
+    sendEmail({
+      to: email,
+      subject: "ProofDeed — You've used 80% of your monthly certifications",
+      text: [
+        "Heads up — your ProofDeed account is approaching its monthly limit.",
+        "",
+        `Used: ${used_this_month.toLocaleString()} of ${monthly_limit.toLocaleString()} certifications (80%+)`,
+        "",
+        "To avoid interruption, consider adding more credits or upgrading your plan before you hit the limit.",
+        "",
+        "Manage your plan:",
+        upgradeUrl,
+        "",
+        "ProofDeed\nhttps://proofdeed.com"
+      ].join("\n")
     }).catch(err => console.error("Usage 80% email failed:", err.message));
   }
 }
@@ -408,24 +404,11 @@ app.post(["/auth/magic-link", "/api/auth/magic-link"], authRateLimit, async (req
     );
 
     const magicLink = "https://proofdeed.com/auth/verify?token=" + token;
-    const mailgunDomain = process.env.MAILGUN_DOMAIN;
-    const mailgunApiKey = process.env.MAILGUN_API_KEY;
-
-    if (mailgunDomain && mailgunApiKey) {
-      await fetch("https://api.mailgun.net/v3/" + mailgunDomain + "/messages", {
-        method: "POST",
-        headers: {
-          "Authorization": "Basic " + Buffer.from("api:" + mailgunApiKey).toString("base64"),
-          "Content-Type": "application/x-www-form-urlencoded"
-        },
-        body: new URLSearchParams({
-          from: process.env.MAIL_FROM || "ProofDeed <mailgun@" + mailgunDomain + ">",
-          to: email,
-          subject: "Your ProofDeed Sign-In Link",
-          text: "Click the link below to sign in to ProofDeed.\n\nThis link expires in 15 minutes.\n\n" + magicLink + "\n\nIf you did not request this, please ignore this email.\n\nProofDeed\nhttps://proofdeed.com"
-        })
-      });
-    }
+    await sendEmail({
+      to: email,
+      subject: "Your ProofDeed Sign-In Link",
+      text: "Click the link below to sign in to ProofDeed.\n\nThis link expires in 15 minutes.\n\n" + magicLink + "\n\nIf you did not request this, please ignore this email.\n\nProofDeed\nhttps://proofdeed.com"
+    });
 
     console.log("Magic link sent to " + email);
     res.json({ success: true });
@@ -579,25 +562,11 @@ app.post("/api/enterprise/generate-key", async (req, res) => {
       [email, stripeCustomerId, stripeSubscriptionId]
     );
 
-    // Send welcome email
-    const mailgunDomain = process.env.MAILGUN_DOMAIN;
-    const mailgunApiKey = process.env.MAILGUN_API_KEY;
-
-    if (mailgunDomain && mailgunApiKey) {
-      await fetch("https://api.mailgun.net/v3/" + mailgunDomain + "/messages", {
-        method: "POST",
-        headers: {
-          "Authorization": "Basic " + Buffer.from("api:" + mailgunApiKey).toString("base64"),
-          "Content-Type": "application/x-www-form-urlencoded"
-        },
-        body: new URLSearchParams({
-          from: process.env.MAIL_FROM || "ProofDeed <mailgun@" + mailgunDomain + ">",
-          to: email,
-          subject: "Your ProofDeed Enterprise API Key",
-          text: "Welcome to ProofDeed Enterprise.\n\nYour API Key: " + apiKey + "\n\nBilling: Usage-based, billed monthly via Stripe. Graduated pricing starts at $0.76/cert.\n\nAPI Documentation: https://proofdeed.com/api-docs\n\nProofDeed\nhttps://proofdeed.com"
-        })
-      });
-    }
+    sendEmail({
+      to: email,
+      subject: "Your ProofDeed Enterprise API Key",
+      text: "Welcome to ProofDeed Enterprise.\n\nYour API Key: " + apiKey + "\n\nBilling: Usage-based, billed monthly via Stripe. Graduated pricing starts at $0.76/cert.\n\nAPI Documentation: https://proofdeed.com/api-docs\n\nProofDeed\nhttps://proofdeed.com"
+    });
 
     res.json({
       success: true,
@@ -1844,90 +1813,41 @@ app.post(["/create-proof", "/api/create-proof"], async (req, res) => {
       verificationText: "Your document fingerprint has been permanently recorded on the Polygon blockchain."
     });
 
-    // Certificate delivery email
-    const mailgunDomain = process.env.MAILGUN_DOMAIN;
-    const mailgunApiKey = process.env.MAILGUN_API_KEY;
-    if (mailgunDomain && mailgunApiKey && user.email) {
-      fetch("https://api.mailgun.net/v3/" + mailgunDomain + "/messages", {
-        method: "POST",
-        headers: {
-          "Authorization": "Basic " + Buffer.from("api:" + mailgunApiKey).toString("base64"),
-          "Content-Type": "application/x-www-form-urlencoded"
-        },
-        body: new URLSearchParams({
-          from: process.env.MAIL_FROM || "ProofDeed <info@proofdeed.com>",
-          to: user.email,
-          subject: "ProofDeed Certificate — " + proofId,
-          text: [
-            "Your document has been certified and permanently anchored to the Polygon blockchain.",
-            "",
-            "Certificate ID: " + proofId,
-            "SHA-256 Hash:   " + documentHash,
-            "Certified:      " + new Date(timestamp).toUTCString(),
-            "",
-            "Verify this certificate at any time:",
-            "https://proofdeed.com/verify/" + proofId,
-            "",
-            "This certificate is legally defensible under FRE Rule 901. Keep this email as your record.",
-            "",
-            "ProofDeed",
-            "https://proofdeed.com"
-          ].join("\n")
-        })
-      }).catch(err => console.error("Cert delivery email failed:", err.message));
+    if (user.email) {
+      sendEmail({
+        to: user.email,
+        subject: "ProofDeed Certificate — " + proofId,
+        text: [
+          "Your document has been certified and permanently anchored to the Polygon blockchain.",
+          "",
+          "Certificate ID: " + proofId,
+          "SHA-256 Hash:   " + documentHash,
+          "Certified:      " + new Date(timestamp).toUTCString(),
+          "",
+          "Verify this certificate at any time:",
+          "https://proofdeed.com/verify/" + proofId,
+          "",
+          "This certificate is legally defensible under FRE Rule 901. Keep this email as your record.",
+          "",
+          "ProofDeed\nhttps://proofdeed.com"
+        ].join("\n")
+      });
     }
 
-    // Usage warning for JWT users (80% and 100%)
     const newUsed = used + 1;
     const pct = newUsed / certLimit;
-    if (pct >= 1.0) {
-      fetch("https://api.mailgun.net/v3/" + mailgunDomain + "/messages", {
-        method: "POST",
-        headers: {
-          "Authorization": "Basic " + Buffer.from("api:" + mailgunApiKey).toString("base64"),
-          "Content-Type": "application/x-www-form-urlencoded"
-        },
-        body: new URLSearchParams({
-          from: process.env.MAIL_FROM || "ProofDeed <info@proofdeed.com>",
-          to: user.email,
-          subject: "ProofDeed — Monthly limit reached",
-          text: [
-            "You have used all " + certLimit + " certifications in your plan this month.",
-            "",
-            "Your account is now paused until your limit resets on the 1st of next month.",
-            "",
-            "To certify more documents now, upgrade your plan:",
-            "https://proofdeed.com/#pricing",
-            "",
-            "ProofDeed",
-            "https://proofdeed.com"
-          ].join("\n")
-        })
-      }).catch(() => {});
-    } else if (pct >= 0.8) {
-      fetch("https://api.mailgun.net/v3/" + mailgunDomain + "/messages", {
-        method: "POST",
-        headers: {
-          "Authorization": "Basic " + Buffer.from("api:" + mailgunApiKey).toString("base64"),
-          "Content-Type": "application/x-www-form-urlencoded"
-        },
-        body: new URLSearchParams({
-          from: process.env.MAIL_FROM || "ProofDeed <info@proofdeed.com>",
-          to: user.email,
-          subject: "ProofDeed — You've used 80% of your monthly certifications",
-          text: [
-            "Heads up — you've used " + newUsed + " of " + certLimit + " certifications this month.",
-            "",
-            "To avoid interruption, consider upgrading your plan before you hit the limit:",
-            "https://proofdeed.com/#pricing",
-            "",
-            "Your limit resets on the 1st of each month.",
-            "",
-            "ProofDeed",
-            "https://proofdeed.com"
-          ].join("\n")
-        })
-      }).catch(() => {});
+    if (pct >= 1.0 && user.email) {
+      sendEmail({
+        to: user.email,
+        subject: "ProofDeed — Monthly limit reached",
+        text: "You have used all " + certLimit + " certifications in your plan this month.\n\nYour account is now paused until your limit resets on the 1st of next month.\n\nTo certify more documents now, upgrade your plan:\nhttps://proofdeed.com/api-dashboard\n\nProofDeed\nhttps://proofdeed.com"
+      });
+    } else if (pct >= 0.8 && user.email) {
+      sendEmail({
+        to: user.email,
+        subject: "ProofDeed — You've used 80% of your monthly certifications",
+        text: "Heads up — you've used " + newUsed + " of " + certLimit + " certifications this month.\n\nTo avoid interruption, consider upgrading your plan before you hit the limit:\nhttps://proofdeed.com/api-dashboard\n\nProofDeed\nhttps://proofdeed.com"
+      });
     }
 
     // Background blockchain anchoring — updates DB when confirmed
@@ -2864,6 +2784,72 @@ app.get('/widget.js', async (req, res) => {
   res.send(js);
 });
 
+/* ---------------- NOTARY INTAKE ---------------- */
+app.post(["/api/notary/intake"], async (req, res) => {
+  try {
+    const { name, email, company, phone, document_type, notes } = req.body;
+    if (!name || !email) return res.status(400).json({ error: 'Name and email required.' });
+    await sendEmail({
+      to: 'info@proofdeed.com',
+      subject: `Notary Intake: ${name}`,
+      text: `Name: ${name}\nEmail: ${email}\nCompany: ${company || ''}\nPhone: ${phone || ''}\nDocument Type: ${document_type || ''}\nNotes: ${notes || ''}`,
+    });
+    await sendEmail({
+      to: email,
+      subject: 'ProofDeed — We received your notarization request',
+      text: `Hi ${name},\n\nWe received your notarization inquiry and will be in touch within one business day.\n\nProofDeed Trust Infrastructure\nhttps://proofdeed.com`,
+    });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('/api/notary/intake error:', err);
+    res.status(500).json({ error: 'Server error.' });
+  }
+});
+
+/* ---------------- AUTO INTAKE ---------------- */
+app.post(["/api/auto/intake"], async (req, res) => {
+  try {
+    const { name, email, company, phone, vehicle_vin, notes } = req.body;
+    if (!name || !email) return res.status(400).json({ error: 'Name and email required.' });
+    await sendEmail({
+      to: 'info@proofdeed.com',
+      subject: `Auto Intake: ${name}`,
+      text: `Name: ${name}\nEmail: ${email}\nCompany: ${company || ''}\nPhone: ${phone || ''}\nVIN: ${vehicle_vin || ''}\nNotes: ${notes || ''}`,
+    });
+    await sendEmail({
+      to: email,
+      subject: 'ProofDeed — We received your vehicle certification request',
+      text: `Hi ${name},\n\nWe received your Asset Passport™ inquiry and will be in touch within one business day.\n\nProofDeed Trust Infrastructure\nhttps://proofdeed.com`,
+    });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('/api/auto/intake error:', err);
+    res.status(500).json({ error: 'Server error.' });
+  }
+});
+
+/* ---------------- GENERAL INQUIRY ---------------- */
+app.post(["/api/inquiry"], async (req, res) => {
+  try {
+    const { name, email, company, phone, subject, message } = req.body;
+    if (!name || !email) return res.status(400).json({ error: 'Name and email required.' });
+    await sendEmail({
+      to: 'info@proofdeed.com',
+      subject: `Inquiry: ${subject || name}`,
+      text: `Name: ${name}\nEmail: ${email}\nCompany: ${company || ''}\nPhone: ${phone || ''}\nMessage: ${message || ''}`,
+    });
+    await sendEmail({
+      to: email,
+      subject: 'ProofDeed — We received your inquiry',
+      text: `Hi ${name},\n\nThank you for reaching out. We'll be in touch shortly.\n\nProofDeed Trust Infrastructure\nhttps://proofdeed.com`,
+    });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('/api/inquiry error:', err);
+    res.status(500).json({ error: 'Server error.' });
+  }
+});
+
 /* ---------------- CONTACT / AFFILIATE FORM ---------------- */
 app.post(["/contact", "/api/contact"], async (req, res) => {
   try {
@@ -2881,9 +2867,6 @@ app.post(["/contact", "/api/contact"], async (req, res) => {
       [name, resolvedCompany, email, resolvedNotes, request_type || "contact"]
     );
 
-    const mailgunDomain = process.env.MAILGUN_DOMAIN;
-    const mailgunApiKey = process.env.MAILGUN_API_KEY;
-
     if (request_type === "affiliate") {
       try {
         const code = name.split(' ')[0].toUpperCase() + Math.floor(1000 + Math.random() * 9000);
@@ -2893,124 +2876,47 @@ app.post(["/contact", "/api/contact"], async (req, res) => {
            ON CONFLICT (email) DO UPDATE SET referral_code = $2`,
           [email, code]
         );
-        if (mailgunDomain && mailgunApiKey) {
-          const affiliateHtml = "<!DOCTYPE html><html><body style='margin:0;padding:0;background:#f0f0ee;font-family:Georgia,serif;'><div style='max-width:600px;margin:40px auto;background:#ffffff;border:1px solid #ddd;border-radius:4px;overflow:hidden;'><div style='height:4px;background:linear-gradient(90deg,#1a3a8e,#4080d0,#1a3a8e);'></div><div style='padding:40px;'><h1 style='font-size:22px;font-weight:700;color:#111;margin:0 0 8px;'>Welcome to ProofDeed Affiliates</h1><p style='font-size:14px;color:#666;margin:0 0 32px;'>Your affiliate account is ready. Start sharing your unique referral link below.</p><div style='background:#f8f8f6;border:1px solid #e5e5e5;border-radius:4px;padding:24px;margin-bottom:24px;'><p style='font-size:11px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:0.1em;margin:0 0 6px;'>Your Referral Code</p><p style='font-size:24px;font-family:monospace;color:#1a3a8e;font-weight:700;margin:0 0 20px;'>" + code + "</p><p style='font-size:11px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:0.1em;margin:0 0 6px;'>Your Referral Links</p><p style='font-size:13px;font-family:monospace;color:#333;margin:0 0 8px;'>https://proofdeed.com/auto?ref=" + code + "</p><p style='font-size:13px;font-family:monospace;color:#333;margin:0 0 8px;'>https://proofdeed.com/document?ref=" + code + "</p></div><p style='font-size:14px;color:#555;margin:0 0 16px;'>Every customer who signs up through your link will be tracked automatically.</p><p style='font-size:14px;color:#555;margin:0 0 32px;'>Questions? Contact us at <a href=\"mailto:info@proofdeed.com\" style=\"color:#1a3a8e;\">info@proofdeed.com</a></p><hr style='border:none;border-top:1px solid #e5e5e5;margin:24px 0;'><p style='font-size:12px;color:#999;font-family:sans-serif;margin:0;'>ProofDeed &mdash; Trust Infrastructure Platform</p></div><div style='height:4px;background:linear-gradient(90deg,#1a3a8e,#4080d0,#1a3a8e);'></div></div></body></html>";
-          await fetch("https://api.mailgun.net/v3/" + mailgunDomain + "/messages", {
-            method: "POST",
-            headers: {
-              "Authorization": "Basic " + Buffer.from("api:" + mailgunApiKey).toString("base64"),
-              "Content-Type": "application/x-www-form-urlencoded"
-            },
-            body: new URLSearchParams({
-              from: process.env.MAIL_FROM || "ProofDeed <mailgun@" + mailgunDomain + ">",
-              to: email,
-              subject: "Your ProofDeed Affiliate Code - " + code,
-              html: affiliateHtml
-            })
-          });
-          console.log("Affiliate code " + code + " sent to " + email);
-        }
+        await sendEmail({
+          to: email,
+          subject: "Your ProofDeed Affiliate Code — " + code,
+          text: "Welcome to ProofDeed Affiliates!\n\nYour referral code: " + code + "\n\nYour referral links:\nhttps://proofdeed.com/auto?ref=" + code + "\nhttps://proofdeed.com/document?ref=" + code + "\n\nEvery customer who signs up through your link will be tracked automatically.\n\nQuestions? Contact us at info@proofdeed.com\n\nProofDeed\nhttps://proofdeed.com"
+        });
+        console.log("Affiliate code " + code + " sent to " + email);
       } catch (affiliateErr) {
         console.error("Affiliate setup error (non-fatal):", affiliateErr.message);
       }
     }
 
-    if (request_type === "purchase_order" && mailgunDomain && mailgunApiKey) {
-      // Notify admin
-      await fetch("https://api.mailgun.net/v3/" + mailgunDomain + "/messages", {
-        method: "POST",
-        headers: {
-          "Authorization": "Basic " + Buffer.from("api:" + mailgunApiKey).toString("base64"),
-          "Content-Type": "application/x-www-form-urlencoded"
-        },
-        body: new URLSearchParams({
-          from: process.env.MAIL_FROM || "ProofDeed <mailgun@" + mailgunDomain + ">",
-          to: process.env.MAIL_TO || process.env.ADMIN_EMAIL || "SJJK@pm.me",
-          subject: "🏛 PO Request: $15K Pilot — " + (resolvedCompany || name),
-          text: "Purchase Order request received.\n\nName: " + name + "\nAgency: " + (resolvedCompany || "N/A") + "\nEmail: " + email + "\nMessage: " + (resolvedNotes || "N/A") + "\n\nAction required: Send invoice to " + email + "\n\nProofDeed Admin\nhttps://proofdeed.com/admin"
-        })
-      }).catch(() => {});
-
-      // Confirm to prospect
-      await fetch("https://api.mailgun.net/v3/" + mailgunDomain + "/messages", {
-        method: "POST",
-        headers: {
-          "Authorization": "Basic " + Buffer.from("api:" + mailgunApiKey).toString("base64"),
-          "Content-Type": "application/x-www-form-urlencoded"
-        },
-        body: new URLSearchParams({
-          from: process.env.MAIL_FROM || "ProofDeed <mailgun@" + mailgunDomain + ">",
-          to: email,
-          subject: "ProofDeed — Government Pilot Invoice Request Received",
-          text: "Hi " + name + ",\n\nWe received your request for the ProofDeed Government Pilot Program ($15,000).\n\nWe will send a formal invoice to this email within 1 business day. Net 30 terms are available for government agencies.\n\nOnce payment is confirmed, your API key and onboarding materials will be sent immediately.\n\nIf you have any questions, reply to this email or contact us at gov@proofdeed.com.\n\nProofDeed\nhttps://proofdeed.com"
-        })
-      }).catch(() => {});
-
+    if (request_type === "purchase_order") {
+      sendEmail({
+        to: "sjjk@pm.me",
+        subject: "PO Request: $15K Pilot — " + (resolvedCompany || name),
+        text: "Purchase Order request received.\n\nName: " + name + "\nAgency: " + (resolvedCompany || "N/A") + "\nEmail: " + email + "\nMessage: " + (resolvedNotes || "N/A") + "\n\nAction required: Send invoice to " + email + "\n\nProofDeed Admin\nhttps://proofdeed.com/admin"
+      });
+      await sendEmail({
+        from: 'ProofDeed Government <gov@proofdeed.com>',
+        to: email,
+        subject: "ProofDeed — Government Pilot Invoice Request Received",
+        text: "Hi " + name + ",\n\nWe received your request for the ProofDeed Government Pilot Program ($15,000).\n\nWe will send a formal invoice to this email within 1 business day. Net 30 terms are available for government agencies.\n\nOnce payment is confirmed, your API key and onboarding materials will be sent immediately.\n\nIf you have any questions, reply to this email or contact us at gov@proofdeed.com.\n\nProofDeed\nhttps://proofdeed.com"
+      });
       console.log("Purchase order request received from:", email, resolvedCompany);
       return res.json({ success: true });
     }
 
-    if (mailgunDomain && mailgunApiKey) {
-      const isProofEmail = !!proofId;
-      const emailSubject = subject || (isProofEmail ? "Your ProofDeed Certificate" : "ProofDeed Contact Confirmation");
-
-      const htmlProofEmail = "<!DOCTYPE html><html><body style='margin:0;padding:0;background:#f0f0ee;font-family:Georgia,serif;'><div style='max-width:600px;margin:40px auto;background:#ffffff;border:1px solid #ddd;border-radius:4px;overflow:hidden;'><div style='height:4px;background:linear-gradient(90deg,#1a3a8e,#4080d0,#1a3a8e);'></div><div style='padding:40px;'><h1 style='font-size:22px;font-weight:700;color:#111;margin:0 0 8px;'>Document Certified</h1><p style='font-size:14px;color:#666;margin:0 0 32px;'>Your document has been permanently recorded on the Polygon blockchain.</p><div style='background:#f8f8f6;border:1px solid #e5e5e5;border-radius:4px;padding:24px;margin-bottom:24px;'><p style='font-size:11px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:0.1em;margin:0 0 6px;'>Proof ID</p><p style='font-size:18px;font-family:monospace;color:#1a3a8e;font-weight:700;margin:0 0 20px;'>" + proofId + "</p><p style='font-size:11px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:0.1em;margin:0 0 6px;'>Document Hash</p><p style='font-size:11px;font-family:monospace;color:#333;word-break:break-all;margin:0 0 20px;'>" + documentHash + "</p><p style='font-size:11px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:0.1em;margin:0 0 6px;'>Timestamp</p><p style='font-size:13px;color:#333;margin:0;'>" + timestamp + "</p></div><a href='https://proofdeed.com/verify' style='display:inline-block;background:#0f172a;color:#ffffff;text-decoration:none;padding:14px 28px;border-radius:6px;font-family:sans-serif;font-size:14px;font-weight:600;margin-bottom:24px;'>Verify Certificate</a><hr style='border:none;border-top:1px solid #e5e5e5;margin:24px 0;'><p style='font-size:12px;color:#999;font-family:sans-serif;margin:0;'>ProofDeed &mdash; Trust Infrastructure Platform</p><p style='font-size:12px;color:#999;font-family:sans-serif;margin:4px 0 0;'><a href='https://proofdeed.com' style='color:#1a3a8e;'>proofdeed.com</a></p></div><div style='height:4px;background:linear-gradient(90deg,#1a3a8e,#4080d0,#1a3a8e);'></div></div></body></html>";
-
-      const textContactEmail = "New contact submission from ProofDeed.\n\nName: " + name + "\nEmail: " + email + "\nOrganization: " + (resolvedCompany || "N/A") + "\nPhone: " + (phone || "N/A") + "\nMessage: " + (resolvedNotes || "N/A") + "\n\nProofDeed\nhttps://proofdeed.com";
-
-      try {
-        const mailParams = {
-          from: process.env.MAIL_FROM || "ProofDeed <mailgun@" + mailgunDomain + ">",
-          to: process.env.MAIL_TO || email,
-          subject: emailSubject,
-        };
-
-        if (isProofEmail) {
-          mailParams.html = htmlProofEmail;
-        } else {
-          mailParams.text = textContactEmail;
-        }
-
-        await fetch("https://api.mailgun.net/v3/" + mailgunDomain + "/messages", {
-          method: "POST",
-          headers: {
-            "Authorization": "Basic " + Buffer.from("api:" + mailgunApiKey).toString("base64"),
-            "Content-Type": "application/x-www-form-urlencoded"
-          },
-          body: new URLSearchParams(mailParams)
-        });
-        console.log("Email sent to " + email);
-      } catch (mailErr) {
-        console.error("Mailgun error (non-fatal):", mailErr.message);
-      }
-    }
-
-    // Notify admin of every contact/inquiry submission
-    if (mailgunDomain && mailgunApiKey && !proofId) {
-      fetch("https://api.mailgun.net/v3/" + mailgunDomain + "/messages", {
-        method: "POST",
-        headers: {
-          "Authorization": "Basic " + Buffer.from("api:" + mailgunApiKey).toString("base64"),
-          "Content-Type": "application/x-www-form-urlencoded"
-        },
-        body: new URLSearchParams({
-          from: process.env.MAIL_FROM || "ProofDeed <noreply@" + mailgunDomain + ">",
-          to: "info@proofdeed.com",
-          subject: "New " + (request_type || "contact") + " submission — " + name + " (" + (resolvedCompany || "no company") + ")",
-          text: [
-            "New submission on ProofDeed.",
-            "",
-            "Name: " + name,
-            "Email: " + email,
-            "Organization: " + (resolvedCompany || "N/A"),
-            "Phone: " + (phone || "N/A"),
-            "Type: " + (request_type || "contact"),
-            "Message: " + (resolvedNotes || "N/A"),
-            "",
-            "Reply directly to: " + email
-          ].join("\n")
-        })
-      }).catch(err => console.error("Admin notification email failed:", err.message));
+    if (proofId) {
+      sendEmail({
+        to: email,
+        subject: subject || "Your ProofDeed Certificate",
+        html: "<div style='font-family:sans-serif;max-width:560px;margin:0 auto'><div style='background:#0f172a;padding:18px 24px;border-radius:8px 8px 0 0'><span style='color:#fff;font-size:17px;font-weight:700'>Proof<span style='color:#60a5fa'>Deed</span></span></div><div style='background:#fff;border:1px solid #e5e7eb;border-top:none;padding:24px;border-radius:0 0 8px 8px'><p style='font-weight:600;font-size:15px;margin:0 0 12px'>Document Certified</p><p style='color:#374151;font-size:13px;margin:0 0 20px'>Your document has been permanently recorded on the Polygon blockchain.</p><table style='width:100%;font-size:13px;border-collapse:collapse;margin-bottom:20px'><tr><td style='color:#6b7280;padding:5px 0;width:100px'>Proof ID</td><td style='font-family:monospace;color:#1e40af'>" + proofId + "</td></tr><tr><td style='color:#6b7280;padding:5px 0'>Hash</td><td style='font-family:monospace;font-size:11px;word-break:break-all;color:#374151'>" + documentHash + "</td></tr></table><a href='https://proofdeed.com/verify/" + proofId + "' style='display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:10px 20px;border-radius:6px;font-size:13px;font-weight:600'>Verify Certificate</a><p style='color:#9ca3af;font-size:11px;margin-top:20px'>Legally defensible under FRE Rule 901. ProofDeed Trust Infrastructure Platform.</p></div></div>"
+      });
+    } else {
+      const contactText = "New contact submission from ProofDeed.\n\nName: " + name + "\nEmail: " + email + "\nOrganization: " + (resolvedCompany || "N/A") + "\nPhone: " + (phone || "N/A") + "\nMessage: " + (resolvedNotes || "N/A") + "\n\nProofDeed\nhttps://proofdeed.com";
+      sendEmail({ to: email, subject: subject || "ProofDeed Contact Confirmation", text: contactText });
+      sendEmail({
+        to: "sjjk@pm.me",
+        subject: "New " + (request_type || "contact") + " — " + name + " (" + (resolvedCompany || "no company") + ")",
+        text: "Name: " + name + "\nEmail: " + email + "\nOrg: " + (resolvedCompany || "N/A") + "\nPhone: " + (phone || "N/A") + "\nType: " + (request_type || "contact") + "\nMessage: " + (resolvedNotes || "N/A") + "\n\nReply to: " + email
+      });
     }
 
     console.log("New " + (request_type || "contact") + " submission from: " + email);
@@ -3131,55 +3037,37 @@ app.post(["/stripe-webhook", "/api/stripe-webhook"], express.raw({ type: "applic
         [email, customerId, subscriptionId || null, referral || null]
       );
 
+      // Plan → limit mapping (aligned with frontend pricing)
+      const PLAN_LIMITS = {
+        'professional-monthly': 250, 'professional-annual': 250,
+        'business-monthly': 2500,    'business-annual': 2500,
+        'enterprise-monthly': 25000, 'enterprise-annual': 25000,
+        'government-monthly': 50000, 'government-annual': 50000,
+        'api-monthly': 100000,
+        'starter-monthly': 250,      'starter-annual': 250,
+        'pro-monthly': 2500,         'pro-annual': 2500,
+        'enterprise': 25000,
+      };
+
       if (isOneTime && session.metadata?.type === "topup_1000") {
-        // Credit top-up — add 1,000 certs and reset notification flags
         const apiKeyVal = session.metadata?.api_key;
         if (apiKeyVal) {
           await pool.query(
-            `UPDATE api_keys
-             SET monthly_limit = monthly_limit + 1000,
-                 notified_80 = FALSE,
-                 notified_100 = FALSE
-             WHERE api_key = $1`,
+            `UPDATE api_keys SET monthly_limit = monthly_limit + 1000, notified_80 = FALSE, notified_100 = FALSE WHERE api_key = $1`,
             [apiKeyVal]
           );
           console.log("Top-up applied: +1000 certs for key", apiKeyVal);
-
-          // Confirmation email
-          const mailgunDomain = process.env.MAILGUN_DOMAIN;
-          const mailgunApiKey = process.env.MAILGUN_API_KEY;
-          if (email && mailgunDomain && mailgunApiKey) {
-            fetch("https://api.mailgun.net/v3/" + mailgunDomain + "/messages", {
-              method: "POST",
-              headers: {
-                "Authorization": "Basic " + Buffer.from("api:" + mailgunApiKey).toString("base64"),
-                "Content-Type": "application/x-www-form-urlencoded"
-              },
-              body: new URLSearchParams({
-                from: process.env.MAIL_FROM || "ProofDeed <noreply@" + mailgunDomain + ">",
-                to: email,
-                subject: "ProofDeed — 1,000 certifications added to your account",
-                text: [
-                  "Your top-up has been applied.",
-                  "",
-                  "1,000 additional certifications have been added to your monthly limit.",
-                  "Your API is active and ready.",
-                  "",
-                  "View your updated usage:",
-                  "https://proofdeed.com/api-dashboard",
-                  "",
-                  "ProofDeed\nhttps://proofdeed.com"
-                ].join("\n")
-              })
-            }).catch(err => console.error("Top-up email failed:", err.message));
-          }
+          sendEmail({
+            to: email,
+            subject: "ProofDeed — 1,000 certifications added to your account",
+            text: "Your top-up has been applied.\n\n1,000 additional certifications have been added to your monthly limit. Your API is active and ready.\n\nView your updated usage:\nhttps://proofdeed.com/api-dashboard\n\nProofDeed\nhttps://proofdeed.com"
+          });
         }
         return;
       }
 
       if (isOneTime) {
-        // Government pilot — payment received but ACH not yet cleared.
-        // Store email + payment_intent ID so we can provision when funds confirm.
+        // Government pilot — pending ACH
         const paymentIntentId = session.payment_intent;
         await pool.query(
           `INSERT INTO api_keys (email, api_key, plan, monthly_limit, used_this_month, active, created_at)
@@ -3188,49 +3076,34 @@ app.post(["/stripe-webhook", "/api/stripe-webhook"], express.raw({ type: "applic
           [email, "pending_" + paymentIntentId]
         );
         console.log("Government pilot payment received (pending ACH):", email);
-
-        // Send "payment received" confirmation — key will follow when funds clear
-        const mailgunDomain = process.env.MAILGUN_DOMAIN;
-        const mailgunApiKey = process.env.MAILGUN_API_KEY;
-        if (mailgunDomain && mailgunApiKey) {
-          try {
-            await fetch("https://api.mailgun.net/v3/" + mailgunDomain + "/messages", {
-              method: "POST",
-              headers: {
-                "Authorization": "Basic " + Buffer.from("api:" + mailgunApiKey).toString("base64"),
-                "Content-Type": "application/x-www-form-urlencoded"
-              },
-              body: new URLSearchParams({
-                from: "ProofDeed Government <gov@proofdeed.com>",
-                to: email,
-                subject: "ProofDeed Government Pilot — Payment Received",
-                text: [
-                  "Thank you — your payment for the ProofDeed Government Pilot Program has been received.",
-                  "",
-                  "ACH bank transfers take 3–5 business days to clear. Once your payment is confirmed,",
-                  "you will receive a second email with your API key and full access credentials.",
-                  "",
-                  "Pilot Summary:",
-                  "  • Duration: 45 days from activation",
-                  "  • Certification limit: 50,000 documents",
-                  "  • Access: Upload portal, batch processing, REST API",
-                  "  • Fixed fee: $15,000 — no variable costs during pilot",
-                  "",
-                  "Questions? Contact us at gov@proofdeed.com.",
-                  "",
-                  "ProofDeed",
-                  "https://proofdeed.com"
-                ].join("\n")
-              })
-            });
-            console.log("Pilot payment-received email sent to:", email);
-          } catch (mailErr) {
-            console.error("Pilot payment-received email failed:", mailErr.message);
-          }
-        }
+        await sendEmail({
+          from: 'ProofDeed Government <gov@proofdeed.com>',
+          to: email,
+          subject: "ProofDeed Government Pilot — Payment Received",
+          text: [
+            "Thank you — your payment for the ProofDeed Government Pilot Program has been received.",
+            "",
+            "ACH bank transfers take 3–5 business days to clear. Once your payment is confirmed,",
+            "you will receive a second email with your API key and full access credentials.",
+            "",
+            "Pilot Summary:",
+            "  • Duration: 45 days from activation",
+            "  • Certification limit: 50,000 documents",
+            "  • Access: Upload portal, batch processing, REST API",
+            "  • Fixed fee: $15,000 — no variable costs during pilot",
+            "",
+            "Questions? Contact us at gov@proofdeed.com.",
+            "",
+            "ProofDeed\nhttps://proofdeed.com"
+          ].join("\n")
+        });
 
       } else {
-        // Standard subscription — store subscription item ID for metered billing
+        // Standard subscription — provision or update API key
+        const planName = session.metadata?.plan || 'professional-monthly';
+        const monthlyLimit = PLAN_LIMITS[planName] || 250;
+        const newApiKey = 'pd_live_' + crypto.randomBytes(24).toString('hex');
+
         let subscriptionItemId = null;
         try {
           const subscription = await stripe.subscriptions.retrieve(subscriptionId);
@@ -3239,12 +3112,55 @@ app.post(["/stripe-webhook", "/api/stripe-webhook"], express.raw({ type: "applic
           console.error("Could not retrieve subscription item:", err.message);
         }
 
-        if (subscriptionItemId) {
-          await pool.query(
-            `UPDATE api_keys SET stripe_subscription_item_id = $1 WHERE email = $2`,
-            [subscriptionItemId, email]
-          );
-        }
+        // UPSERT — create key for new customers, update limit for upgrades
+        await pool.query(
+          `INSERT INTO api_keys (email, api_key, plan, monthly_limit, used_this_month, active, stripe_subscription_item_id, created_at)
+           VALUES ($1, $2, $3, $4, 0, TRUE, $5, NOW())
+           ON CONFLICT (email) DO UPDATE
+           SET plan = $3, monthly_limit = $4, active = TRUE,
+               stripe_subscription_item_id = COALESCE($5, api_keys.stripe_subscription_item_id)`,
+          [email, newApiKey, planName, monthlyLimit, subscriptionItemId]
+        );
+        console.log("API key provisioned for:", email, "plan:", planName, "limit:", monthlyLimit);
+
+        // Fetch the actual key (may be existing if upsert hit conflict)
+        const keyRow = await pool.query('SELECT api_key, monthly_limit FROM api_keys WHERE email=$1', [email]);
+        const activeKey = keyRow.rows[0]?.api_key || newApiKey;
+        const activeLimit = keyRow.rows[0]?.monthly_limit || monthlyLimit;
+
+        const planLabels = {
+          'professional-monthly': 'Professional', 'business-monthly': 'Business',
+          'enterprise-monthly': 'Enterprise', 'api-monthly': 'API Developer',
+          'government-monthly': 'Government', 'starter-monthly': 'Starter',
+          'pro-monthly': 'Pro',
+        };
+        const planLabel = planLabels[planName] || 'Professional';
+
+        await sendEmail({
+          to: email,
+          subject: `Welcome to ProofDeed — your ${planLabel} account is active`,
+          html: `
+            <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:580px;margin:0 auto;color:#111827">
+              <div style="background:#0f172a;padding:20px 28px;border-radius:8px 8px 0 0">
+                <span style="color:#fff;font-size:18px;font-weight:700">Proof<span style="color:#60a5fa">Deed</span></span>
+              </div>
+              <div style="background:#fff;border:1px solid #e5e7eb;border-top:none;padding:28px;border-radius:0 0 8px 8px">
+                <p style="font-size:16px;font-weight:600;margin:0 0 6px">Your ${planLabel} account is active</p>
+                <p style="color:#374151;font-size:14px;margin:0 0 24px">Welcome to ProofDeed. Your API key is ready — keep it secure.</p>
+                <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:20px;margin-bottom:24px">
+                  <div style="font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Your API Key</div>
+                  <div style="font-family:monospace;font-size:13px;color:#1e40af;word-break:break-all;margin-bottom:16px">${activeKey}</div>
+                  <div style="font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Monthly Limit</div>
+                  <div style="font-size:14px;color:#111827">${activeLimit.toLocaleString()} Trust Records/month</div>
+                </div>
+                <p style="font-size:14px;color:#374151;margin:0 0 8px">Getting started:</p>
+                <p style="font-size:14px;color:#374151;margin:0 0 4px">• Certify a document: <a href="https://proofdeed.com/upload" style="color:#2563eb">proofdeed.com/upload</a></p>
+                <p style="font-size:14px;color:#374151;margin:0 0 4px">• API dashboard: <a href="https://proofdeed.com/api-dashboard" style="color:#2563eb">proofdeed.com/api-dashboard</a></p>
+                <p style="font-size:14px;color:#374151;margin:0 0 24px">• API docs: <a href="https://proofdeed.com/api-docs" style="color:#2563eb">proofdeed.com/api-docs</a></p>
+                <p style="color:#9ca3af;font-size:12px;margin:0">Questions? Reply to this email or contact <a href="mailto:info@proofdeed.com" style="color:#9ca3af">info@proofdeed.com</a>. Legally defensible under FRE Rule 901.</p>
+              </div>
+            </div>`
+        });
       }
 
       if (referral) {
@@ -3256,46 +3172,6 @@ app.post(["/stripe-webhook", "/api/stripe-webhook"], express.raw({ type: "applic
           console.log("Referral credited:", referral);
         } catch (err) {
           console.error("Referral update failed:", err.message);
-        }
-      }
-
-      // Welcome email for new subscribers (not government pilot or top-ups)
-      if (!isOneTime && email) {
-        const planName = session.metadata?.plan || "starter";
-        const planLabel = planName.includes("pro") ? "Professional" : "Starter";
-        const certLimit = planName.includes("pro") ? "70" : "25";
-        const mailgunDomain = process.env.MAILGUN_DOMAIN;
-        const mailgunApiKey = process.env.MAILGUN_API_KEY;
-        if (mailgunDomain && mailgunApiKey) {
-          fetch("https://api.mailgun.net/v3/" + mailgunDomain + "/messages", {
-            method: "POST",
-            headers: {
-              "Authorization": "Basic " + Buffer.from("api:" + mailgunApiKey).toString("base64"),
-              "Content-Type": "application/x-www-form-urlencoded"
-            },
-            body: new URLSearchParams({
-              from: process.env.MAIL_FROM || "ProofDeed <info@proofdeed.com>",
-              to: email,
-              subject: "Welcome to ProofDeed — your account is active",
-              text: [
-                "Your ProofDeed " + planLabel + " subscription is now active.",
-                "",
-                "You have " + certLimit + " certifications per month. Every document you certify receives a permanent, permanently anchored to the Polygon blockchain.",
-                "",
-                "Getting started:",
-                "  • Certify a document: https://proofdeed.com/upload",
-                "  • View your dashboard: https://proofdeed.com/dashboard",
-                "  • Verify any certificate: https://proofdeed.com/verify",
-                "",
-                "Your document is hashed entirely in your browser — we never see or store your files.",
-                "",
-                "Questions? Reply to this email or contact us at info@proofdeed.com.",
-                "",
-                "ProofDeed",
-                "https://proofdeed.com"
-              ].join("\n")
-            })
-          }).catch(err => console.error("Welcome email failed:", err.message));
         }
       }
 
@@ -3321,37 +3197,23 @@ app.post(["/stripe-webhook", "/api/stripe-webhook"], express.raw({ type: "applic
         );
         console.log("API key deactivated on subscription cancellation for:", email);
 
-        // Win-back email
-        const mailgunDomain = process.env.MAILGUN_DOMAIN;
-        const mailgunApiKey = process.env.MAILGUN_API_KEY;
-        if (mailgunDomain && mailgunApiKey) {
-          fetch("https://api.mailgun.net/v3/" + mailgunDomain + "/messages", {
-            method: "POST",
-            headers: {
-              "Authorization": "Basic " + Buffer.from("api:" + mailgunApiKey).toString("base64"),
-              "Content-Type": "application/x-www-form-urlencoded"
-            },
-            body: new URLSearchParams({
-              from: process.env.MAIL_FROM || "ProofDeed <info@proofdeed.com>",
-              to: email,
-              subject: "Your ProofDeed subscription has been cancelled",
-              text: [
-                "Your ProofDeed subscription has been cancelled and your access has ended.",
-                "",
-                "Every certificate you created remains permanently on the Polygon blockchain — your proofs are yours forever, regardless of your subscription status.",
-                "",
-                "If you cancelled by mistake or would like to resubscribe:",
-                "  https://proofdeed.com/#pricing",
-                "",
-                "If there was something we could have done better, we'd genuinely like to know.",
-                "Reply to this email — we read every response.",
-                "",
-                "ProofDeed",
-                "https://proofdeed.com"
-              ].join("\n")
-            })
-          }).catch(err => console.error("Win-back email failed:", err.message));
-        }
+        sendEmail({
+          to: email,
+          subject: "Your ProofDeed subscription has been cancelled",
+          text: [
+            "Your ProofDeed subscription has been cancelled and your access has ended.",
+            "",
+            "Every certificate you created remains permanently on the Polygon blockchain — your proofs are yours forever, regardless of your subscription status.",
+            "",
+            "If you cancelled by mistake or would like to resubscribe:",
+            "  https://proofdeed.com/#pricing",
+            "",
+            "If there was something we could have done better, we'd genuinely like to know.",
+            "Reply to this email — we read every response.",
+            "",
+            "ProofDeed\nhttps://proofdeed.com"
+          ].join("\n")
+        });
       }
     } catch (dbErr) {
       console.error("Subscription cancellation DB update failed:", dbErr.message);
@@ -3367,41 +3229,23 @@ app.post(["/stripe-webhook", "/api/stripe-webhook"], express.raw({ type: "applic
       : "your next billing date";
     const amountFormatted = "$" + (amountCents / 100).toFixed(2);
 
-    const mailgunDomain = process.env.MAILGUN_DOMAIN;
-    const mailgunApiKey = process.env.MAILGUN_API_KEY;
-    if (mailgunDomain && mailgunApiKey && email) {
-      try {
-        await fetch("https://api.mailgun.net/v3/" + mailgunDomain + "/messages", {
-          method: "POST",
-          headers: {
-            "Authorization": "Basic " + Buffer.from("api:" + mailgunApiKey).toString("base64"),
-            "Content-Type": "application/x-www-form-urlencoded"
-          },
-          body: new URLSearchParams({
-            from: process.env.MAIL_FROM || "ProofDeed <info@proofdeed.com>",
-            to: email,
-            subject: "Your ProofDeed subscription renews on " + renewalDate,
-            text: [
-              "Hi,",
-              "",
-              "This is a reminder that your ProofDeed subscription will automatically renew on " + renewalDate + " for " + amountFormatted + ".",
-              "",
-              "No action is needed — your access will continue uninterrupted.",
-              "",
-              "To update your payment method, change your plan, or cancel before you're charged:",
-              "  https://proofdeed.com/api-dashboard",
-              "",
-              "Questions? Reply to this email or contact us at info@proofdeed.com.",
-              "",
-              "ProofDeed",
-              "https://proofdeed.com"
-            ].join("\n")
-          })
-        });
-        console.log("Renewal reminder sent to:", email, "for", amountFormatted, "on", renewalDate);
-      } catch (mailErr) {
-        console.error("Renewal reminder email failed:", mailErr.message);
-      }
+    if (email) {
+      sendEmail({
+        to: email,
+        subject: "Your ProofDeed subscription renews on " + renewalDate,
+        text: [
+          "This is a reminder that your ProofDeed subscription will automatically renew on " + renewalDate + " for " + amountFormatted + ".",
+          "",
+          "No action is needed — your access will continue uninterrupted.",
+          "",
+          "To update your payment method, change your plan, or cancel before you're charged:",
+          "  https://proofdeed.com/api-dashboard",
+          "",
+          "Questions? Reply to this email or contact us at info@proofdeed.com.",
+          "",
+          "ProofDeed\nhttps://proofdeed.com"
+        ].join("\n")
+      }).then(() => console.log("Renewal reminder sent to:", email));
     }
   }
 
@@ -3426,27 +3270,12 @@ app.post(["/stripe-webhook", "/api/stripe-webhook"], express.raw({ type: "applic
     const customerId = invoice.customer;
     const email = invoice.customer_email;
     console.log("Payment failed for customer:", customerId, email);
-
-    const mailgunDomain = process.env.MAILGUN_DOMAIN;
-    const mailgunApiKey = process.env.MAILGUN_API_KEY;
-    if (mailgunDomain && mailgunApiKey && email) {
-      try {
-        await fetch("https://api.mailgun.net/v3/" + mailgunDomain + "/messages", {
-          method: "POST",
-          headers: {
-            "Authorization": "Basic " + Buffer.from("api:" + mailgunApiKey).toString("base64"),
-            "Content-Type": "application/x-www-form-urlencoded"
-          },
-          body: new URLSearchParams({
-            from: process.env.MAIL_FROM || "ProofDeed <mailgun@" + mailgunDomain + ">",
-            to: email,
-            subject: "ProofDeed: Payment failed — action required",
-            text: "Hi,\n\nWe were unable to process your ProofDeed subscription payment. Please update your payment method to keep your account active.\n\nUpdate billing: https://proofdeed.com/dashboard\n\nIf you need help, contact us at info@proofdeed.com.\n\nProofDeed\nhttps://proofdeed.com"
-          })
-        });
-      } catch (mailErr) {
-        console.error("Payment failed email error (non-fatal):", mailErr.message);
-      }
+    if (email) {
+      sendEmail({
+        to: email,
+        subject: "ProofDeed: Payment failed — action required",
+        text: "We were unable to process your ProofDeed subscription payment. Please update your payment method to keep your account active.\n\nUpdate billing: https://proofdeed.com/api-dashboard\n\nIf you need help, contact us at info@proofdeed.com.\n\nProofDeed\nhttps://proofdeed.com"
+      });
     }
   }
 
@@ -3464,7 +3293,7 @@ app.post(["/stripe-webhook", "/api/stripe-webhook"], express.raw({ type: "applic
 
       if (pending.rows.length > 0) {
         const email = pending.rows[0].email;
-        const pilotKey = "pd_gov_" + require("crypto").randomBytes(24).toString("hex");
+        const pilotKey = "pd_gov_" + crypto.randomBytes(24).toString("hex");
 
         const pilotExpiresAt = new Date(Date.now() + 45 * 24 * 60 * 60 * 1000);
         await pool.query(
@@ -3474,53 +3303,36 @@ app.post(["/stripe-webhook", "/api/stripe-webhook"], express.raw({ type: "applic
         );
         console.log("Government pilot ACH cleared — API key activated for:", email);
 
-        // Send access credentials email
-        const mailgunDomain = process.env.MAILGUN_DOMAIN;
-        const mailgunApiKey = process.env.MAILGUN_API_KEY;
-        if (mailgunDomain && mailgunApiKey) {
-          try {
-            await fetch("https://api.mailgun.net/v3/" + mailgunDomain + "/messages", {
-              method: "POST",
-              headers: {
-                "Authorization": "Basic " + Buffer.from("api:" + mailgunApiKey).toString("base64"),
-                "Content-Type": "application/x-www-form-urlencoded"
-              },
-              body: new URLSearchParams({
-                from: "ProofDeed Government <gov@proofdeed.com>",
-                to: email,
-                subject: "ProofDeed Government Pilot — Payment Confirmed. Your API Key Is Ready.",
-                text: [
-                  "Your payment has cleared. Your ProofDeed Government Pilot is now active.",
-                  "",
-                  "API Key: " + pilotKey,
-                  "Pilot Duration: 45 days from today",
-                  "Certification Limit: 50,000 documents",
-                  "Access: Upload portal, batch processing, and REST API",
-                  "",
-                  "Getting Started:",
-                  "  • Upload portal: https://proofdeed.com/upload",
-                  "  • API documentation: https://proofdeed.com/api-docs",
-                  "  • Verify a certificate: https://proofdeed.com/verify",
-                  "",
-                  "API Usage:",
-                  "  Include your key in all API requests:",
-                  "  Authorization: Bearer " + pilotKey,
-                  "",
-                  "  Single certification:  POST https://proofdeed.com/api/v1/certify",
-                  "  Batch certification:   POST https://proofdeed.com/api/v1/certify/batch",
-                  "",
-                  "Keep this key secure. To rotate it contact us at info@proofdeed.com.",
-                  "",
-                  "ProofDeed",
-                  "https://proofdeed.com"
-                ].join("\n")
-              })
-            });
-            console.log("Pilot activation email sent to:", email);
-          } catch (mailErr) {
-            console.error("Pilot activation email failed:", mailErr.message);
-          }
-        }
+        await sendEmail({
+          from: 'ProofDeed Government <gov@proofdeed.com>',
+          to: email,
+          subject: "ProofDeed Government Pilot — Payment Confirmed. Your API Key Is Ready.",
+          text: [
+            "Your payment has cleared. Your ProofDeed Government Pilot is now active.",
+            "",
+            "API Key: " + pilotKey,
+            "Pilot Duration: 45 days from today",
+            "Certification Limit: 50,000 documents",
+            "Access: Upload portal, batch processing, and REST API",
+            "",
+            "Getting Started:",
+            "  • Upload portal: https://proofdeed.com/upload",
+            "  • API documentation: https://proofdeed.com/api-docs",
+            "  • Verify a certificate: https://proofdeed.com/verify",
+            "",
+            "API Usage:",
+            "  Include your key in all API requests:",
+            "  Authorization: Bearer " + pilotKey,
+            "",
+            "  Single certification:  POST https://proofdeed.com/api/v1/certify",
+            "  Batch certification:   POST https://proofdeed.com/api/v1/certify/batch",
+            "",
+            "Keep this key secure. To rotate it contact us at info@proofdeed.com.",
+            "",
+            "ProofDeed\nhttps://proofdeed.com"
+          ].join("\n")
+        });
+        console.log("Pilot activation email sent to:", email);
       }
     } catch (err) {
       console.error("Pilot ACH provisioning error:", err.message);
@@ -4278,37 +4090,12 @@ cron.schedule("0 4 * * *", async () => {
        RETURNING email`
     );
     for (const row of expired.rows) {
-      const mailgunDomain = process.env.MAILGUN_DOMAIN;
-      const mailgunApiKey = process.env.MAILGUN_API_KEY;
-      if (mailgunDomain && mailgunApiKey) {
-        fetch("https://api.mailgun.net/v3/" + mailgunDomain + "/messages", {
-          method: "POST",
-          headers: {
-            "Authorization": "Basic " + Buffer.from("api:" + mailgunApiKey).toString("base64"),
-            "Content-Type": "application/x-www-form-urlencoded"
-          },
-          body: new URLSearchParams({
-            from: "ProofDeed Government <gov@proofdeed.com>",
-            to: row.email,
-            subject: "ProofDeed Government Pilot — Your 45-Day Pilot Has Ended",
-            text: [
-              "Your ProofDeed Government Pilot Program has now concluded.",
-              "",
-              "All records certified during your pilot remain permanently on the Polygon blockchain — fully verifiable forever.",
-              "",
-              "To continue using ProofDeed, please contact us to discuss volume pricing for your agency:",
-              "",
-              "  Email: gov@proofdeed.com",
-              "  Enterprise pricing starts at $0.76/certification, dropping to $0.15 at scale.",
-              "",
-              "We would love to continue supporting your agency's record integrity needs.",
-              "",
-              "ProofDeed",
-              "https://proofdeed.com"
-            ].join("\n")
-          })
-        }).catch(err => console.error("Pilot expiry email failed:", err.message));
-      }
+      sendEmail({
+        from: 'ProofDeed Government <gov@proofdeed.com>',
+        to: row.email,
+        subject: "ProofDeed Government Pilot — Your 45-Day Pilot Has Ended",
+        text: "Your ProofDeed Government Pilot Program has now concluded.\n\nAll records certified during your pilot remain permanently on the Polygon blockchain — fully verifiable forever.\n\nTo continue using ProofDeed, please contact us to discuss volume pricing for your agency:\n\n  Email: gov@proofdeed.com\n  Enterprise pricing starts at $0.76/certification, dropping to $0.15 at scale.\n\nWe would love to continue supporting your agency's record integrity needs.\n\nProofDeed\nhttps://proofdeed.com"
+      }).catch(err => console.error("Pilot expiry email failed:", err.message));
       console.log("Government pilot expired and deactivated:", row.email);
     }
     if (expired.rowCount > 0) console.log("Pilot expiry job: deactivated", expired.rowCount, "pilots.");
@@ -4612,23 +4399,11 @@ app.post(['/api/webhooks/resend-inbound', '/webhooks/resend-inbound'], async (re
 
     // Alert on high-intent reply
     if (isHighIntent) {
-      const mailgunDomain = process.env.MAILGUN_DOMAIN;
-      const mailgunApiKey = process.env.MAILGUN_API_KEY;
-      if (mailgunDomain && mailgunApiKey) {
-        fetch('https://api.mailgun.net/v3/' + mailgunDomain + '/messages', {
-          method: 'POST',
-          headers: {
-            'Authorization': 'Basic ' + Buffer.from('api:' + mailgunApiKey).toString('base64'),
-            'Content-Type': 'application/x-www-form-urlencoded'
-          },
-          body: new URLSearchParams({
-            from: process.env.MAIL_FROM || 'ProofDeed <mailgun@' + mailgunDomain + '>',
-            to: process.env.MAIL_TO || 'info@proofdeed.com',
-            subject: `🔥 HOT REPLY: ${contact.name} (${contact.company}) — Move to Pilot Discussion`,
-            text: `High-intent reply detected!\n\nContact: ${contact.name}\nCompany: ${contact.company}\nEmail: ${contact.email}\nTitle: ${contact.title || 'N/A'}\nIndustry: ${contact.industry}\nPriority Score: ${contact.priority_score || 'N/A'}\n\nTheir reply subject: ${subject}\nSnippet: ${textSnippet}\n\nAction: Move to Pilot Discussed — reach out within 24 hours.\n\nAdmin: https://proofdeed.com/admin`
-          })
-        }).catch(() => {});
-      }
+      sendEmail({
+        to: 'sjjk@pm.me',
+        subject: `HOT REPLY: ${contact.name} (${contact.company}) — Move to Pilot Discussion`,
+        text: `High-intent reply detected!\n\nContact: ${contact.name}\nCompany: ${contact.company}\nEmail: ${contact.email}\nTitle: ${contact.title || 'N/A'}\nIndustry: ${contact.industry}\nPriority Score: ${contact.priority_score || 'N/A'}\n\nTheir reply subject: ${subject}\nSnippet: ${textSnippet}\n\nAction: Move to Pilot Discussed — reach out within 24 hours.\n\nAdmin: https://proofdeed.com/admin`
+      }).catch(() => {});
     }
   } catch (err) {
     console.error('Inbound webhook error:', err.message);
@@ -4725,22 +4500,12 @@ app.post(['/api/webhooks/mailgun-inbound', '/webhooks/mailgun-inbound'], async (
     console.log(`📥 Inbound email: ${fromEmail} → ${toEmail} | intent: ${intent} | sentiment: ${sentiment}`);
 
     // Admin notification for anything that needs attention
-    const mailgunDomain = process.env.MAILGUN_DOMAIN;
-    const mailgunApiKey = process.env.MAILGUN_API_KEY;
-    if (mailgunDomain && mailgunApiKey && sentiment !== 'negative') {
+    if (sentiment !== 'negative') {
       const isHot = intent === 'pricing_inquiry' || intent === 'partnership';
-      fetch('https://api.mailgun.net/v3/' + mailgunDomain + '/messages', {
-        method: 'POST',
-        headers: {
-          'Authorization': 'Basic ' + Buffer.from('api:' + mailgunApiKey).toString('base64'),
-          'Content-Type': 'application/x-www-form-urlencoded'
-        },
-        body: new URLSearchParams({
-          from: process.env.MAIL_FROM || `ProofDeed CRM <mailgun@${mailgunDomain}>`,
-          to: process.env.MAIL_TO || 'info@proofdeed.com',
-          subject: `${isHot ? '🔥' : '📥'} New email: ${fromName} — ${subject}`,
-          text: `New inbound email in CRM\n\nFrom: ${fromName} <${fromEmail}>\nTo: ${toEmail}\nSubject: ${subject}\nIntent: ${intent}\nSentiment: ${sentiment}\n\n---\n${bodyText.substring(0, 800)}\n\n---\nView in CRM: https://proofdeed.com/admin`
-        })
+      sendEmail({
+        to: 'sjjk@pm.me',
+        subject: `${isHot ? 'HOT - ' : ''}New email: ${fromName} — ${subject}`,
+        text: `New inbound email in CRM\n\nFrom: ${fromName} <${fromEmail}>\nTo: ${toEmail}\nSubject: ${subject}\nIntent: ${intent}\nSentiment: ${sentiment}\n\n---\n${bodyText.substring(0, 800)}\n\n---\nView in CRM: https://proofdeed.com/admin`
       }).catch(() => {});
     }
 
@@ -4928,28 +4693,16 @@ app.post('/api/reseller/apply', authRateLimit, async (req, res) => {
       throw e;
     }
 
-    const domain = process.env.MAILGUN_DOMAIN;
-    const key = process.env.MAILGUN_API_KEY;
-
-    // Welcome email to reseller
-    if (domain && key) {
-      await fetch(`https://api.mailgun.net/v3/${domain}/messages`, {
-        method: 'POST',
-        headers: { Authorization: 'Basic ' + Buffer.from('api:' + key).toString('base64'), 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          from: process.env.MAIL_FROM || `ProofDeed <noreply@${domain}>`,
-          to: email,
-          subject: `Welcome to ProofDeed Reseller — Your Portal Is Being Set Up`,
-          text: `Hi ${name},\n\nThank you for applying to become a ProofDeed Reseller.\n\nYour branded portal is being configured and will be live within 24 hours at:\n\n${portal_url}\n\nPlan selected: ${planLabels[plan] || plan}\n\nWe will send your payment instructions to this email address within 24 hours. Once payment is confirmed, your portal will be activated and your clients can begin using it immediately.\n\nYour referral code: ${referral_code}\n\nIf you have any questions, reply to this email or contact us at info@proofdeed.com.\n\nProofDeed\nhttps://proofdeed.com`,
-        }),
-      }).catch(() => {});
-
-      // Admin notification
-      await sendAlertEmail(
-        `🏪 New Reseller Application — ${company} (${plan})`,
-        `New reseller signup:\n\nName: ${name}\nEmail: ${email}\nCompany: ${company}\nIndustry: ${industry || 'N/A'}\nPlan: ${planLabels[plan] || plan}\nWebsite: ${website || 'N/A'}\nBrand Name: ${brand_name || 'N/A'}\nBrand Color: ${brand_color || 'N/A'}\nTagline: ${brand_tagline || 'N/A'}\n\nPortal URL: ${portal_url}\nAffiliate ID: ${aff.id}\n\nAction needed: Send payment link and activate account in admin.\nhttps://proofdeed.com/admin`
-      ).catch(() => {});
-    }
+    sendEmail({
+      to: email,
+      subject: `Welcome to ProofDeed Reseller — Your Portal Is Being Set Up`,
+      text: `Hi ${name},\n\nThank you for applying to become a ProofDeed Reseller.\n\nYour branded portal is being configured and will be live within 24 hours at:\n\n${portal_url}\n\nPlan selected: ${planLabels[plan] || plan}\n\nWe will send your payment instructions to this email address within 24 hours. Once payment is confirmed, your portal will be activated and your clients can begin using it immediately.\n\nYour referral code: ${referral_code}\n\nIf you have any questions, reply to this email or contact us at info@proofdeed.com.\n\nProofDeed\nhttps://proofdeed.com`,
+    }).catch(() => {});
+    sendEmail({
+      to: 'sjjk@pm.me',
+      subject: `New Reseller Application — ${company} (${plan})`,
+      text: `New reseller signup:\n\nName: ${name}\nEmail: ${email}\nCompany: ${company}\nIndustry: ${industry || 'N/A'}\nPlan: ${planLabels[plan] || plan}\nWebsite: ${website || 'N/A'}\n\nPortal URL: ${portal_url}\nAffiliate ID: ${aff.id}\n\nAction needed: Send payment link and activate account in admin.\nhttps://proofdeed.com/admin`
+    }).catch(() => {});
 
     res.json({ success: true, referral_code, portal_url });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -5057,32 +4810,15 @@ app.post(['/api/admin/inbox/:id/reply', '/admin/inbox/:id/reply'], authRateLimit
     const { body, subject } = req.body;
     if (!body) return res.status(400).json({ error: 'Reply body required.' });
 
-    const mailgunDomain = process.env.MAILGUN_DOMAIN;
-    const mailgunApiKey = process.env.MAILGUN_API_KEY;
-    if (!mailgunDomain || !mailgunApiKey) return res.status(500).json({ error: 'Mailgun not configured.' });
+    if (!process.env.RESEND_API_KEY) return res.status(500).json({ error: 'Email not configured.' });
 
     const replySubject = subject || (email.subject.startsWith('Re:') ? email.subject : `Re: ${email.subject}`);
 
-    const mgRes = await fetch('https://api.mailgun.net/v3/' + mailgunDomain + '/messages', {
-      method: 'POST',
-      headers: {
-        'Authorization': 'Basic ' + Buffer.from('api:' + mailgunApiKey).toString('base64'),
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      body: new URLSearchParams({
-        from: process.env.MAIL_FROM || `ProofDeed <info@${mailgunDomain}>`,
-        to: email.from_email,
-        subject: replySubject,
-        text: body,
-        'h:In-Reply-To': email.message_id,
-        'h:References': email.message_id,
-      })
+    await sendEmail({
+      to: email.from_email,
+      subject: replySubject,
+      text: body,
     });
-
-    if (!mgRes.ok) {
-      const errText = await mgRes.text();
-      return res.status(500).json({ error: 'Mailgun send failed: ' + errText });
-    }
 
     // Mark email read, log event on contact
     await pool.query('UPDATE inbound_emails SET is_read=true WHERE id=$1', [email.id]);
