@@ -2326,7 +2326,7 @@ function runTrustAnalysis({ certRows, passportRows, passportEvents, trustIdRows,
 }
 
 /* POST /api/v1/trust-analysis — Authenticated endpoint, runs rule-based trust analysis */
-app.post('/api/v1/trust-analysis', requireAuth, async (req, res) => {
+app.post('/api/v1/trust-analysis', authenticateApiKey, async (req, res) => {
   try {
     const { proof_id, passport_id, trust_id } = req.body;
     if (!proof_id && !passport_id && !trust_id) {
