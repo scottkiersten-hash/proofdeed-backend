@@ -2493,6 +2493,249 @@ app.get('/analysis/:id', async (req, res) => {
   }
 });
 
+/* ============================================================
+   RESELLER PORTAL
+   ============================================================ */
+
+function generateResellerId() {
+  return 'RSL-' + crypto.randomBytes(5).toString('hex').toUpperCase();
+}
+
+function generateResellerApiKey() {
+  return 'rsl_' + crypto.randomBytes(24).toString('hex');
+}
+
+/* POST /api/v1/reseller/register — Admin only, creates a new reseller account */
+app.post('/api/v1/reseller/register', async (req, res) => {
+  const adminSecret = req.headers['x-admin-secret'];
+  if (!adminSecret || adminSecret !== process.env.ADMIN_SECRET) {
+    return res.status(401).json({ error: 'Unauthorized.' });
+  }
+  try {
+    const { company_name, contact_email, slug, commission_rate, brand_color, brand_logo_url } = req.body;
+    if (!company_name || !contact_email || !slug) {
+      return res.status(400).json({ error: 'company_name, contact_email, and slug are required.' });
+    }
+    const cleanSlug = slug.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+    const reseller_id = generateResellerId();
+    const api_key = generateResellerApiKey();
+
+    const existing = await pool.query('SELECT id FROM resellers WHERE slug=$1', [cleanSlug]);
+    if (existing.rows.length) return res.status(409).json({ error: 'Slug already taken.' });
+
+    await pool.query(
+      `INSERT INTO resellers (reseller_id, slug, company_name, contact_email, api_key, commission_rate, brand_color, brand_logo_url)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+      [reseller_id, cleanSlug, company_name, contact_email, api_key,
+       commission_rate || 20.00, brand_color || '#2563eb', brand_logo_url || null]
+    );
+
+    return res.json({
+      reseller_id,
+      slug: cleanSlug,
+      api_key,
+      portal_url: `https://proofdeed.com/reseller/${cleanSlug}`,
+      stats_url: `https://proofdeed.com/api/v1/reseller/${cleanSlug}/stats`,
+    });
+  } catch (err) {
+    console.error('Reseller register error:', err.message);
+    return res.status(500).json({ error: 'Registration failed.' });
+  }
+});
+
+/* GET /api/v1/reseller/:slug/stats — Reseller API key auth, returns usage stats */
+app.get('/api/v1/reseller/:slug/stats', async (req, res) => {
+  const apiKey = req.headers['x-reseller-key'] || req.headers['authorization']?.replace('Bearer ', '');
+  if (!apiKey) return res.status(401).json({ error: 'Missing x-reseller-key header.' });
+
+  try {
+    const { slug } = req.params;
+    const row = await pool.query('SELECT * FROM resellers WHERE slug=$1 AND active=true', [slug]);
+    if (!row.rows.length) return res.status(404).json({ error: 'Reseller not found.' });
+
+    const r = row.rows[0];
+    if (r.api_key !== apiKey) return res.status(401).json({ error: 'Invalid API key.' });
+
+    // Certifications created via this reseller's API key (tracked by source tag if present, otherwise total system counts as proxy)
+    const certCount = await pool.query(
+      `SELECT COUNT(*) FROM certifications WHERE created_at >= $1`,
+      [r.created_at]
+    );
+    const passportCount = await pool.query(
+      `SELECT COUNT(*) FROM asset_passports WHERE created_at >= $1`,
+      [r.created_at]
+    );
+    const trustIdCount = await pool.query(
+      `SELECT COUNT(*) FROM trust_ids WHERE created_at >= $1`,
+      [r.created_at]
+    );
+
+    return res.json({
+      reseller_id: r.reseller_id,
+      company_name: r.company_name,
+      slug: r.slug,
+      commission_rate: r.commission_rate,
+      portal_url: `https://proofdeed.com/reseller/${r.slug}`,
+      member_since: r.created_at,
+      platform_totals: {
+        certifications: parseInt(certCount.rows[0].count),
+        asset_passports: parseInt(passportCount.rows[0].count),
+        trust_ids: parseInt(trustIdCount.rows[0].count),
+      },
+    });
+  } catch (err) {
+    console.error('Reseller stats error:', err.message);
+    return res.status(500).json({ error: 'Failed to load stats.' });
+  }
+});
+
+/* GET /reseller/:slug — Public branded reseller portal page */
+app.get('/reseller/:slug', async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const row = await pool.query('SELECT * FROM resellers WHERE slug=$1 AND active=true', [slug]);
+    if (!row.rows.length) return res.status(404).send('<h2>Partner portal not found.</h2>');
+
+    const r = row.rows[0];
+    const color = r.brand_color || '#2563eb';
+
+    // Darken color slightly for hover states (simple approach: use opacity)
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${r.company_name} — Document Verification Portal</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f9fafb;color:#111827;min-height:100vh}
+  .header{background:#0f172a;padding:16px 24px;display:flex;align-items:center;justify-content:space-between}
+  .header-brand{display:flex;align-items:center;gap:14px}
+  .partner-logo{max-height:36px;max-width:160px;object-fit:contain}
+  .partner-name{color:#fff;font-size:17px;font-weight:600}
+  .powered{color:#64748b;font-size:12px}
+  .powered a{color:#64748b;text-decoration:none}
+  .hero{background:${color};color:#fff;padding:56px 24px;text-align:center}
+  .hero h1{font-size:clamp(24px,4vw,40px);font-weight:700;line-height:1.2;margin-bottom:14px}
+  .hero p{font-size:16px;opacity:.9;max-width:540px;margin:0 auto}
+  .container{max-width:760px;margin:0 auto;padding:40px 16px 60px}
+  .section-title{font-size:13px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.07em;margin-bottom:20px}
+  .verify-card{background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:28px;margin-bottom:28px}
+  .input-group{display:flex;gap:10px;flex-wrap:wrap}
+  .input-group input{flex:1;min-width:200px;padding:11px 14px;border:1.5px solid #d1d5db;border-radius:8px;font-size:15px;outline:none;transition:border .15s}
+  .input-group input:focus{border-color:${color}}
+  .btn{background:${color};color:#fff;border:none;padding:11px 22px;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;white-space:nowrap}
+  .btn:hover{opacity:.9}
+  #result{display:none;margin-top:20px}
+  .pass{background:#f0fdf4;border:1.5px solid #86efac;border-radius:8px;padding:18px}
+  .fail{background:#fef2f2;border:1.5px solid #fca5a5;border-radius:8px;padding:18px}
+  .pass-title{color:#166534;font-size:17px;font-weight:700;margin-bottom:6px}
+  .fail-title{color:#991b1b;font-size:17px;font-weight:700;margin-bottom:6px}
+  .meta{margin-top:12px;display:grid;gap:6px}
+  .meta-row{display:flex;gap:8px;font-size:13px}
+  .meta-key{color:#6b7280;min-width:110px;font-weight:500}
+  .meta-val{color:#111827;word-break:break-all}
+  .how-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:28px}
+  .how-card{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:20px}
+  .how-num{width:32px;height:32px;border-radius:50%;background:${color};color:#fff;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center;margin-bottom:12px}
+  .how-title{font-weight:600;font-size:14px;margin-bottom:6px}
+  .how-desc{color:#6b7280;font-size:13px;line-height:1.5}
+  .footer{text-align:center;color:#9ca3af;font-size:12px;padding-top:24px;border-top:1px solid #e5e7eb}
+  .footer a{color:#9ca3af}
+  .error-msg{color:#dc2626;font-size:14px;margin-top:10px;display:none}
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="header-brand">
+    ${r.brand_logo_url ? `<img src="${r.brand_logo_url}" class="partner-logo" alt="${r.company_name}">` : `<span class="partner-name">${r.company_name}</span>`}
+  </div>
+  <div class="powered">Verification powered by <a href="https://proofdeed.com" target="_blank">ProofDeed</a></div>
+</div>
+
+<div class="hero">
+  <h1>Document Verification Portal</h1>
+  <p>Instantly verify the authenticity of any document certified through ${r.company_name}.</p>
+</div>
+
+<div class="container">
+  <div class="section-title">Verify a Document</div>
+  <div class="verify-card">
+    <div class="input-group">
+      <input type="text" id="proofId" placeholder="Enter Proof ID or document hash…">
+      <button class="btn" onclick="verify()">Verify</button>
+    </div>
+    <div class="error-msg" id="errMsg">No record found for that ID. Please check and try again.</div>
+    <div id="result"></div>
+  </div>
+
+  <div class="section-title">How It Works</div>
+  <div class="how-cards">
+    <div class="how-card">
+      <div class="how-num">1</div>
+      <div class="how-title">Document Certified</div>
+      <div class="how-desc">When a document is issued, every field is individually hashed and anchored on the Polygon blockchain.</div>
+    </div>
+    <div class="how-card">
+      <div class="how-num">2</div>
+      <div class="how-title">Proof ID Issued</div>
+      <div class="how-desc">A unique Proof ID ties the document to its blockchain record — shareable and permanently verifiable.</div>
+    </div>
+    <div class="how-card">
+      <div class="how-num">3</div>
+      <div class="how-title">Verify Instantly</div>
+      <div class="how-desc">Enter the Proof ID above to confirm the document is authentic and has not been altered since certification.</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    Verification infrastructure provided by <a href="https://proofdeed.com" target="_blank">ProofDeed Trust Infrastructure Platform</a>. Legally defensible under FRE Rule 901.
+  </div>
+</div>
+
+<script>
+async function verify() {
+  const id = document.getElementById('proofId').value.trim();
+  const resultDiv = document.getElementById('result');
+  const errMsg = document.getElementById('errMsg');
+  resultDiv.style.display = 'none';
+  errMsg.style.display = 'none';
+  if (!id) return;
+
+  try {
+    const res = await fetch('/api/verify/' + encodeURIComponent(id));
+    if (res.status === 404) { errMsg.style.display = 'block'; return; }
+    const data = await res.json();
+    if (!data || data.error) { errMsg.style.display = 'block'; return; }
+
+    const fmt = s => s ? new Date(s).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+    resultDiv.innerHTML = \`
+      <div class="pass">
+        <div class="pass-title">✓ Verified — Authentic</div>
+        <div style="color:#166534;font-size:14px">This document has not been altered since certification.</div>
+        <div class="meta">
+          <div class="meta-row"><span class="meta-key">Proof ID</span><span class="meta-val">\${data.proof_id || id}</span></div>
+          <div class="meta-row"><span class="meta-key">Certified</span><span class="meta-val">\${fmt(data.certified_at)}</span></div>
+          \${data.polygon_tx ? '<div class="meta-row"><span class="meta-key">Blockchain TX</span><span class="meta-val">' + data.polygon_tx + '</span></div>' : ''}
+        </div>
+      </div>\`;
+    resultDiv.style.display = 'block';
+  } catch(e) {
+    errMsg.style.display = 'block';
+  }
+}
+document.getElementById('proofId').addEventListener('keydown', e => { if (e.key === 'Enter') verify(); });
+</script>
+</body>
+</html>`;
+
+    return res.send(html);
+  } catch (err) {
+    console.error('Reseller portal error:', err.message);
+    return res.status(500).send('<h2>Portal unavailable.</h2>');
+  }
+});
+
 /* ---------------- CONTACT / AFFILIATE FORM ---------------- */
 app.post(["/contact", "/api/contact"], async (req, res) => {
   try {
@@ -3698,6 +3941,22 @@ async function ensureIndexes() {
       );
       CREATE INDEX IF NOT EXISTS idx_trust_analyses_id ON trust_analyses(analysis_id);
       CREATE INDEX IF NOT EXISTS idx_trust_analyses_proof ON trust_analyses(proof_id);
+
+      CREATE TABLE IF NOT EXISTS resellers (
+        id              SERIAL PRIMARY KEY,
+        reseller_id     TEXT UNIQUE NOT NULL,
+        slug            TEXT UNIQUE NOT NULL,
+        company_name    TEXT NOT NULL,
+        contact_email   TEXT NOT NULL,
+        api_key         TEXT UNIQUE NOT NULL,
+        commission_rate NUMERIC(5,2) NOT NULL DEFAULT 20.00,
+        brand_color     TEXT NOT NULL DEFAULT '#2563eb',
+        brand_logo_url  TEXT,
+        active          BOOLEAN NOT NULL DEFAULT true,
+        created_at      TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_resellers_slug ON resellers(slug);
+      CREATE INDEX IF NOT EXISTS idx_resellers_api_key ON resellers(api_key);
 
       CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
       CREATE INDEX IF NOT EXISTS idx_certifications_hash ON certifications(hash);
