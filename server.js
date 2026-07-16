@@ -9266,23 +9266,7 @@ async function runHealthChecks() {
     checks.push({ name: 'Resend', ok: false, error: e.message });
   }
 
-  // 4. Mailgun
-  try {
-    const domain = process.env.MAILGUN_DOMAIN;
-    const key = process.env.MAILGUN_API_KEY;
-    if (domain && key) {
-      const r = await fetch(`https://api.mailgun.net/v3/domains/${domain}`, {
-        headers: { Authorization: 'Basic ' + Buffer.from('api:' + key).toString('base64') },
-      });
-      checks.push({ name: 'Mailgun', ok: r.ok, error: r.ok ? null : `HTTP ${r.status}` });
-    } else {
-      checks.push({ name: 'Mailgun', ok: false, error: 'Keys not set' });
-    }
-  } catch (e) {
-    checks.push({ name: 'Mailgun', ok: false, error: e.message });
-  }
-
-  // 5. Key Site Pages (frontend)
+  // 4. Key Site Pages (frontend)
   const pagesToCheck = ['/', '/government', '/login', '/verify', '/how-it-works', '/api-docs'];
   for (const page of pagesToCheck) {
     try {
