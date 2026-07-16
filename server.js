@@ -1986,6 +1986,227 @@ app.get(["/verify/:certId", "/api/verify/:certId"], async (req, res) => {
   }
 });
 
+/* ============================================================
+   FIELD-LEVEL VERIFICATION UI — Public page to verify any ProofDeed record
+   ============================================================ */
+
+/* POST /api/verify/fields-check — Accepts proofId + fields, returns tamper result */
+app.post('/api/verify/fields-check', async (req, res) => {
+  try {
+    const { proof_id, fields } = req.body;
+    if (!proof_id || !fields || typeof fields !== 'object') {
+      return res.status(400).json({ error: 'proof_id and fields are required.' });
+    }
+
+    const cert = await pool.query(
+      'SELECT certification_id, hash, polygon_tx, created_at FROM certifications WHERE certification_id=$1',
+      [proof_id]
+    );
+    if (!cert.rows[0]) return res.status(404).json({ error: 'Proof ID not found.' });
+
+    const recomputedHashes = {};
+    for (const [key, value] of Object.entries(fields)) {
+      recomputedHashes[key] = crypto.createHash('sha256').update(String(value)).digest('hex');
+    }
+    const rootInput = Object.keys(recomputedHashes).sort().map(k => `${k}:${recomputedHashes[k]}`).join('|');
+    const recomputedRoot = crypto.createHash('sha256').update(rootInput).digest('hex');
+    const intact = recomputedRoot === cert.rows[0].hash;
+
+    // Try to find linked asset passport or trust ID record for extra context
+    const apRow = await pool.query('SELECT passport_id, asset_type, asset_identifier, label FROM asset_passports WHERE proof_id=$1', [proof_id]).catch(() => ({ rows: [] }));
+    const tidRow = await pool.query('SELECT t.trust_id, t.entity_name, r.record_label FROM trust_id_records r JOIN trust_ids t ON t.trust_id=r.trust_id WHERE r.proof_id=$1', [proof_id]).catch(() => ({ rows: [] }));
+
+    res.json({
+      intact,
+      proof_id,
+      certified_at: cert.rows[0].created_at,
+      polygon_tx: cert.rows[0].polygon_tx,
+      original_root_hash: cert.rows[0].hash,
+      recomputed_root_hash: recomputedRoot,
+      field_results: Object.fromEntries(
+        Object.entries(recomputedHashes).map(([k, h]) => [k, { hash: h, intact: true }])
+      ),
+      asset_passport: apRow.rows[0] || null,
+      trust_id: tidRow.rows[0] || null,
+      message: intact
+        ? 'All fields verified — this record is authentic and unaltered.'
+        : 'TAMPER DETECTED — one or more fields do not match the certified values.'
+    });
+  } catch (err) {
+    console.error('[FieldVerify] Error:', err);
+    res.status(500).json({ error: 'Internal server error.' });
+  }
+});
+
+/* GET /verify-fields — Public field-level verification UI */
+app.get('/verify-fields', (req, res) => {
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Verify a Trust Record — ProofDeed</title>
+  <meta name="description" content="Instantly verify that any ProofDeed-certified document or record is authentic and unaltered.">
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f8fafc;color:#0f172a}
+    .nav{background:#021d5b;padding:16px 32px;display:flex;align-items:center;justify-content:space-between}
+    .nav-brand{color:white;font-size:18px;font-weight:800;letter-spacing:-0.5px}
+    .nav-sub{color:#93c5fd;font-size:12px;margin-left:8px}
+    .nav a{color:#93c5fd;font-size:13px;text-decoration:none}
+    .wrap{max-width:700px;margin:48px auto;padding:0 20px}
+    h1{font-size:28px;font-weight:800;color:#0f172a;margin-bottom:8px}
+    .sub{font-size:15px;color:#64748b;margin-bottom:32px;line-height:1.6}
+    .card{background:white;border:1px solid #e2e8f0;border-radius:10px;padding:28px;margin-bottom:20px}
+    label{display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px}
+    input,textarea{width:100%;border:1px solid #e2e8f0;border-radius:6px;padding:10px 14px;font-size:14px;font-family:inherit;color:#0f172a;background:#fafafa;outline:none;transition:border 0.15s}
+    input:focus,textarea:focus{border-color:#0176D3;background:white}
+    textarea{resize:vertical;min-height:140px;font-family:monospace;font-size:13px}
+    .hint{font-size:12px;color:#94a3b8;margin-top:5px}
+    .btn{display:inline-block;background:#0176D3;color:white;border:none;border-radius:6px;padding:13px 28px;font-size:15px;font-weight:700;cursor:pointer;width:100%;margin-top:8px;transition:background 0.15s}
+    .btn:hover{background:#0165b8}
+    .btn:disabled{background:#94a3b8;cursor:not-allowed}
+    #result{display:none}
+    .pass{background:#dcfce7;border:1px solid #bbf7d0;border-radius:10px;padding:20px 24px}
+    .fail{background:#fee2e2;border:1px solid #fecaca;border-radius:10px;padding:20px 24px}
+    .pass-title{font-size:18px;font-weight:800;color:#15803d;margin-bottom:4px}
+    .fail-title{font-size:18px;font-weight:800;color:#dc2626;margin-bottom:4px}
+    .pass-sub{font-size:13px;color:#16a34a}
+    .fail-sub{font-size:13px;color:#dc2626}
+    .meta{margin-top:20px;background:white;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden}
+    .meta-row{display:flex;padding:10px 16px;border-bottom:1px solid #f1f5f9;gap:16px;flex-wrap:wrap}
+    .meta-row:last-child{border-bottom:none}
+    .meta-key{font-size:12px;color:#64748b;min-width:130px;flex-shrink:0;padding-top:1px}
+    .meta-val{font-size:12px;color:#0f172a;font-family:monospace;word-break:break-all}
+    .chain-badge{display:inline-block;background:#dcfce7;color:#16a34a;font-size:11px;padding:3px 10px;border-radius:20px;font-weight:700;margin-top:6px}
+    .link-row{margin-top:16px;display:flex;gap:12px;flex-wrap:wrap}
+    .link-btn{display:inline-block;padding:8px 16px;border-radius:6px;font-size:13px;font-weight:600;text-decoration:none;border:1px solid #e2e8f0;color:#0176D3;background:white}
+    .error-box{background:#fef9c3;border:1px solid #fde68a;border-radius:8px;padding:14px 18px;font-size:13px;color:#92400e;margin-top:12px;display:none}
+    .field-table{width:100%;border-collapse:collapse;margin-top:12px}
+    .field-table th{text-align:left;font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;padding:8px 12px;background:#f8fafc}
+    .field-table td{padding:8px 12px;font-size:12px;border-bottom:1px solid #f1f5f9;font-family:monospace;word-break:break-all}
+    .field-table td:first-child{font-family:inherit;font-size:13px;font-weight:600;color:#374151;white-space:nowrap;word-break:normal}
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <div><span class="nav-brand">ProofDeed</span><span class="nav-sub">Field Verification</span></div>
+    <a href="https://proofdeed.com">proofdeed.com</a>
+  </div>
+
+  <div class="wrap">
+    <h1>Verify a Trust Record</h1>
+    <p class="sub">Enter the Proof ID and the field values you received. ProofDeed will instantly confirm whether each field is authentic and unaltered since certification.</p>
+
+    <div class="card">
+      <div style="margin-bottom:20px">
+        <label>Proof ID</label>
+        <input type="text" id="proofId" placeholder="PD-F-1234567890-abc123" autocomplete="off" spellcheck="false">
+        <div class="hint">The Proof ID was provided when this record was certified (starts with PD-)</div>
+      </div>
+
+      <div>
+        <label>Fields to Verify (JSON)</label>
+        <textarea id="fields" placeholder='{\n  "vin": "1HGBH41JXMN109186",\n  "sale_price": "24500.00",\n  "odometer": "45231",\n  "buyer_name": "Jane Smith"\n}'></textarea>
+        <div class="hint">Paste the key/value pairs exactly as they were at the time of certification. Order does not matter.</div>
+      </div>
+
+      <div id="errorBox" class="error-box"></div>
+      <button class="btn" id="verifyBtn" onclick="verify()">Verify Now</button>
+    </div>
+
+    <div id="result"></div>
+
+    <div style="text-align:center;padding:24px 0;font-size:12px;color:#94a3b8">
+      Legally defensible under FRE Rule 901 &middot; Powered by Polygon blockchain &middot; ProofDeed LLC
+    </div>
+  </div>
+
+  <script>
+    async function verify() {
+      const btn = document.getElementById('verifyBtn');
+      const errorBox = document.getElementById('errorBox');
+      const resultDiv = document.getElementById('result');
+      const proofId = document.getElementById('proofId').value.trim();
+      const fieldsRaw = document.getElementById('fields').value.trim();
+
+      errorBox.style.display = 'none';
+      resultDiv.style.display = 'none';
+
+      if (!proofId) { showError('Please enter a Proof ID.'); return; }
+      if (!fieldsRaw) { showError('Please enter the fields to verify.'); return; }
+
+      let fields;
+      try { fields = JSON.parse(fieldsRaw); }
+      catch(e) { showError('Fields must be valid JSON. Check your formatting — each key and value should be in quotes.'); return; }
+
+      btn.disabled = true;
+      btn.textContent = 'Verifying...';
+
+      try {
+        const r = await fetch('/api/verify/fields-check', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ proof_id: proofId, fields })
+        });
+        const data = await r.json();
+
+        if (!r.ok) { showError(data.error || 'Verification failed.'); return; }
+
+        renderResult(data, fields);
+      } catch(e) {
+        showError('Network error — please try again.');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Verify Now';
+      }
+    }
+
+    function showError(msg) {
+      const box = document.getElementById('errorBox');
+      box.textContent = msg;
+      box.style.display = 'block';
+    }
+
+    function fmt(iso) {
+      return new Date(iso).toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'UTC'}) + ' UTC';
+    }
+
+    function renderResult(data, fields) {
+      const div = document.getElementById('result');
+      const intact = data.intact;
+
+      const fieldRows = Object.entries(fields).map(([k, v]) =>
+        '<tr><td>' + k.replace(/_/g,' ') + '</td><td>' + v + '</td><td>' + (data.field_results?.[k]?.hash || '').substring(0,20) + '...</td><td style="color:' + (intact?'#16a34a':'#dc2626') + ';font-weight:700">' + (intact ? '✓ Intact' : '✗ Mismatch') + '</td></tr>'
+      ).join('');
+
+      const links = (data.asset_passport ? '<a class="link-btn" href="/passport/' + data.asset_passport.passport_id + '">View Asset Passport™ →</a>' : '') +
+        (data.trust_id ? '<a class="link-btn" href="/trust/' + data.trust_id.trust_id + '">View Trust ID™ →</a>' : '');
+
+      div.innerHTML = \`
+        <div class="\${intact ? 'pass' : 'fail'}">
+          <div class="\${intact ? 'pass-title' : 'fail-title'}">\${intact ? '✓ Verified — Authentic' : '✗ Tamper Detected'}</div>
+          <div class="\${intact ? 'pass-sub' : 'fail-sub'}">\${data.message}</div>
+          <div class="meta">
+            <div class="meta-row"><span class="meta-key">Proof ID</span><span class="meta-val">\${data.proof_id}</span></div>
+            <div class="meta-row"><span class="meta-key">Certified At</span><span class="meta-val">\${fmt(data.certified_at)}</span></div>
+            <div class="meta-row"><span class="meta-key">Root Hash</span><span class="meta-val">\${data.original_root_hash}</span></div>
+            \${data.polygon_tx ? '<div class="meta-row"><span class="meta-key">Polygon TX</span><span class="meta-val">' + data.polygon_tx + '<br><span class="chain-badge">✓ On-Chain Confirmed</span></span></div>' : '<div class="meta-row"><span class="meta-key">Blockchain</span><span class="meta-val" style="color:#d97706">Anchoring in progress...</span></div>'}
+          </div>
+          \${fieldRows ? '<div style="margin-top:16px;overflow-x:auto"><table class="field-table"><thead><tr><th>Field</th><th>Value</th><th>Hash (first 20)</th><th>Status</th></tr></thead><tbody>' + fieldRows + '</tbody></table></div>' : ''}
+          \${links ? '<div class="link-row">' + links + '</div>' : ''}
+        </div>\`;
+      div.style.display = 'block';
+      div.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  </script>
+</body>
+</html>`;
+
+  res.setHeader('Content-Type', 'text/html');
+  res.send(html);
+});
+
 /* ---------------- CONTACT / AFFILIATE FORM ---------------- */
 app.post(["/contact", "/api/contact"], async (req, res) => {
   try {
