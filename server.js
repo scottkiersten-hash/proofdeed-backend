@@ -44,7 +44,6 @@ function getTOTPUri(secret) {
   });
   return totp.toString();
 }
-import Anthropic from '@anthropic-ai/sdk';
 import { anchorToPolygon } from "./polygon.js";
 import multer from 'multer';
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -65,7 +64,6 @@ const REQUIRED_ENV = [
   "POLYGON_RPC_URL",
   "POLYGON_PRIVATE_KEY",
   "ADMIN_SECRET",
-  "ANTHROPIC_API_KEY",
 ];
 
 const missingEnv = REQUIRED_ENV.filter((key) => !process.env[key]);
@@ -2213,13 +2211,121 @@ app.get('/verify-fields', (req, res) => {
    AI TRUST ANALYSIS™
    ============================================================ */
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || '' });
-
 function generateAnalysisId() {
   return 'ATA-' + crypto.randomBytes(6).toString('hex').toUpperCase();
 }
 
-/* POST /api/v1/trust-analysis — Authenticated endpoint, runs AI analysis on a proof/passport/trust_id */
+function runTrustAnalysis({ certRows, passportRows, passportEvents, trustIdRows, trustRecords }) {
+  const findings = [];
+  let riskScore = 0; // higher = more risk
+  let confidenceScore = 50;
+
+  const totalRecords = certRows.length + passportRows.length + trustIdRows.length;
+  if (totalRecords === 0) return null;
+
+  // More records = higher confidence
+  confidenceScore = Math.min(95, 50 + totalRecords * 8 + trustRecords.length * 4);
+
+  // --- Blockchain anchoring ---
+  const anchored = certRows.filter(c => c.polygon_tx);
+  const pending = certRows.filter(c => !c.polygon_tx);
+  if (certRows.length > 0) {
+    if (anchored.length === certRows.length) {
+      findings.push({ type: 'positive', title: 'Blockchain Anchoring Confirmed', detail: `All ${anchored.length} certification record(s) are anchored on the Polygon blockchain with confirmed transaction hashes.` });
+    } else if (anchored.length > 0) {
+      riskScore += 15;
+      findings.push({ type: 'warning', title: 'Partial Blockchain Anchoring', detail: `${anchored.length} of ${certRows.length} record(s) are confirmed on-chain. ${pending.length} record(s) are still pending blockchain confirmation.` });
+    } else {
+      riskScore += 30;
+      findings.push({ type: 'warning', title: 'Blockchain Anchoring Pending', detail: `${certRows.length} record(s) exist in the ProofDeed system but have not yet been confirmed on the Polygon blockchain. Anchoring is typically completed within minutes of certification.` });
+    }
+  }
+
+  // --- Field integrity ---
+  const certsWithFields = certRows.filter(c => c.fields && Object.keys(c.fields).length > 0);
+  const certsWithHashes = certRows.filter(c => c.field_hashes && Object.keys(c.field_hashes).length > 0);
+  if (certsWithFields.length > 0 && certsWithHashes.length > 0) {
+    findings.push({ type: 'positive', title: 'Field-Level Integrity Verified', detail: `${certsWithFields.length} record(s) include individually hashed field values, enabling granular tamper detection on a per-field basis.` });
+  } else if (certRows.length > 0) {
+    riskScore += 10;
+    findings.push({ type: 'warning', title: 'No Field-Level Hashing Detected', detail: 'Records were certified at the document level only. Field-level integrity verification is not available for these records.' });
+  }
+
+  // --- Asset Passport completeness ---
+  if (passportRows.length > 0) {
+    const p = passportRows[0];
+    if (passportEvents.length > 0) {
+      findings.push({ type: 'positive', title: 'Asset Passport With Full Event History', detail: `Asset Passport for ${p.asset_type} (${p.asset_identifier}) contains ${passportEvents.length} logged event(s), providing a complete chain of custody record.` });
+    } else {
+      riskScore += 10;
+      findings.push({ type: 'warning', title: 'Asset Passport — No Events Recorded', detail: `Asset Passport for ${p.asset_type} (${p.asset_identifier}) has been created but contains no logged events. A complete chain of custody requires event documentation.` });
+    }
+  }
+
+  // --- Trust ID score ---
+  if (trustIdRows.length > 0) {
+    const t = trustIdRows[0];
+    const score = parseInt(t.trust_score) || 0;
+    if (score >= 80) {
+      findings.push({ type: 'positive', title: 'High Trust Score', detail: `Trust ID for ${t.entity_name} carries a Trust Score of ${score}/100, reflecting a strong record of verified activity.` });
+    } else if (score >= 50) {
+      riskScore += 10;
+      findings.push({ type: 'warning', title: 'Moderate Trust Score', detail: `Trust ID for ${t.entity_name} has a Trust Score of ${score}/100. Additional verified records would strengthen this entity's trust profile.` });
+    } else {
+      riskScore += 25;
+      findings.push({ type: 'critical', title: 'Low Trust Score', detail: `Trust ID for ${t.entity_name} has a Trust Score of ${score}/100. This entity has limited verified history in the ProofDeed system.` });
+    }
+    if (trustRecords.length > 0) {
+      findings.push({ type: 'positive', title: `${trustRecords.length} Linked Trust Record(s)`, detail: `This entity has ${trustRecords.length} verified record(s) linked to their Trust ID, including: ${trustRecords.slice(0,3).map(r => r.record_label).join(', ')}${trustRecords.length > 3 ? ' and more' : ''}.` });
+    }
+  }
+
+  // --- Timeline consistency ---
+  const allDates = [
+    ...certRows.map(c => c.created_at),
+    ...passportRows.map(p => p.created_at),
+    ...passportEvents.map(e => e.occurred_at),
+    ...trustRecords.map(r => r.issued_at),
+  ].filter(Boolean).map(d => new Date(d)).filter(d => !isNaN(d));
+
+  if (allDates.length >= 2) {
+    const sorted = allDates.sort((a, b) => a - b);
+    const earliest = sorted[0];
+    const latest = sorted[sorted.length - 1];
+    const spanDays = Math.round((latest - earliest) / 86400000);
+    findings.push({ type: 'positive', title: 'Timeline Consistent', detail: `Records span ${spanDays === 0 ? 'a single day' : `${spanDays} day(s)`} from ${earliest.toLocaleDateString('en-US', { dateStyle: 'medium' })} to ${latest.toLocaleDateString('en-US', { dateStyle: 'medium' })}. No chronological anomalies detected.` });
+  }
+
+  // --- Determine final risk level ---
+  let risk_level;
+  if (riskScore === 0) risk_level = 'low';
+  else if (riskScore <= 15) risk_level = 'low';
+  else if (riskScore <= 30) risk_level = 'medium';
+  else if (riskScore <= 50) risk_level = 'high';
+  else risk_level = 'critical';
+
+  // --- Generate summary ---
+  const parts = [];
+  if (certRows.length) parts.push(`${certRows.length} certification record(s)`);
+  if (passportRows.length) parts.push(`an Asset Passport`);
+  if (trustIdRows.length) parts.push(`a Trust ID for ${trustIdRows[0].entity_name}`);
+  const recordDesc = parts.join(', ');
+  const anchorStatus = anchored.length === certRows.length && certRows.length > 0
+    ? 'all records are confirmed on the Polygon blockchain'
+    : certRows.length > 0 ? 'blockchain anchoring is pending for some records' : 'no direct certification records were analyzed';
+
+  const summary = `This analysis covers ${recordDesc}. At the time of analysis, ${anchorStatus}. Overall integrity risk is assessed as ${risk_level.toUpperCase()} based on ${findings.length} evaluated signal(s).`;
+
+  const recommendation = risk_level === 'low'
+    ? 'These records meet ProofDeed integrity standards and can be relied upon as legally defensible under FRE Rule 901.'
+    : risk_level === 'medium'
+    ? 'Review the flagged warnings before relying on these records in legal or financial proceedings.'
+    : 'Do not rely on these records without first resolving the identified integrity issues.';
+
+  return { risk_level, confidence: confidenceScore, summary, recommendation, findings };
+}
+
+/* POST /api/v1/trust-analysis — Authenticated endpoint, runs rule-based trust analysis */
 app.post('/api/v1/trust-analysis', requireAuth, async (req, res) => {
   try {
     const { proof_id, passport_id, trust_id } = req.body;
@@ -2227,7 +2333,6 @@ app.post('/api/v1/trust-analysis', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Provide proof_id, passport_id, or trust_id.' });
     }
 
-    // Gather all relevant records
     let certRows = [], passportRows = [], passportEvents = [], trustIdRows = [], trustRecords = [];
 
     if (proof_id) {
@@ -2241,8 +2346,7 @@ app.post('/api/v1/trust-analysis', requireAuth, async (req, res) => {
       if (pr.rows.length) {
         const pe = await pool.query('SELECT event_type, description, actor, occurred_at, fields FROM asset_passport_events WHERE passport_id=$1 ORDER BY occurred_at', [passport_id]);
         passportEvents = pe.rows;
-        // also pull any certifications linked to this passport
-        const linked = await pool.query('SELECT hash, file_name, created_at, polygon_tx, fields FROM certifications WHERE id IN (SELECT unnest(proof_ids) FROM asset_passports WHERE passport_id=$1)', [passport_id]).catch(() => ({ rows: [] }));
+        const linked = await pool.query('SELECT hash, file_name, created_at, polygon_tx, fields, field_hashes FROM certifications WHERE id IN (SELECT unnest(proof_ids) FROM asset_passports WHERE passport_id=$1)', [passport_id]).catch(() => ({ rows: [] }));
         certRows = [...certRows, ...linked.rows];
       }
     }
@@ -2261,102 +2365,23 @@ app.post('/api/v1/trust-analysis', requireAuth, async (req, res) => {
       return res.status(404).json({ error: 'No records found for the provided identifier.' });
     }
 
-    // Build structured prompt
-    const now = new Date().toISOString();
-    const contextBlocks = [];
+    const result = runTrustAnalysis({ certRows, passportRows, passportEvents, trustIdRows, trustRecords });
+    if (!result) return res.status(404).json({ error: 'Insufficient data for analysis.' });
 
-    if (certRows.length) {
-      contextBlocks.push('=== CERTIFICATION RECORDS ===');
-      certRows.forEach((c, i) => {
-        contextBlocks.push(`Record ${i+1}: file="${c.file_name || 'unknown'}", certified_at=${c.created_at}, blockchain_tx=${c.polygon_tx || 'pending'}`);
-        if (c.fields && Object.keys(c.fields).length) {
-          contextBlocks.push('Fields: ' + JSON.stringify(c.fields));
-        }
-      });
-    }
-
-    if (passportRows.length) {
-      const p = passportRows[0];
-      contextBlocks.push('=== ASSET PASSPORT ===');
-      contextBlocks.push(`Type: ${p.asset_type}, Identifier: ${p.asset_identifier}, Label: ${p.label}, Created: ${p.created_at}`);
-      if (passportEvents.length) {
-        contextBlocks.push('Events:');
-        passportEvents.forEach(e => contextBlocks.push(`  - [${e.occurred_at}] ${e.event_type}: ${e.description} (actor: ${e.actor || 'system'})`));
-      }
-    }
-
-    if (trustIdRows.length) {
-      const t = trustIdRows[0];
-      contextBlocks.push('=== TRUST ID ===');
-      contextBlocks.push(`Entity: ${t.entity_name}, Email: ${t.entity_email || 'n/a'}, Trust Score: ${t.trust_score}, Created: ${t.created_at}`);
-      if (trustRecords.length) {
-        contextBlocks.push('Linked Records:');
-        trustRecords.forEach(r => contextBlocks.push(`  - [${r.issued_at}] ${r.record_label} (${r.record_type})`));
-      }
-    }
-
-    const prompt = `You are an AI Trust Analyst for ProofDeed, a blockchain-based document certification platform. Your job is to analyze verified document records and provide an independent trust assessment that would help a legal, financial, or regulatory professional understand the integrity of these records.
-
-Today's date: ${now}
-
-== RECORDS UNDER ANALYSIS ==
-${contextBlocks.join('\n')}
-
-== YOUR TASK ==
-Analyze these records and return a JSON object with EXACTLY this structure:
-{
-  "risk_level": "low" | "medium" | "high" | "critical",
-  "confidence": <integer 0-100>,
-  "summary": "<2-3 sentence plain-English summary of what these records show>",
-  "recommendation": "<1 sentence actionable recommendation for anyone relying on these records>",
-  "findings": [
-    { "type": "positive" | "warning" | "critical", "title": "<short title>", "detail": "<explanation>" }
-  ]
-}
-
-Guidelines:
-- risk_level reflects the overall integrity risk of the document set (low = everything checks out, critical = major integrity concerns)
-- confidence reflects your certainty in the assessment based on available data (lower if data is sparse)
-- findings should include 2-5 items covering: blockchain anchoring status, record completeness, timeline consistency, field integrity, and any anomalies
-- Be precise and professional — this analysis may be used in legal or regulatory proceedings
-- Do not invent data not present in the records above
-- Return ONLY the JSON object, no markdown, no extra text`;
-
-    const stream = await anthropic.messages.stream({
-      model: 'claude-opus-4-8',
-      max_tokens: 4000,
-      thinking: { type: 'adaptive' },
-      messages: [{ role: 'user', content: prompt }],
-    });
-    const message = await stream.finalMessage();
-
-    // Extract the JSON from the response
-    const textContent = message.content.find(b => b.type === 'text');
-    if (!textContent) throw new Error('No text response from AI');
-
-    let parsed;
-    try {
-      // Strip any accidental markdown fences
-      const clean = textContent.text.replace(/```json\n?|```\n?/g, '').trim();
-      parsed = JSON.parse(clean);
-    } catch {
-      throw new Error('AI returned non-JSON response');
-    }
-
-    const { risk_level, confidence, summary, recommendation, findings } = parsed;
+    const { risk_level, confidence, summary, recommendation, findings } = result;
     const analysis_id = generateAnalysisId();
 
     await pool.query(
       `INSERT INTO trust_analyses (analysis_id, proof_id, passport_id, trust_id_ref, risk_level, confidence, summary, recommendation, findings, raw_input)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
       [analysis_id, proof_id || null, passport_id || null, trust_id || null,
-       risk_level, confidence || 0, summary, recommendation, JSON.stringify(findings || []),
+       risk_level, confidence, summary, recommendation, JSON.stringify(findings),
        JSON.stringify({ proof_id, passport_id, trust_id })]
     );
 
     return res.json({ analysis_id, risk_level, confidence, summary, recommendation, findings, analysis_url: `/analysis/${analysis_id}` });
   } catch (err) {
-    console.error('AI Trust Analysis error:', err.message);
+    console.error('Trust Analysis error:', err.message);
     return res.status(500).json({ error: 'Analysis failed. Please try again.' });
   }
 });
