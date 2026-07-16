@@ -44,6 +44,7 @@ function getTOTPUri(secret) {
   });
   return totp.toString();
 }
+import Anthropic from '@anthropic-ai/sdk';
 import { anchorToPolygon } from "./polygon.js";
 import multer from 'multer';
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -64,6 +65,7 @@ const REQUIRED_ENV = [
   "POLYGON_RPC_URL",
   "POLYGON_PRIVATE_KEY",
   "ADMIN_SECRET",
+  "ANTHROPIC_API_KEY",
 ];
 
 const missingEnv = REQUIRED_ENV.filter((key) => !process.env[key]);
@@ -2207,6 +2209,265 @@ app.get('/verify-fields', (req, res) => {
   res.send(html);
 });
 
+/* ============================================================
+   AI TRUST ANALYSIS™
+   ============================================================ */
+
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || '' });
+
+function generateAnalysisId() {
+  return 'ATA-' + crypto.randomBytes(6).toString('hex').toUpperCase();
+}
+
+/* POST /api/v1/trust-analysis — Authenticated endpoint, runs AI analysis on a proof/passport/trust_id */
+app.post('/api/v1/trust-analysis', requireAuth, async (req, res) => {
+  try {
+    const { proof_id, passport_id, trust_id } = req.body;
+    if (!proof_id && !passport_id && !trust_id) {
+      return res.status(400).json({ error: 'Provide proof_id, passport_id, or trust_id.' });
+    }
+
+    // Gather all relevant records
+    let certRows = [], passportRows = [], passportEvents = [], trustIdRows = [], trustRecords = [];
+
+    if (proof_id) {
+      const cr = await pool.query('SELECT hash, file_name, created_at, polygon_tx, fields, field_hashes FROM certifications WHERE hash=$1 OR id::text=$1 LIMIT 5', [proof_id]);
+      certRows = cr.rows;
+    }
+
+    if (passport_id) {
+      const pr = await pool.query('SELECT * FROM asset_passports WHERE passport_id=$1', [passport_id]);
+      passportRows = pr.rows;
+      if (pr.rows.length) {
+        const pe = await pool.query('SELECT event_type, description, actor, occurred_at, fields FROM asset_passport_events WHERE passport_id=$1 ORDER BY occurred_at', [passport_id]);
+        passportEvents = pe.rows;
+        // also pull any certifications linked to this passport
+        const linked = await pool.query('SELECT hash, file_name, created_at, polygon_tx, fields FROM certifications WHERE id IN (SELECT unnest(proof_ids) FROM asset_passports WHERE passport_id=$1)', [passport_id]).catch(() => ({ rows: [] }));
+        certRows = [...certRows, ...linked.rows];
+      }
+    }
+
+    if (trust_id) {
+      const tr = await pool.query('SELECT * FROM trust_ids WHERE trust_id=$1', [trust_id]);
+      trustIdRows = tr.rows;
+      if (tr.rows.length) {
+        const rr = await pool.query('SELECT record_label, record_type, fields, field_hashes, issued_at FROM trust_id_records WHERE trust_id=$1 ORDER BY issued_at', [trust_id]);
+        trustRecords = rr.rows;
+      }
+    }
+
+    const hasData = certRows.length || passportRows.length || trustIdRows.length;
+    if (!hasData) {
+      return res.status(404).json({ error: 'No records found for the provided identifier.' });
+    }
+
+    // Build structured prompt
+    const now = new Date().toISOString();
+    const contextBlocks = [];
+
+    if (certRows.length) {
+      contextBlocks.push('=== CERTIFICATION RECORDS ===');
+      certRows.forEach((c, i) => {
+        contextBlocks.push(`Record ${i+1}: file="${c.file_name || 'unknown'}", certified_at=${c.created_at}, blockchain_tx=${c.polygon_tx || 'pending'}`);
+        if (c.fields && Object.keys(c.fields).length) {
+          contextBlocks.push('Fields: ' + JSON.stringify(c.fields));
+        }
+      });
+    }
+
+    if (passportRows.length) {
+      const p = passportRows[0];
+      contextBlocks.push('=== ASSET PASSPORT ===');
+      contextBlocks.push(`Type: ${p.asset_type}, Identifier: ${p.asset_identifier}, Label: ${p.label}, Created: ${p.created_at}`);
+      if (passportEvents.length) {
+        contextBlocks.push('Events:');
+        passportEvents.forEach(e => contextBlocks.push(`  - [${e.occurred_at}] ${e.event_type}: ${e.description} (actor: ${e.actor || 'system'})`));
+      }
+    }
+
+    if (trustIdRows.length) {
+      const t = trustIdRows[0];
+      contextBlocks.push('=== TRUST ID ===');
+      contextBlocks.push(`Entity: ${t.entity_name}, Email: ${t.entity_email || 'n/a'}, Trust Score: ${t.trust_score}, Created: ${t.created_at}`);
+      if (trustRecords.length) {
+        contextBlocks.push('Linked Records:');
+        trustRecords.forEach(r => contextBlocks.push(`  - [${r.issued_at}] ${r.record_label} (${r.record_type})`));
+      }
+    }
+
+    const prompt = `You are an AI Trust Analyst for ProofDeed, a blockchain-based document certification platform. Your job is to analyze verified document records and provide an independent trust assessment that would help a legal, financial, or regulatory professional understand the integrity of these records.
+
+Today's date: ${now}
+
+== RECORDS UNDER ANALYSIS ==
+${contextBlocks.join('\n')}
+
+== YOUR TASK ==
+Analyze these records and return a JSON object with EXACTLY this structure:
+{
+  "risk_level": "low" | "medium" | "high" | "critical",
+  "confidence": <integer 0-100>,
+  "summary": "<2-3 sentence plain-English summary of what these records show>",
+  "recommendation": "<1 sentence actionable recommendation for anyone relying on these records>",
+  "findings": [
+    { "type": "positive" | "warning" | "critical", "title": "<short title>", "detail": "<explanation>" }
+  ]
+}
+
+Guidelines:
+- risk_level reflects the overall integrity risk of the document set (low = everything checks out, critical = major integrity concerns)
+- confidence reflects your certainty in the assessment based on available data (lower if data is sparse)
+- findings should include 2-5 items covering: blockchain anchoring status, record completeness, timeline consistency, field integrity, and any anomalies
+- Be precise and professional — this analysis may be used in legal or regulatory proceedings
+- Do not invent data not present in the records above
+- Return ONLY the JSON object, no markdown, no extra text`;
+
+    const stream = await anthropic.messages.stream({
+      model: 'claude-opus-4-8',
+      max_tokens: 4000,
+      thinking: { type: 'adaptive' },
+      messages: [{ role: 'user', content: prompt }],
+    });
+    const message = await stream.finalMessage();
+
+    // Extract the JSON from the response
+    const textContent = message.content.find(b => b.type === 'text');
+    if (!textContent) throw new Error('No text response from AI');
+
+    let parsed;
+    try {
+      // Strip any accidental markdown fences
+      const clean = textContent.text.replace(/```json\n?|```\n?/g, '').trim();
+      parsed = JSON.parse(clean);
+    } catch {
+      throw new Error('AI returned non-JSON response');
+    }
+
+    const { risk_level, confidence, summary, recommendation, findings } = parsed;
+    const analysis_id = generateAnalysisId();
+
+    await pool.query(
+      `INSERT INTO trust_analyses (analysis_id, proof_id, passport_id, trust_id_ref, risk_level, confidence, summary, recommendation, findings, raw_input)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+      [analysis_id, proof_id || null, passport_id || null, trust_id || null,
+       risk_level, confidence || 0, summary, recommendation, JSON.stringify(findings || []),
+       JSON.stringify({ proof_id, passport_id, trust_id })]
+    );
+
+    return res.json({ analysis_id, risk_level, confidence, summary, recommendation, findings, analysis_url: `/analysis/${analysis_id}` });
+  } catch (err) {
+    console.error('AI Trust Analysis error:', err.message);
+    return res.status(500).json({ error: 'Analysis failed. Please try again.' });
+  }
+});
+
+/* GET /analysis/:id — Public AI Trust Analysis™ report page */
+app.get('/analysis/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const row = await pool.query('SELECT * FROM trust_analyses WHERE analysis_id=$1', [id]);
+    if (!row.rows.length) return res.status(404).send('<h2>Analysis not found.</h2>');
+
+    const a = row.rows[0];
+    const findings = Array.isArray(a.findings) ? a.findings : JSON.parse(a.findings || '[]');
+
+    const riskColors = { low: '#16a34a', medium: '#d97706', high: '#dc2626', critical: '#7c3aed', unknown: '#6b7280' };
+    const riskBg = { low: '#f0fdf4', medium: '#fffbeb', high: '#fef2f2', critical: '#f5f3ff', unknown: '#f9fafb' };
+    const riskIcon = { low: '✓', medium: '⚠', high: '✗', critical: '⛔', unknown: '?' };
+    const color = riskColors[a.risk_level] || riskColors.unknown;
+    const bg = riskBg[a.risk_level] || riskBg.unknown;
+    const icon = riskIcon[a.risk_level] || '?';
+
+    const findingHtml = findings.map(f => {
+      const fc = f.type === 'positive' ? '#16a34a' : f.type === 'warning' ? '#d97706' : '#dc2626';
+      const fi = f.type === 'positive' ? '✓' : f.type === 'warning' ? '⚠' : '✗';
+      return `<div style="border-left:3px solid ${fc};padding:10px 14px;margin-bottom:10px;background:#fff;border-radius:0 6px 6px 0">
+        <div style="font-weight:600;color:${fc}">${fi} ${f.title || ''}</div>
+        <div style="color:#374151;margin-top:4px;font-size:14px">${f.detail || ''}</div>
+      </div>`;
+    }).join('');
+
+    const linkedIds = [
+      a.proof_id ? `<span style="background:#f3f4f6;padding:4px 10px;border-radius:4px;font-size:13px">Proof ID: ${a.proof_id}</span>` : '',
+      a.passport_id ? `<span style="background:#f3f4f6;padding:4px 10px;border-radius:4px;font-size:13px">Passport: <a href="/passport/${a.passport_id}" style="color:#2563eb">${a.passport_id}</a></span>` : '',
+      a.trust_id_ref ? `<span style="background:#f3f4f6;padding:4px 10px;border-radius:4px;font-size:13px">Trust ID: <a href="/trust/${a.trust_id_ref}" style="color:#2563eb">${a.trust_id_ref}</a></span>` : '',
+    ].filter(Boolean).join(' ');
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI Trust Analysis™ — ${a.analysis_id} | ProofDeed</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f9fafb;color:#111827;min-height:100vh}
+  .header{background:#0f172a;color:#fff;padding:18px 24px;display:flex;align-items:center;gap:12px}
+  .header-logo{font-size:18px;font-weight:700;letter-spacing:-0.5px}
+  .header-logo span{color:#60a5fa}
+  .container{max-width:720px;margin:32px auto;padding:0 16px 60px}
+  .analysis-id{font-size:13px;color:#6b7280;margin-bottom:24px}
+  .risk-badge{display:inline-flex;align-items:center;gap:8px;padding:10px 18px;border-radius:8px;font-weight:700;font-size:20px;background:${bg};color:${color};border:1.5px solid ${color};margin-bottom:24px}
+  .card{background:#fff;border-radius:10px;border:1px solid #e5e7eb;padding:22px;margin-bottom:20px}
+  .card-title{font-size:13px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.07em;margin-bottom:14px}
+  .summary-text{color:#1f2937;line-height:1.65;font-size:15px}
+  .confidence-bar{background:#e5e7eb;border-radius:4px;height:8px;margin-top:12px}
+  .confidence-fill{background:${color};height:8px;border-radius:4px;width:${a.confidence}%}
+  .confidence-label{font-size:13px;color:#6b7280;margin-top:6px}
+  .rec{background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:14px 16px;color:#1e40af;font-size:14px;line-height:1.6}
+  .linked{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+  .legal{color:#9ca3af;font-size:12px;line-height:1.6;margin-top:28px;padding-top:16px;border-top:1px solid #e5e7eb}
+  .footer{text-align:center;margin-top:32px}
+  .footer a{color:#2563eb;text-decoration:none;font-size:13px}
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="header-logo">Proof<span>Deed</span></div>
+  <div style="color:#94a3b8;font-size:14px">AI Trust Analysis™</div>
+</div>
+<div class="container">
+  <div class="analysis-id">Analysis ID: ${a.analysis_id} &nbsp;·&nbsp; Generated: ${new Date(a.created_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })} UTC</div>
+
+  <div class="risk-badge">${icon} Risk Level: ${(a.risk_level || 'unknown').toUpperCase()}</div>
+
+  <div class="card">
+    <div class="card-title">Summary</div>
+    <div class="summary-text">${a.summary || 'No summary available.'}</div>
+    <div class="confidence-bar"><div class="confidence-fill"></div></div>
+    <div class="confidence-label">AI Confidence: ${a.confidence}%</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Findings</div>
+    ${findingHtml || '<p style="color:#6b7280;font-size:14px">No findings recorded.</p>'}
+  </div>
+
+  <div class="card">
+    <div class="card-title">Recommendation</div>
+    <div class="rec">${a.recommendation || 'No recommendation available.'}</div>
+  </div>
+
+  ${linkedIds ? `<div class="card"><div class="card-title">Linked Records</div><div class="linked">${linkedIds}</div></div>` : ''}
+
+  <div class="legal">
+    This AI Trust Analysis™ is generated by Claude (Anthropic) based solely on the verified records stored in the ProofDeed system at the time of analysis. It does not constitute legal advice. The findings are informational and should be reviewed by a qualified professional before reliance in legal, regulatory, or financial proceedings. ProofDeed Trust Records are independently verifiable on the Polygon blockchain.
+  </div>
+
+  <div class="footer" style="margin-top:24px">
+    <a href="https://proofdeed.com">ProofDeed Trust Infrastructure Platform</a>
+  </div>
+</div>
+</body>
+</html>`;
+
+    return res.send(html);
+  } catch (err) {
+    console.error('Analysis page error:', err.message);
+    return res.status(500).send('<h2>Error loading analysis.</h2>');
+  }
+});
+
 /* ---------------- CONTACT / AFFILIATE FORM ---------------- */
 app.post(["/contact", "/api/contact"], async (req, res) => {
   try {
@@ -3395,6 +3656,23 @@ async function ensureIndexes() {
       CREATE INDEX IF NOT EXISTS idx_trust_ids_id ON trust_ids(trust_id);
       CREATE INDEX IF NOT EXISTS idx_trust_ids_email ON trust_ids(entity_email);
       CREATE INDEX IF NOT EXISTS idx_trust_id_records_trust_id ON trust_id_records(trust_id);
+
+      CREATE TABLE IF NOT EXISTS trust_analyses (
+        id            SERIAL PRIMARY KEY,
+        analysis_id   TEXT UNIQUE NOT NULL,
+        proof_id      TEXT,
+        passport_id   TEXT,
+        trust_id_ref  TEXT,
+        risk_level    TEXT NOT NULL DEFAULT 'unknown',
+        confidence    INTEGER NOT NULL DEFAULT 0,
+        summary       TEXT,
+        recommendation TEXT,
+        findings      JSONB NOT NULL DEFAULT '[]',
+        raw_input     JSONB NOT NULL DEFAULT '{}',
+        created_at    TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_trust_analyses_id ON trust_analyses(analysis_id);
+      CREATE INDEX IF NOT EXISTS idx_trust_analyses_proof ON trust_analyses(proof_id);
 
       CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
       CREATE INDEX IF NOT EXISTS idx_certifications_hash ON certifications(hash);
