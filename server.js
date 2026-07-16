@@ -809,6 +809,291 @@ app.post("/api/v1/webhooks/dms", authenticateApiKey, async (req, res) => {
   }
 });
 
+/* ============================================================
+   ASSET PASSPORT™ — Permanent, publicly verifiable asset history
+   ============================================================ */
+
+// Generate a unique passport ID
+function generatePassportId(assetType, identifier) {
+  const slug = (assetType || 'asset').toUpperCase().slice(0, 4);
+  const rand = crypto.randomBytes(4).toString('hex').toUpperCase();
+  return `AP-${slug}-${rand}`;
+}
+
+// Hash fields and compute root hash (same logic as field certify)
+function hashFields(fields) {
+  const fieldHashes = {};
+  for (const [key, value] of Object.entries(fields)) {
+    fieldHashes[key] = crypto.createHash('sha256').update(String(value)).digest('hex');
+  }
+  const rootInput = Object.keys(fieldHashes).sort().map(k => `${k}:${fieldHashes[k]}`).join('|');
+  const rootHash = crypto.createHash('sha256').update(rootInput).digest('hex');
+  return { fieldHashes, rootHash };
+}
+
+/* POST /api/v1/asset-passport — Create a new Asset Passport */
+app.post('/api/v1/asset-passport', authenticateApiKey, async (req, res) => {
+  try {
+    const { asset_type, asset_identifier, label, owner_name, owner_email, fields } = req.body;
+
+    if (!asset_type || !asset_identifier) {
+      return res.status(400).json({ error: 'asset_type and asset_identifier are required.' });
+    }
+    if (!fields || typeof fields !== 'object' || Array.isArray(fields)) {
+      return res.status(400).json({ error: 'fields must be a key/value object.' });
+    }
+
+    const passportId = generatePassportId(asset_type, asset_identifier);
+    const proofId = 'PD-AP-' + Date.now() + '-' + crypto.randomBytes(3).toString('hex');
+    const { fieldHashes, rootHash } = hashFields(fields);
+    const timestamp = new Date().toISOString();
+
+    await pool.query(
+      `INSERT INTO asset_passports (passport_id, asset_type, asset_identifier, label, owner_name, owner_email, fields, field_hashes, root_hash, proof_id, api_key_email, created_at, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NOW(),NOW())`,
+      [passportId, asset_type, asset_identifier, label || null, owner_name || null, owner_email || null,
+       JSON.stringify(fields), JSON.stringify(fieldHashes), rootHash, proofId, req.apiKey.email]
+    );
+
+    // Record creation as first event
+    await pool.query(
+      `INSERT INTO asset_passport_events (passport_id, event_type, event_label, fields, field_hashes, root_hash, proof_id, occurred_at)
+       VALUES ($1,'created',$2,$3,$4,$5,$6,NOW())`,
+      [passportId, label || 'Passport Created', JSON.stringify(fields), JSON.stringify(fieldHashes), rootHash, proofId]
+    );
+
+    await pool.query(
+      `INSERT INTO certifications (certification_id, hash, polygon_tx, api_key_email, ip_address, created_at)
+       VALUES ($1,$2,NULL,$3,$4,NOW()) ON CONFLICT (certification_id) DO NOTHING`,
+      [proofId, rootHash, req.apiKey.email, req.ip || req.headers['x-forwarded-for'] || null]
+    );
+    await pool.query('UPDATE api_keys SET used_this_month = used_this_month + 1 WHERE api_key = $1', [req.apiKey.api_key]);
+    if (req.apiKey.stripe_subscription_item_id) await reportUsageToStripe(req.apiKey.stripe_subscription_item_id, 1);
+
+    const publicUrl = `https://proofdeed.com/passport/${passportId}`;
+
+    res.json({ passportId, proofId, timestamp, rootHash, fieldHashes, asset_type, asset_identifier, publicUrl,
+      message: `Asset Passport™ created. Share publicUrl to allow anyone to verify this asset's history.` });
+
+    // Anchor to blockchain in background
+    anchorToPolygon(rootHash).then(async (txHash) => {
+      await pool.query('UPDATE certifications SET polygon_tx=$1 WHERE certification_id=$2', [txHash, proofId]);
+      await pool.query('UPDATE asset_passports SET polygon_tx=$1 WHERE passport_id=$2', [txHash, passportId]);
+      await pool.query('UPDATE asset_passport_events SET polygon_tx=$1 WHERE proof_id=$2', [txHash, proofId]);
+    }).catch(err => console.error('[AssetPassport] Blockchain anchor failed:', err.message));
+
+  } catch (err) {
+    console.error('[AssetPassport] Create error:', err);
+    res.status(500).json({ error: 'Internal server error.' });
+  }
+});
+
+/* POST /api/v1/asset-passport/:id/event — Add a lifecycle event to an existing passport */
+app.post('/api/v1/asset-passport/:id/event', authenticateApiKey, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { event_type, event_label, fields } = req.body;
+
+    if (!event_type || !fields || typeof fields !== 'object') {
+      return res.status(400).json({ error: 'event_type and fields are required.' });
+    }
+
+    const passport = await pool.query('SELECT * FROM asset_passports WHERE passport_id=$1', [id]);
+    if (!passport.rows[0]) return res.status(404).json({ error: 'Asset Passport not found.' });
+
+    const proofId = 'PD-APE-' + Date.now() + '-' + crypto.randomBytes(3).toString('hex');
+    const { fieldHashes, rootHash } = hashFields(fields);
+    const timestamp = new Date().toISOString();
+
+    await pool.query(
+      `INSERT INTO asset_passport_events (passport_id, event_type, event_label, fields, field_hashes, root_hash, proof_id, occurred_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())`,
+      [id, event_type, event_label || event_type, JSON.stringify(fields), JSON.stringify(fieldHashes), rootHash, proofId]
+    );
+
+    await pool.query('UPDATE asset_passports SET updated_at=NOW() WHERE passport_id=$1', [id]);
+
+    await pool.query(
+      `INSERT INTO certifications (certification_id, hash, polygon_tx, api_key_email, ip_address, created_at)
+       VALUES ($1,$2,NULL,$3,$4,NOW()) ON CONFLICT (certification_id) DO NOTHING`,
+      [proofId, rootHash, req.apiKey.email, req.ip || req.headers['x-forwarded-for'] || null]
+    );
+    await pool.query('UPDATE api_keys SET used_this_month = used_this_month + 1 WHERE api_key = $1', [req.apiKey.api_key]);
+    if (req.apiKey.stripe_subscription_item_id) await reportUsageToStripe(req.apiKey.stripe_subscription_item_id, 1);
+
+    res.json({ passportId: id, proofId, timestamp, event_type, event_label: event_label || event_type,
+      rootHash, fieldHashes, publicUrl: `https://proofdeed.com/passport/${id}`,
+      message: 'Event added to Asset Passport™ and anchored to blockchain.' });
+
+    anchorToPolygon(rootHash).then(async (txHash) => {
+      await pool.query('UPDATE certifications SET polygon_tx=$1 WHERE certification_id=$2', [txHash, proofId]);
+      await pool.query('UPDATE asset_passport_events SET polygon_tx=$1 WHERE proof_id=$2', [txHash, proofId]);
+    }).catch(err => console.error('[AssetPassport] Event anchor failed:', err.message));
+
+  } catch (err) {
+    console.error('[AssetPassport] Event error:', err);
+    res.status(500).json({ error: 'Internal server error.' });
+  }
+});
+
+/* GET /api/v1/asset-passport/:id — Get passport data (API) */
+app.get('/api/v1/asset-passport/:id', authenticateApiKey, async (req, res) => {
+  try {
+    const passport = await pool.query('SELECT * FROM asset_passports WHERE passport_id=$1', [req.params.id]);
+    if (!passport.rows[0]) return res.status(404).json({ error: 'Asset Passport not found.' });
+
+    const events = await pool.query(
+      'SELECT * FROM asset_passport_events WHERE passport_id=$1 ORDER BY occurred_at ASC', [req.params.id]
+    );
+
+    res.json({ ...passport.rows[0], events: events.rows, publicUrl: `https://proofdeed.com/passport/${req.params.id}` });
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error.' });
+  }
+});
+
+/* GET /passport/:id — Public Asset Passport™ verification page */
+app.get('/passport/:id', async (req, res) => {
+  try {
+    const passport = await pool.query('SELECT * FROM asset_passports WHERE passport_id=$1', [req.params.id]);
+    if (!passport.rows[0]) {
+      return res.status(404).send(`<!DOCTYPE html><html><head><title>Passport Not Found — ProofDeed</title></head>
+        <body style="font-family:sans-serif;text-align:center;padding:80px;color:#333">
+        <h1>Passport Not Found</h1><p>No Asset Passport exists for ID: ${req.params.id}</p>
+        <a href="https://proofdeed.com">proofdeed.com</a></body></html>`);
+    }
+
+    const p = passport.rows[0];
+    const events = await pool.query(
+      'SELECT * FROM asset_passport_events WHERE passport_id=$1 ORDER BY occurred_at ASC', [req.params.id]
+    );
+
+    const fieldsHtml = Object.entries(p.fields || {}).map(([k, v]) =>
+      `<tr><td style="padding:10px 16px;color:#64748b;font-size:13px;text-transform:capitalize;white-space:nowrap">${k.replace(/_/g,' ')}</td>
+       <td style="padding:10px 16px;font-size:13px;font-weight:600;color:#0f172a">${v}</td>
+       <td style="padding:10px 16px;font-size:11px;font-family:monospace;color:#94a3b8;word-break:break-all">${(p.field_hashes||{})[k]||''}</td></tr>`
+    ).join('');
+
+    const eventsHtml = events.rows.map((e, i) => {
+      const eFields = Object.entries(e.fields || {}).map(([k, v]) =>
+        `<div style="display:flex;gap:16px;padding:6px 0;border-bottom:1px solid #f1f5f9">
+          <span style="min-width:140px;font-size:12px;color:#64748b;text-transform:capitalize">${k.replace(/_/g,' ')}</span>
+          <span style="font-size:12px;color:#0f172a;font-weight:500">${v}</span>
+        </div>`
+      ).join('');
+
+      return `<div style="border:1px solid #e2e8f0;border-radius:8px;padding:20px;margin-bottom:12px;background:#fafafa">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+          <div style="width:32px;height:32px;border-radius:50%;background:#0176D3;color:white;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0">${i+1}</div>
+          <div>
+            <div style="font-size:14px;font-weight:700;color:#0f172a">${e.event_label || e.event_type}</div>
+            <div style="font-size:12px;color:#64748b">${new Date(e.occurred_at).toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'UTC'})} UTC</div>
+          </div>
+          ${e.polygon_tx ? `<div style="margin-left:auto;background:#dcfce7;color:#16a34a;font-size:11px;padding:4px 10px;border-radius:20px;font-weight:600">✓ On-Chain</div>` : `<div style="margin-left:auto;background:#fef9c3;color:#ca8a04;font-size:11px;padding:4px 10px;border-radius:20px;font-weight:600">Anchoring...</div>`}
+        </div>
+        <div style="font-size:11px;color:#94a3b8;font-family:monospace;margin-bottom:8px;word-break:break-all">Root Hash: ${e.root_hash}</div>
+        ${e.polygon_tx ? `<div style="font-size:11px;color:#94a3b8;font-family:monospace;margin-bottom:8px;word-break:break-all">Polygon TX: ${e.polygon_tx}</div>` : ''}
+        <div style="margin-top:8px">${eFields}</div>
+      </div>`;
+    }).join('');
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Asset Passport™ — ${p.label || p.asset_identifier} | ProofDeed</title>
+  <meta name="description" content="Verify the authentic history of ${p.asset_identifier} — permanently recorded on the blockchain by ProofDeed.">
+</head>
+<body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+
+  <div style="background:#021d5b;padding:16px 32px;display:flex;align-items:center;justify-content:space-between">
+    <div style="color:white">
+      <span style="font-size:18px;font-weight:800;letter-spacing:-0.5px">ProofDeed</span>
+      <span style="font-size:12px;color:#93c5fd;margin-left:8px">Asset Passport™</span>
+    </div>
+    <a href="https://proofdeed.com" style="color:#93c5fd;font-size:13px;text-decoration:none">proofdeed.com</a>
+  </div>
+
+  <div style="max-width:760px;margin:40px auto;padding:0 20px">
+
+    <!-- Status banner -->
+    <div style="background:#dcfce7;border:1px solid #bbf7d0;border-radius:10px;padding:16px 20px;display:flex;align-items:center;gap:12px;margin-bottom:24px">
+      <div style="width:40px;height:40px;background:#16a34a;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="white"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+      </div>
+      <div>
+        <div style="font-size:15px;font-weight:700;color:#15803d">Verified — Authentic Asset Passport™</div>
+        <div style="font-size:13px;color:#16a34a">This asset's history is permanently recorded and independently verifiable on the Polygon blockchain.</div>
+      </div>
+    </div>
+
+    <!-- Passport header -->
+    <div style="background:white;border:1px solid #e2e8f0;border-radius:10px;padding:28px;margin-bottom:20px">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:16px">
+        <div>
+          <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px">${p.asset_type}</div>
+          <div style="font-size:24px;font-weight:800;color:#0f172a;margin-bottom:4px">${p.label || p.asset_identifier}</div>
+          <div style="font-size:14px;color:#64748b;font-family:monospace">${p.asset_identifier}</div>
+          ${p.owner_name ? `<div style="font-size:13px;color:#64748b;margin-top:8px">Owner: <strong>${p.owner_name}</strong></div>` : ''}
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px">Passport ID</div>
+          <div style="font-size:15px;font-weight:700;color:#0176D3;font-family:monospace">${p.passport_id}</div>
+          <div style="font-size:11px;color:#94a3b8;margin-top:4px">Created ${new Date(p.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</div>
+          <div style="font-size:11px;color:#94a3b8">Events: ${events.rows.length}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Original certified fields -->
+    <div style="background:white;border:1px solid #e2e8f0;border-radius:10px;margin-bottom:20px;overflow:hidden">
+      <div style="padding:20px 24px;border-bottom:1px solid #f1f5f9">
+        <div style="font-size:14px;font-weight:700;color:#0f172a">Certified Fields</div>
+        <div style="font-size:12px;color:#64748b;margin-top:2px">Each field was individually hashed and anchored at time of creation</div>
+      </div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse">
+          <thead><tr style="background:#f8fafc">
+            <th style="padding:10px 16px;text-align:left;font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase">Field</th>
+            <th style="padding:10px 16px;text-align:left;font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase">Value</th>
+            <th style="padding:10px 16px;text-align:left;font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase">SHA-256 Hash</th>
+          </tr></thead>
+          <tbody>${fieldsHtml}</tbody>
+        </table>
+      </div>
+      <div style="padding:14px 16px;border-top:1px solid #f1f5f9;background:#f8fafc">
+        <div style="font-size:11px;color:#64748b">Root Hash: <span style="font-family:monospace;color:#334155;word-break:break-all">${p.root_hash}</span></div>
+        ${p.polygon_tx ? `<div style="font-size:11px;color:#64748b;margin-top:4px">Polygon TX: <span style="font-family:monospace;color:#334155;word-break:break-all">${p.polygon_tx}</span></div>` : ''}
+      </div>
+    </div>
+
+    <!-- Event timeline -->
+    ${events.rows.length > 1 ? `
+    <div style="background:white;border:1px solid #e2e8f0;border-radius:10px;padding:24px;margin-bottom:20px">
+      <div style="font-size:14px;font-weight:700;color:#0f172a;margin-bottom:16px">Full History Timeline</div>
+      ${eventsHtml}
+    </div>` : ''}
+
+    <!-- Legal footer -->
+    <div style="text-align:center;padding:24px 0">
+      <div style="font-size:12px;color:#94a3b8;margin-bottom:8px">Legally defensible under FRE Rule 901 · Anchored on Polygon blockchain · ProofDeed LLC</div>
+      <a href="https://proofdeed.com" style="font-size:12px;color:#0176D3;text-decoration:none">Create your own Asset Passport™ at proofdeed.com</a>
+    </div>
+
+  </div>
+</body>
+</html>`;
+
+    res.setHeader('Content-Type', 'text/html');
+    res.send(html);
+
+  } catch (err) {
+    console.error('[AssetPassport] Public page error:', err);
+    res.status(500).send('Server error.');
+  }
+});
+
 /* ---------------- ENTERPRISE - BATCH CERTIFY (ASYNC) ---------------- */
 
 async function processBatchBackground(batchId, certRecords, apiKey) {
@@ -2566,6 +2851,41 @@ async function ensureIndexes() {
         suppressed     BOOLEAN NOT NULL DEFAULT false,
         last_seen      TIMESTAMPTZ DEFAULT NOW()
       );
+
+      CREATE TABLE IF NOT EXISTS asset_passports (
+        id              SERIAL PRIMARY KEY,
+        passport_id     TEXT UNIQUE NOT NULL,
+        asset_type      TEXT NOT NULL,
+        asset_identifier TEXT NOT NULL,
+        label           TEXT,
+        owner_name      TEXT,
+        owner_email     TEXT,
+        fields          JSONB NOT NULL DEFAULT '{}',
+        field_hashes    JSONB NOT NULL DEFAULT '{}',
+        root_hash       TEXT,
+        polygon_tx      TEXT,
+        proof_id        TEXT,
+        api_key_email   TEXT,
+        created_at      TIMESTAMPTZ DEFAULT NOW(),
+        updated_at      TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS asset_passport_events (
+        id            SERIAL PRIMARY KEY,
+        passport_id   TEXT NOT NULL REFERENCES asset_passports(passport_id) ON DELETE CASCADE,
+        event_type    TEXT NOT NULL,
+        event_label   TEXT,
+        fields        JSONB NOT NULL DEFAULT '{}',
+        field_hashes  JSONB NOT NULL DEFAULT '{}',
+        root_hash     TEXT,
+        polygon_tx    TEXT,
+        proof_id      TEXT,
+        occurred_at   TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_asset_passports_id ON asset_passports(passport_id);
+      CREATE INDEX IF NOT EXISTS idx_asset_passports_identifier ON asset_passports(asset_identifier);
+      CREATE INDEX IF NOT EXISTS idx_asset_passport_events_passport ON asset_passport_events(passport_id);
 
       CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
       CREATE INDEX IF NOT EXISTS idx_certifications_hash ON certifications(hash);
