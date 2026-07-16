@@ -50,6 +50,39 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 
 
 dotenv.config();
 
+/* ---------------- EMAIL HELPER ---------------- */
+async function sendAnchorConfirmationEmail({ to, proofId, txHash, fileName, verifyUrl }) {
+  if (!to || !process.env.RESEND_API_KEY) return;
+  try {
+    const { Resend } = await import('resend');
+    const resend = new Resend(process.env.RESEND_API_KEY);
+    const label = fileName ? `<b>${fileName}</b>` : `Proof ID <b>${proofId}</b>`;
+    await resend.emails.send({
+      from: 'ProofDeed <info@proofdeed.com>',
+      to,
+      subject: `Your document is now on-chain — ${proofId}`,
+      html: `
+        <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:560px;margin:0 auto;color:#111827">
+          <div style="background:#0f172a;padding:20px 28px;border-radius:8px 8px 0 0">
+            <span style="color:#fff;font-size:18px;font-weight:700">Proof<span style="color:#60a5fa">Deed</span></span>
+          </div>
+          <div style="background:#fff;border:1px solid #e5e7eb;border-top:none;padding:28px;border-radius:0 0 8px 8px">
+            <p style="font-size:16px;font-weight:600;margin:0 0 12px">Your document is blockchain-confirmed</p>
+            <p style="color:#374151;font-size:14px;margin:0 0 20px">${label} has been anchored on the Polygon blockchain and is now permanently verifiable.</p>
+            <table style="width:100%;font-size:13px;border-collapse:collapse;margin-bottom:20px">
+              <tr><td style="color:#6b7280;padding:6px 0;width:110px">Proof ID</td><td style="color:#111827;font-family:monospace">${proofId}</td></tr>
+              <tr><td style="color:#6b7280;padding:6px 0">Blockchain TX</td><td style="color:#111827;font-family:monospace;font-size:11px">${txHash}</td></tr>
+            </table>
+            <a href="${verifyUrl || `https://proofdeed.com/verify/${proofId}`}" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:11px 22px;border-radius:6px;font-size:14px;font-weight:600">View Verification Record →</a>
+            <p style="color:#9ca3af;font-size:12px;margin-top:24px">Legally defensible under FRE Rule 901. ProofDeed Trust Infrastructure Platform.</p>
+          </div>
+        </div>`,
+    });
+  } catch (err) {
+    console.error('Anchor confirmation email failed (non-fatal):', err.message);
+  }
+}
+
 /* ---------------- ENV VALIDATION ---------------- */
 const REQUIRED_ENV = [
   "DATABASE_URL",
@@ -634,6 +667,7 @@ app.post("/api/v1/certify", authenticateApiKey, async (req, res) => {
           body: JSON.stringify({ proofId, documentHash, timestamp, polygon_tx: txHash, event: "certification.created" })
         }).catch((err) => console.error("Webhook delivery failed (non-fatal):", err.message));
       }
+      sendAnchorConfirmationEmail({ to: req.apiKey.email, proofId, txHash, verifyUrl: `https://proofdeed.com/verify/${proofId}` });
     }).catch((err) => {
       console.error("Background blockchain anchor failed for", proofId, err.message);
     });
@@ -698,6 +732,7 @@ app.post("/api/v1/certify/fields", authenticateApiKey, async (req, res) => {
           body: JSON.stringify({ event: 'certification.fields.created', proofId, rootHash, fieldHashes, timestamp, polygon_tx: txHash, label })
         }).catch(() => {});
       }
+      sendAnchorConfirmationEmail({ to: req.apiKey.email, proofId, txHash, fileName: label, verifyUrl: `https://proofdeed.com/verify/${proofId}` });
     }).catch(err => console.error('Field cert blockchain anchor failed:', err.message));
 
   } catch (err) {
@@ -880,6 +915,7 @@ app.post('/api/v1/asset-passport', authenticateApiKey, async (req, res) => {
       await pool.query('UPDATE certifications SET polygon_tx=$1 WHERE certification_id=$2', [txHash, proofId]);
       await pool.query('UPDATE asset_passports SET polygon_tx=$1 WHERE passport_id=$2', [txHash, passportId]);
       await pool.query('UPDATE asset_passport_events SET polygon_tx=$1 WHERE proof_id=$2', [txHash, proofId]);
+      sendAnchorConfirmationEmail({ to: req.apiKey.email, proofId, txHash, fileName: `${asset_type} — ${asset_identifier}`, verifyUrl: `https://proofdeed.com/passport/${passportId}` });
     }).catch(err => console.error('[AssetPassport] Blockchain anchor failed:', err.message));
 
   } catch (err) {
@@ -1201,12 +1237,12 @@ app.post('/api/v1/trust-id/:id/record', authenticateApiKey, async (req, res) => 
     anchorToPolygon(rootHash).then(async (txHash) => {
       await pool.query('UPDATE certifications SET polygon_tx=$1 WHERE certification_id=$2', [txHash, proofId]);
       await pool.query('UPDATE trust_id_records SET polygon_tx=$1 WHERE proof_id=$2', [txHash, proofId]);
-      // Recompute score with on-chain count updated
       const updated = await pool.query(
         `SELECT COUNT(*) as total, COUNT(polygon_tx) as onchain FROM trust_id_records WHERE trust_id=$1`, [id]
       );
       const t = parseInt(updated.rows[0].total), oc = parseInt(updated.rows[0].onchain);
       await pool.query('UPDATE trust_ids SET trust_score=$1 WHERE trust_id=$2', [calcTrustScore(t, oc), id]);
+      sendAnchorConfirmationEmail({ to: req.apiKey.email, proofId, txHash, fileName: req.body.record_label, verifyUrl: `https://proofdeed.com/trust/${id}` });
     }).catch(err => console.error('[TrustID] Anchor failed:', err.message));
 
   } catch (err) {
@@ -2734,6 +2770,98 @@ document.getElementById('proofId').addEventListener('keydown', e => { if (e.key 
     console.error('Reseller portal error:', err.message);
     return res.status(500).send('<h2>Portal unavailable.</h2>');
   }
+});
+
+/* ============================================================
+   EMBEDDABLE VERIFICATION WIDGET
+   ============================================================ */
+
+/* GET /widget.js?key=<reseller_api_key> — Returns a self-contained JS snippet
+   Resellers paste one <script> tag on their site; widget renders inline */
+app.get('/widget.js', async (req, res) => {
+  const apiKey = req.query.key || '';
+  let brandColor = '#2563eb';
+  let companyName = 'ProofDeed';
+
+  if (apiKey) {
+    try {
+      const row = await pool.query('SELECT company_name, brand_color FROM resellers WHERE api_key=$1 AND active=true', [apiKey]);
+      if (row.rows.length) {
+        brandColor = row.rows[0].brand_color || brandColor;
+        companyName = row.rows[0].company_name || companyName;
+      }
+    } catch (err) {
+      console.error('Widget key lookup error (non-fatal):', err.message);
+    }
+  }
+
+  const origin = req.headers.origin || 'https://proofdeed.com';
+  const apiBase = 'https://proofdeed.com';
+
+  const js = `(function(){
+  if(document.getElementById('pd-widget-root'))return;
+  var color='${brandColor}';
+  var company='${companyName.replace(/'/g,"\\'")}';
+  var apiBase='${apiBase}';
+  var css=\`
+    #pd-widget-root{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:480px;margin:0 auto}
+    #pd-widget-root .pd-label{font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
+    #pd-widget-root .pd-row{display:flex;gap:8px}
+    #pd-widget-root .pd-input{flex:1;padding:10px 13px;border:1.5px solid #d1d5db;border-radius:7px;font-size:14px;outline:none;transition:border .15s}
+    #pd-widget-root .pd-input:focus{border-color:\${color}}
+    #pd-widget-root .pd-btn{background:\${color};color:#fff;border:none;padding:10px 18px;border-radius:7px;font-size:14px;font-weight:600;cursor:pointer}
+    #pd-widget-root .pd-btn:hover{opacity:.88}
+    #pd-widget-root .pd-result{margin-top:14px;display:none}
+    #pd-widget-root .pd-pass{background:#f0fdf4;border:1.5px solid #86efac;border-radius:7px;padding:14px}
+    #pd-widget-root .pd-fail{background:#fef2f2;border:1.5px solid #fca5a5;border-radius:7px;padding:14px}
+    #pd-widget-root .pd-pass-t{color:#166534;font-weight:700;margin-bottom:4px}
+    #pd-widget-root .pd-fail-t{color:#991b1b;font-weight:700;margin-bottom:4px}
+    #pd-widget-root .pd-sub{font-size:13px;color:#374151}
+    #pd-widget-root .pd-footer{font-size:11px;color:#9ca3af;margin-top:10px}
+    #pd-widget-root .pd-footer a{color:#9ca3af}
+  \`;
+  var style=document.createElement('style');
+  style.textContent=css.replace(/\\\${color}/g,color);
+  document.head.appendChild(style);
+
+  var root=document.createElement('div');
+  root.id='pd-widget-root';
+  root.innerHTML='<div class="pd-label">Verify Document</div>'
+    +'<div class="pd-row"><input class="pd-input" id="pd-input" placeholder="Enter Proof ID or hash…"><button class="pd-btn" id="pd-btn">Verify</button></div>'
+    +'<div class="pd-result" id="pd-result"></div>';
+  var target=document.currentScript?document.currentScript.parentNode:document.body;
+  target.appendChild(root);
+
+  function fmt(s){return s?new Date(s).toLocaleDateString('en-US',{dateStyle:'medium'}):'—'}
+  async function verify(){
+    var id=document.getElementById('pd-input').value.trim();
+    var res=document.getElementById('pd-result');
+    res.style.display='none';
+    if(!id)return;
+    try{
+      var r=await fetch(apiBase+'/api/verify/'+encodeURIComponent(id));
+      var data=await r.json();
+      if(r.status===404||data.error){
+        res.innerHTML='<div class="pd-fail"><div class="pd-fail-t">Not Found</div><div class="pd-sub">No record found for that ID.</div></div>'
+          +'<div class="pd-footer">Powered by <a href="https://proofdeed.com" target="_blank">ProofDeed</a></div>';
+      } else {
+        res.innerHTML='<div class="pd-pass"><div class="pd-pass-t">✓ Verified — Authentic</div>'
+          +'<div class="pd-sub">Certified '+fmt(data.certified_at)+(data.polygon_tx?' · On-chain confirmed':'· Anchoring in progress')+'</div></div>'
+          +'<div class="pd-footer">Powered by <a href="https://proofdeed.com" target="_blank">ProofDeed</a></div>';
+      }
+      res.style.display='block';
+    }catch(e){
+      res.innerHTML='<div class="pd-fail"><div class="pd-fail-t">Error</div><div class="pd-sub">Verification unavailable. Try again.</div></div>';
+      res.style.display='block';
+    }
+  }
+  document.getElementById('pd-btn').addEventListener('click',verify);
+  document.getElementById('pd-input').addEventListener('keydown',function(e){if(e.key==='Enter')verify();});
+})();`;
+
+  res.set('Content-Type', 'application/javascript');
+  res.set('Cache-Control', 'public, max-age=3600');
+  res.send(js);
 });
 
 /* ---------------- CONTACT / AFFILIATE FORM ---------------- */
