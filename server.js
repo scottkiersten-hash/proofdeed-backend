@@ -1094,6 +1094,261 @@ app.get('/passport/:id', async (req, res) => {
   }
 });
 
+/* ============================================================
+   TRUST IDs™ — Persistent entity identity with accumulated Trust Records
+   ============================================================ */
+
+function generateTrustId(entityType) {
+  const slug = (entityType || 'entity').toUpperCase().slice(0, 3);
+  const rand = crypto.randomBytes(5).toString('hex').toUpperCase();
+  return `TID-${slug}-${rand}`;
+}
+
+// Score increases with each verified record: base 10 per record, bonus for on-chain
+function calcTrustScore(recordCount, onChainCount) {
+  return Math.min(100, recordCount * 8 + onChainCount * 4);
+}
+
+/* POST /api/v1/trust-id — Create a new Trust ID™ for an entity */
+app.post('/api/v1/trust-id', authenticateApiKey, async (req, res) => {
+  try {
+    const { entity_type, entity_name, entity_email, entity_org, metadata } = req.body;
+    if (!entity_type || !entity_name) {
+      return res.status(400).json({ error: 'entity_type and entity_name are required.' });
+    }
+
+    // Prevent duplicate Trust IDs for same email
+    if (entity_email) {
+      const existing = await pool.query('SELECT trust_id FROM trust_ids WHERE entity_email=$1', [entity_email.toLowerCase()]);
+      if (existing.rows[0]) {
+        return res.status(409).json({ error: 'A Trust ID already exists for this email.', trust_id: existing.rows[0].trust_id,
+          publicUrl: `https://proofdeed.com/trust/${existing.rows[0].trust_id}` });
+      }
+    }
+
+    const trustId = generateTrustId(entity_type);
+    await pool.query(
+      `INSERT INTO trust_ids (trust_id, entity_type, entity_name, entity_email, entity_org, metadata, api_key_email, created_at, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,NOW(),NOW())`,
+      [trustId, entity_type, entity_name, entity_email?.toLowerCase() || null, entity_org || null,
+       JSON.stringify(metadata || {}), req.apiKey.email]
+    );
+
+    await pool.query('UPDATE api_keys SET used_this_month = used_this_month + 1 WHERE api_key = $1', [req.apiKey.api_key]);
+
+    res.status(201).json({
+      trust_id: trustId,
+      entity_type, entity_name, entity_email: entity_email || null, entity_org: entity_org || null,
+      trust_score: 0, record_count: 0,
+      publicUrl: `https://proofdeed.com/trust/${trustId}`,
+      message: `Trust ID™ created. Attach Trust Records to build this entity's verified history.`
+    });
+  } catch (err) {
+    console.error('[TrustID] Create error:', err);
+    res.status(500).json({ error: 'Internal server error.' });
+  }
+});
+
+/* POST /api/v1/trust-id/:id/record — Attach a Trust Record to a Trust ID™ */
+app.post('/api/v1/trust-id/:id/record', authenticateApiKey, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { record_type, record_label, fields, passport_id } = req.body;
+
+    if (!record_type || !fields || typeof fields !== 'object') {
+      return res.status(400).json({ error: 'record_type and fields are required.' });
+    }
+
+    const tid = await pool.query('SELECT * FROM trust_ids WHERE trust_id=$1', [id]);
+    if (!tid.rows[0]) return res.status(404).json({ error: 'Trust ID not found.' });
+
+    const proofId = 'PD-TID-' + Date.now() + '-' + crypto.randomBytes(3).toString('hex');
+    const { fieldHashes, rootHash } = hashFields(fields);
+
+    await pool.query(
+      `INSERT INTO trust_id_records (trust_id, record_type, record_label, proof_id, passport_id, root_hash, fields, field_hashes, issued_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW())`,
+      [id, record_type, record_label || record_type, proofId, passport_id || null, rootHash,
+       JSON.stringify(fields), JSON.stringify(fieldHashes)]
+    );
+
+    // Recompute score
+    const counts = await pool.query(
+      `SELECT COUNT(*) as total, COUNT(polygon_tx) as onchain FROM trust_id_records WHERE trust_id=$1`, [id]
+    );
+    const total = parseInt(counts.rows[0].total);
+    const onchain = parseInt(counts.rows[0].onchain);
+    const newScore = calcTrustScore(total, onchain);
+
+    await pool.query(
+      `UPDATE trust_ids SET record_count=$1, trust_score=$2, updated_at=NOW() WHERE trust_id=$3`,
+      [total, newScore, id]
+    );
+
+    await pool.query(
+      `INSERT INTO certifications (certification_id, hash, polygon_tx, api_key_email, ip_address, created_at)
+       VALUES ($1,$2,NULL,$3,$4,NOW()) ON CONFLICT (certification_id) DO NOTHING`,
+      [proofId, rootHash, req.apiKey.email, req.ip || req.headers['x-forwarded-for'] || null]
+    );
+    await pool.query('UPDATE api_keys SET used_this_month = used_this_month + 1 WHERE api_key = $1', [req.apiKey.api_key]);
+    if (req.apiKey.stripe_subscription_item_id) await reportUsageToStripe(req.apiKey.stripe_subscription_item_id, 1);
+
+    res.json({ trust_id: id, proofId, rootHash, record_type, record_label: record_label || record_type,
+      trust_score: newScore, record_count: total,
+      publicUrl: `https://proofdeed.com/trust/${id}`,
+      message: 'Trust Record attached and anchored to blockchain.' });
+
+    anchorToPolygon(rootHash).then(async (txHash) => {
+      await pool.query('UPDATE certifications SET polygon_tx=$1 WHERE certification_id=$2', [txHash, proofId]);
+      await pool.query('UPDATE trust_id_records SET polygon_tx=$1 WHERE proof_id=$2', [txHash, proofId]);
+      // Recompute score with on-chain count updated
+      const updated = await pool.query(
+        `SELECT COUNT(*) as total, COUNT(polygon_tx) as onchain FROM trust_id_records WHERE trust_id=$1`, [id]
+      );
+      const t = parseInt(updated.rows[0].total), oc = parseInt(updated.rows[0].onchain);
+      await pool.query('UPDATE trust_ids SET trust_score=$1 WHERE trust_id=$2', [calcTrustScore(t, oc), id]);
+    }).catch(err => console.error('[TrustID] Anchor failed:', err.message));
+
+  } catch (err) {
+    console.error('[TrustID] Record error:', err);
+    res.status(500).json({ error: 'Internal server error.' });
+  }
+});
+
+/* GET /api/v1/trust-id/:id — Retrieve Trust ID™ + all records (API) */
+app.get('/api/v1/trust-id/:id', authenticateApiKey, async (req, res) => {
+  try {
+    const tid = await pool.query('SELECT * FROM trust_ids WHERE trust_id=$1', [req.params.id]);
+    if (!tid.rows[0]) return res.status(404).json({ error: 'Trust ID not found.' });
+    const records = await pool.query(
+      'SELECT * FROM trust_id_records WHERE trust_id=$1 ORDER BY issued_at ASC', [req.params.id]
+    );
+    res.json({ ...tid.rows[0], records: records.rows, publicUrl: `https://proofdeed.com/trust/${req.params.id}` });
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error.' });
+  }
+});
+
+/* GET /api/v1/trust-id/lookup/:email — Look up a Trust ID by entity email */
+app.get('/api/v1/trust-id/lookup/:email', authenticateApiKey, async (req, res) => {
+  try {
+    const tid = await pool.query('SELECT * FROM trust_ids WHERE entity_email=$1', [req.params.email.toLowerCase()]);
+    if (!tid.rows[0]) return res.status(404).json({ error: 'No Trust ID found for this email.' });
+    res.json({ trust_id: tid.rows[0].trust_id, entity_name: tid.rows[0].entity_name,
+      trust_score: tid.rows[0].trust_score, record_count: tid.rows[0].record_count,
+      publicUrl: `https://proofdeed.com/trust/${tid.rows[0].trust_id}` });
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error.' });
+  }
+});
+
+/* GET /trust/:id — Public Trust ID™ verification page */
+app.get('/trust/:id', async (req, res) => {
+  try {
+    const tid = await pool.query('SELECT * FROM trust_ids WHERE trust_id=$1', [req.params.id]);
+    if (!tid.rows[0]) {
+      return res.status(404).send(`<!DOCTYPE html><html><head><title>Trust ID Not Found — ProofDeed</title></head>
+        <body style="font-family:sans-serif;text-align:center;padding:80px;color:#333">
+        <h1>Trust ID™ Not Found</h1><p>No Trust ID exists for: ${req.params.id}</p>
+        <a href="https://proofdeed.com">proofdeed.com</a></body></html>`);
+    }
+
+    const t = tid.rows[0];
+    const records = await pool.query(
+      'SELECT * FROM trust_id_records WHERE trust_id=$1 ORDER BY issued_at ASC', [req.params.id]
+    );
+
+    const scoreColor = t.trust_score >= 75 ? '#16a34a' : t.trust_score >= 40 ? '#d97706' : '#dc2626';
+    const scoreBg = t.trust_score >= 75 ? '#dcfce7' : t.trust_score >= 40 ? '#fef9c3' : '#fee2e2';
+
+    const recordsHtml = records.rows.map((r, i) => `
+      <div style="display:flex;align-items:flex-start;gap:16px;padding:16px 0;border-bottom:1px solid #f1f5f9">
+        <div style="width:36px;height:36px;border-radius:50%;background:#0176D3;color:white;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0">${i+1}</div>
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span style="font-size:14px;font-weight:700;color:#0f172a">${r.record_label || r.record_type}</span>
+            <span style="font-size:11px;background:#eff6ff;color:#1d4ed8;padding:2px 8px;border-radius:20px;font-weight:600">${r.record_type}</span>
+            ${r.polygon_tx ? `<span style="font-size:11px;background:#dcfce7;color:#16a34a;padding:2px 8px;border-radius:20px;font-weight:600">✓ On-Chain</span>` : `<span style="font-size:11px;background:#fef9c3;color:#ca8a04;padding:2px 8px;border-radius:20px;font-weight:600">Anchoring</span>`}
+          </div>
+          <div style="font-size:12px;color:#64748b;margin-top:4px">${new Date(r.issued_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</div>
+          <div style="font-size:11px;font-family:monospace;color:#94a3b8;margin-top:4px;word-break:break-all">Root Hash: ${r.root_hash}</div>
+          ${r.passport_id ? `<div style="font-size:11px;margin-top:4px"><a href="/passport/${r.passport_id}" style="color:#0176D3;text-decoration:none">View Asset Passport™ →</a></div>` : ''}
+        </div>
+      </div>`
+    ).join('');
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Trust ID™ — ${t.entity_name} | ProofDeed</title>
+  <meta name="description" content="Verified Trust ID™ for ${t.entity_name} — ${t.record_count} independently verified Trust Records on the blockchain.">
+</head>
+<body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+
+  <div style="background:#021d5b;padding:16px 32px;display:flex;align-items:center;justify-content:space-between">
+    <div style="color:white">
+      <span style="font-size:18px;font-weight:800;letter-spacing:-0.5px">ProofDeed</span>
+      <span style="font-size:12px;color:#93c5fd;margin-left:8px">Trust ID™</span>
+    </div>
+    <a href="https://proofdeed.com" style="color:#93c5fd;font-size:13px;text-decoration:none">proofdeed.com</a>
+  </div>
+
+  <div style="max-width:720px;margin:40px auto;padding:0 20px">
+
+    <!-- Identity card -->
+    <div style="background:white;border:1px solid #e2e8f0;border-radius:10px;padding:28px;margin-bottom:20px">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:20px">
+        <div>
+          <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px">${t.entity_type} · Trust ID™</div>
+          <div style="font-size:26px;font-weight:800;color:#0f172a;margin-bottom:4px">${t.entity_name}</div>
+          ${t.entity_org ? `<div style="font-size:14px;color:#64748b">${t.entity_org}</div>` : ''}
+          <div style="font-size:13px;font-family:monospace;color:#0176D3;margin-top:8px;font-weight:700">${t.trust_id}</div>
+          <div style="font-size:12px;color:#94a3b8;margin-top:4px">Member since ${new Date(t.created_at).toLocaleDateString('en-US',{month:'long',year:'numeric'})}</div>
+        </div>
+        <div style="text-align:center">
+          <div style="width:88px;height:88px;border-radius:50%;background:${scoreBg};border:3px solid ${scoreColor};display:flex;flex-direction:column;align-items:center;justify-content:center;margin-bottom:8px">
+            <div style="font-size:28px;font-weight:800;color:${scoreColor};line-height:1">${t.trust_score}</div>
+            <div style="font-size:9px;font-weight:700;color:${scoreColor};text-transform:uppercase;letter-spacing:0.05em">/ 100</div>
+          </div>
+          <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.05em">Trust Score</div>
+          <div style="font-size:12px;color:#64748b;margin-top:4px">${t.record_count} verified record${t.record_count !== 1 ? 's' : ''}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Verified badge -->
+    <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:14px 20px;display:flex;align-items:center;gap:12px;margin-bottom:20px">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="#1d4ed8"><path fill-rule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+      <div style="font-size:13px;color:#1d4ed8;font-weight:600">This Trust ID™ is independently verifiable. All records are anchored on the Polygon blockchain and cannot be altered.</div>
+    </div>
+
+    <!-- Trust Records -->
+    <div style="background:white;border:1px solid #e2e8f0;border-radius:10px;padding:24px;margin-bottom:20px">
+      <div style="font-size:14px;font-weight:700;color:#0f172a;margin-bottom:4px">Trust Records (${t.record_count})</div>
+      <div style="font-size:12px;color:#64748b;margin-bottom:16px">Each record is independently verified and permanently anchored to the blockchain</div>
+      ${records.rows.length > 0 ? recordsHtml : `<div style="text-align:center;padding:32px;color:#94a3b8;font-size:14px">No Trust Records yet.</div>`}
+    </div>
+
+    <div style="text-align:center;padding:24px 0">
+      <div style="font-size:12px;color:#94a3b8;margin-bottom:8px">Legally defensible under FRE Rule 901 · Anchored on Polygon blockchain · ProofDeed LLC</div>
+      <a href="https://proofdeed.com" style="font-size:12px;color:#0176D3;text-decoration:none">Create a Trust ID™ at proofdeed.com</a>
+    </div>
+
+  </div>
+</body>
+</html>`;
+
+    res.setHeader('Content-Type', 'text/html');
+    res.send(html);
+
+  } catch (err) {
+    console.error('[TrustID] Public page error:', err);
+    res.status(500).send('Server error.');
+  }
+});
+
 /* ---------------- ENTERPRISE - BATCH CERTIFY (ASYNC) ---------------- */
 
 async function processBatchBackground(batchId, certRecords, apiKey) {
@@ -2886,6 +3141,39 @@ async function ensureIndexes() {
       CREATE INDEX IF NOT EXISTS idx_asset_passports_id ON asset_passports(passport_id);
       CREATE INDEX IF NOT EXISTS idx_asset_passports_identifier ON asset_passports(asset_identifier);
       CREATE INDEX IF NOT EXISTS idx_asset_passport_events_passport ON asset_passport_events(passport_id);
+
+      CREATE TABLE IF NOT EXISTS trust_ids (
+        id              SERIAL PRIMARY KEY,
+        trust_id        TEXT UNIQUE NOT NULL,
+        entity_type     TEXT NOT NULL,
+        entity_name     TEXT NOT NULL,
+        entity_email    TEXT,
+        entity_org      TEXT,
+        metadata        JSONB NOT NULL DEFAULT '{}',
+        record_count    INT NOT NULL DEFAULT 0,
+        trust_score     INT NOT NULL DEFAULT 0,
+        api_key_email   TEXT,
+        created_at      TIMESTAMPTZ DEFAULT NOW(),
+        updated_at      TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS trust_id_records (
+        id            SERIAL PRIMARY KEY,
+        trust_id      TEXT NOT NULL REFERENCES trust_ids(trust_id) ON DELETE CASCADE,
+        record_type   TEXT NOT NULL,
+        record_label  TEXT,
+        proof_id      TEXT,
+        passport_id   TEXT,
+        root_hash     TEXT,
+        polygon_tx    TEXT,
+        fields        JSONB NOT NULL DEFAULT '{}',
+        field_hashes  JSONB NOT NULL DEFAULT '{}',
+        issued_at     TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_trust_ids_id ON trust_ids(trust_id);
+      CREATE INDEX IF NOT EXISTS idx_trust_ids_email ON trust_ids(entity_email);
+      CREATE INDEX IF NOT EXISTS idx_trust_id_records_trust_id ON trust_id_records(trust_id);
 
       CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
       CREATE INDEX IF NOT EXISTS idx_certifications_hash ON certifications(hash);
