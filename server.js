@@ -3402,6 +3402,20 @@ app.get('/ref/:code', async (req, res) => {
 });
 
 /* ---------------- ADMIN DASHBOARD ---------------- */
+/* ---------------- ADMIN DELETE TEST USER ---------------- */
+app.delete(["/admin/delete-test-user", "/api/admin/delete-test-user"], async (req, res) => {
+  try {
+    if (!verifyAdminAuth(req)) return res.status(401).json({ error: "Unauthorized." });
+    await pool.query("DELETE FROM api_keys WHERE email = 'healthcheck-test@proofdeed.com'");
+    await pool.query("DELETE FROM users WHERE email = 'healthcheck-test@proofdeed.com'");
+    await pool.query("DELETE FROM magic_links WHERE email = 'healthcheck-test@proofdeed.com'");
+    res.json({ success: true, message: "Test user deleted." });
+  } catch (err) {
+    console.error("/api/admin/delete-test-user error:", err);
+    res.status(500).json({ error: "Server error." });
+  }
+});
+
 /* ---------------- ADMIN IMPERSONATE ---------------- */
 app.post(["/admin/impersonate", "/api/admin/impersonate"], authRateLimit, async (req, res) => {
   try {
