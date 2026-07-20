@@ -52,19 +52,20 @@ dotenv.config();
 
 /* ---------------- EMAIL HELPER (Resend — single source of truth for all transactional email) ---------------- */
 async function sendEmail({ to, from, subject, text, html }) {
-  if (!to || !process.env.RESEND_API_KEY) return;
-  try {
-    const { Resend } = await import('resend');
-    const resend = new Resend(process.env.RESEND_API_KEY);
-    await resend.emails.send({
-      from: from || 'ProofDeed <info@proofdeed.com>',
-      to,
-      subject,
-      ...(html ? { html } : { text: text || '' }),
-    });
-  } catch (err) {
-    console.error('sendEmail failed (non-fatal):', subject, err.message);
+  if (!to || !process.env.RESEND_API_KEY) throw new Error('RESEND_API_KEY missing');
+  const { Resend } = await import('resend');
+  const resend = new Resend(process.env.RESEND_API_KEY);
+  const result = await resend.emails.send({
+    from: from || 'ProofDeed <info@proofdeed.com>',
+    to,
+    subject,
+    ...(html ? { html } : { text: text || '' }),
+  });
+  if (result.error) {
+    console.error('sendEmail Resend error:', subject, result.error);
+    throw new Error(result.error.message || 'Resend rejected the email');
   }
+  return result;
 }
 
 async function sendAnchorConfirmationEmail({ to, proofId, txHash, fileName, verifyUrl }) {
@@ -404,14 +405,18 @@ app.post(["/auth/magic-link", "/api/auth/magic-link"], authRateLimit, async (req
     );
 
     const magicLink = "https://proofdeed.com/auth/verify?token=" + token;
-    await sendEmail({
-      to: email,
-      subject: "Your ProofDeed Sign-In Link",
-      text: "Click the link below to sign in to ProofDeed.\n\nThis link expires in 15 minutes.\n\n" + magicLink + "\n\nIf you did not request this, please ignore this email.\n\nProofDeed\nhttps://proofdeed.com"
-    });
-
-    console.log("Magic link sent to " + email);
-    res.json({ success: true });
+    try {
+      await sendEmail({
+        to: email,
+        subject: "Your ProofDeed Sign-In Link",
+        text: "Click the link below to sign in to ProofDeed.\n\nThis link expires in 15 minutes.\n\n" + magicLink + "\n\nIf you did not request this, please ignore this email.\n\nProofDeed\nhttps://proofdeed.com"
+      });
+      console.log("Magic link sent to " + email);
+      res.json({ success: true });
+    } catch (emailErr) {
+      console.error("Magic link email FAILED for " + email + ":", emailErr.message);
+      res.status(500).json({ error: "Failed to send sign-in email. Please try again or contact support@proofdeed.com." });
+    }
 
   } catch (error) {
     console.error("Magic link error:", error);
@@ -3413,6 +3418,20 @@ app.delete(["/admin/delete-test-user", "/api/admin/delete-test-user"], async (re
   } catch (err) {
     console.error("/api/admin/delete-test-user error:", err);
     res.status(500).json({ error: "Server error." });
+  }
+});
+
+/* ---------------- ADMIN TEST EMAIL ---------------- */
+app.post(["/admin/test-email", "/api/admin/test-email"], async (req, res) => {
+  try {
+    if (!verifyAdminAuth(req)) return res.status(401).json({ error: "Unauthorized." });
+    const { to } = req.body;
+    if (!to) return res.status(400).json({ error: "to required." });
+    await sendEmail({ to, subject: "ProofDeed Email Test", text: "This is a test email from ProofDeed. If you received this, email delivery is working." });
+    res.json({ success: true, message: "Email sent to " + to });
+  } catch (err) {
+    console.error("Test email failed:", err.message);
+    res.status(500).json({ error: err.message });
   }
 });
 
