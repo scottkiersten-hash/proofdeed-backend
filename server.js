@@ -3354,6 +3354,31 @@ app.get('/ref/:code', async (req, res) => {
 });
 
 /* ---------------- ADMIN DASHBOARD ---------------- */
+/* ---------------- ADMIN IMPERSONATE ---------------- */
+app.post(["/admin/impersonate", "/api/admin/impersonate"], authRateLimit, async (req, res) => {
+  try {
+    if (!verifyAdminAuth(req)) return res.status(401).json({ error: "Unauthorized." });
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: "Email required." });
+
+    const userCheck = await pool.query("SELECT email FROM users WHERE email = $1", [email]);
+    if (userCheck.rows.length === 0) return res.status(404).json({ error: "No user found with that email." });
+
+    const token = crypto.randomBytes(32).toString("hex");
+    const expires = new Date(Date.now() + 15 * 60 * 1000); // 15 min
+    await pool.query(
+      "INSERT INTO magic_links (email, token, expires_at) VALUES ($1, $2, $3)",
+      [email, token, expires]
+    );
+
+    const loginUrl = `https://proofdeed.com/auth/verify?token=${token}`;
+    res.json({ success: true, email, login_url: loginUrl, expires_in: "15 minutes" });
+  } catch (err) {
+    console.error("/api/admin/impersonate error:", err);
+    res.status(500).json({ error: "Server error." });
+  }
+});
+
 app.get(["/admin/stats", "/api/admin/stats"], authRateLimit, async (req, res) => {
   try {
     if (!verifyAdminAuth(req)) return res.status(401).json({ error: "Unauthorized." });
