@@ -9547,17 +9547,21 @@ async function runHealthChecks() {
     checks.push({ name: 'CRM (outreach_contacts)', ok: false, error: e.message });
   }
 
-  // 11. Lead engine — check last run was recent (within 48h)
+  // 11. Lead engine — check last run was on last business day (Mon-Fri only)
   try {
     const leRow = await pool.query(`SELECT MAX(created_at) AS last_run FROM outreach_contacts WHERE created_at > NOW() - INTERVAL '7 days'`);
     const lastRun = leRow.rows[0].last_run;
     const hoursSince = lastRun ? (Date.now() - new Date(lastRun).getTime()) / 3600000 : null;
+    // Allow up to 72h on weekends (engine only runs Mon-Fri CT)
+    const nowDay = new Date().toLocaleDateString('en-US', { timeZone: 'America/Chicago', weekday: 'long' });
+    const isWeekend = nowDay === 'Saturday' || nowDay === 'Sunday';
+    const staleThreshold = isWeekend ? 96 : 48;
     if (!lastRun) {
       checks.push({ name: 'Lead Engine', ok: false, error: 'No new contacts added in last 7 days — lead engine may be stopped' });
-    } else if (hoursSince > 48) {
+    } else if (hoursSince > staleThreshold) {
       checks.push({ name: 'Lead Engine', ok: false, error: `Last contact added ${hoursSince.toFixed(0)}h ago — engine may be stalled` });
     } else {
-      checks.push({ name: 'Lead Engine', ok: true, error: null, info: `Last run ${hoursSince.toFixed(0)}h ago` });
+      checks.push({ name: 'Lead Engine', ok: true, error: null, info: `Last run ${hoursSince.toFixed(0)}h ago${isWeekend ? ' (weekend — runs Mon–Fri)' : ''}` });
     }
   } catch (e) {
     checks.push({ name: 'Lead Engine', ok: false, error: e.message });
