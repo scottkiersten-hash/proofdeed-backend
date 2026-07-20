@@ -9656,6 +9656,21 @@ app.get(['/api/admin/health-check', '/admin/health-check'], authRateLimit, async
   res.json({ allOk, checks, timestamp: new Date().toISOString() });
 });
 
+// Clear alert streak for a named check — stops emails immediately
+app.post('/api/admin/clear-alert', authRateLimit, async (req, res) => {
+  if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
+  const { name } = req.body;
+  if (name) {
+    delete failureStreak[name];
+    delete lastAlertSent[name];
+    res.json({ cleared: name });
+  } else {
+    // Clear all streaks
+    Object.keys(failureStreak).forEach(k => { delete failureStreak[k]; delete lastAlertSent[k]; });
+    res.json({ cleared: 'all' });
+  }
+});
+
 /* ---------------- One-Time Article Pitch Sender ---------------- */
 app.post(['/api/admin/send-articles', '/admin/send-articles'], authRateLimit, async (req, res) => {
   if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
