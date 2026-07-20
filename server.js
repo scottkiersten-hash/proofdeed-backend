@@ -111,6 +111,7 @@ const REQUIRED_ENV = [
   "PRICE_PRO_MONTHLY",
   "PRICE_PRO_YEARLY",
   "PRICE_ENTERPRISE",
+  "PRICE_ENTERPRISE_MONTHLY",
   "POLYGON_RPC_URL",
   "POLYGON_PRIVATE_KEY",
   "ADMIN_SECRET",
@@ -168,16 +169,6 @@ app.get("/health", async (req, res) => {
   }
 });
 
-app.get("/health/auth", async (req, res) => {
-  try {
-    await pool.query("SELECT COUNT(*) FROM magic_links WHERE expires_at > NOW()");
-    const testToken = jwt.sign({ health: true }, process.env.JWT_SECRET, { expiresIn: "1m" });
-    jwt.verify(testToken, process.env.JWT_SECRET);
-    res.json({ status: "ok", auth: "healthy" });
-  } catch (e) {
-    res.status(500).json({ status: "error", error: e.message });
-  }
-});
 
 const PORT = process.env.PORT || 8080;
 
@@ -9208,8 +9199,23 @@ cron.schedule('0 8 * * 1-5', async () => {
 /* ---------------- System Health Monitor ---------------- */
 const ADMIN_ALERT_EMAIL = process.env.MAIL_TO || 'sjjk@pm.me';
 let lastAlertSent = {};
-let failureStreak = {};  // tracks consecutive failure count per service
 const ALERT_AFTER_FAILURES = 3; // must fail 3 checks in a row (~45 min) before alerting
+
+// failureStreak persisted in DB so deploys don't reset the counter
+let failureStreak = {};
+(async () => {
+  try {
+    await pool.query(`CREATE TABLE IF NOT EXISTS health_streak (name TEXT PRIMARY KEY, streak INT NOT NULL DEFAULT 0, last_alert_sent BIGINT DEFAULT 0)`);
+    const rows = await pool.query(`SELECT name, streak, last_alert_sent FROM health_streak`);
+    for (const r of rows.rows) {
+      if (r.streak > 0) failureStreak[r.name] = r.streak;
+      if (r.last_alert_sent > 0) lastAlertSent[r.name] = parseInt(r.last_alert_sent);
+    }
+    console.log('[HealthMonitor] Streak state restored from DB');
+  } catch (e) {
+    console.warn('[HealthMonitor] Could not restore streak state:', e.message);
+  }
+})();
 
 async function sendAlertEmail(subject, body) {
   if (!process.env.RESEND_API_KEY) {
@@ -9416,6 +9422,7 @@ async function runHealthChecks() {
   // Increment streak for failing services, reset for healthy ones
   for (const f of failures) {
     failureStreak[f.name] = (failureStreak[f.name] || 0) + 1;
+    pool.query(`INSERT INTO health_streak (name, streak) VALUES ($1,$2) ON CONFLICT (name) DO UPDATE SET streak=$2`, [f.name, failureStreak[f.name]]).catch(() => {});
     console.warn(`[HealthMonitor] ${f.name} failure streak: ${failureStreak[f.name]}/${ALERT_AFTER_FAILURES}`);
   }
   for (const c of checks.filter(c => c.ok)) {
@@ -9424,6 +9431,7 @@ async function runHealthChecks() {
       console.log(`[HealthMonitor] ${c.name} recovered after ${failureStreak[c.name]} check(s).`);
       delete failureStreak[c.name];
       delete lastAlertSent[c.name];
+      pool.query(`DELETE FROM health_streak WHERE name=$1`, [c.name]).catch(() => {});
     }
   }
 
@@ -9434,6 +9442,7 @@ async function runHealthChecks() {
       // Re-alert every 2 hours if still down (not every check)
       if (now - lastSent > 2 * 60 * 60 * 1000) {
         lastAlertSent[f.name] = now;
+        pool.query(`INSERT INTO health_streak (name, streak, last_alert_sent) VALUES ($1,$2,$3) ON CONFLICT (name) DO UPDATE SET last_alert_sent=$3`, [f.name, failureStreak[f.name], now]).catch(() => {});
         await sendAlertEmail(
           `🚨 ProofDeed Alert: ${f.name} has been DOWN for ~${failureStreak[f.name] * 15} minutes`,
           `ProofDeed system alert — ${new Date().toLocaleString()}\n\n${f.name} has failed ${failureStreak[f.name]} consecutive health checks (~${failureStreak[f.name] * 15} minutes of downtime).\n\nError: ${f.error}\n\nCheck DigitalOcean logs immediately:\nhttps://cloud.digitalocean.com\n\nYou will be notified again in 2 hours if still down, or immediately when it recovers.`
