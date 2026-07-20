@@ -9585,16 +9585,8 @@ async function runHealthChecks() {
   }
   for (const c of checks.filter(c => c.ok)) {
     if (failureStreak[c.name]) {
-      // Recovered — send recovery email if we had previously alerted
-      if (lastAlertSent[c.name]) {
-        await sendAlertEmail(
-          `✅ ProofDeed Recovery: ${c.name} is back online`,
-          `ProofDeed system alert — ${new Date().toLocaleString()}\n\n${c.name} has recovered and is responding normally.\n\nDowntime streak: ${failureStreak[c.name]} checks (~${failureStreak[c.name] * 15} minutes)\n\nNo action needed.`
-        ).catch(() => {});
-        console.log(`[HealthMonitor] ${c.name} recovered — recovery email sent.`);
-      } else {
-        console.log(`[HealthMonitor] ${c.name} recovered after ${failureStreak[c.name]} check(s) — no alert was sent (blip).`);
-      }
+      // Recovered — log only, no email
+      console.log(`[HealthMonitor] ${c.name} recovered after ${failureStreak[c.name]} check(s).`);
       delete failureStreak[c.name];
       delete lastAlertSent[c.name];
     }
@@ -9622,28 +9614,34 @@ async function runHealthChecks() {
 // Health monitor — checks every 15 minutes
 cron.schedule('*/15 * * * *', () => runHealthChecks());
 
-// Daily summary at 8am PT
+// Daily summary at 8am Bangkok — only email if there are failures
 cron.schedule('0 8 * * *', async () => {
   const checks = await runHealthChecks();
   const allOk = checks.every(c => c.ok);
-  const lines = checks.map(c => `${c.ok ? '✅' : '❌'} ${c.name}${c.error ? ': ' + c.error : ''}`).join('\n');
-  await sendAlertEmail(
-    allOk ? '✅ ProofDeed Daily Health Check — All Systems OK' : '⚠️ ProofDeed Daily Health Check — Issues Detected',
-    `ProofDeed Daily System Report — ${new Date().toLocaleDateString()}\n\n${lines}\n\nAdmin: https://proofdeed.com/admin`
-  ).catch(() => {});
-  console.log(`[HealthMonitor] Daily summary sent. All OK: ${allOk}`);
+  if (!allOk) {
+    const lines = checks.map(c => `${c.ok ? '✅' : '❌'} ${c.name}${c.error ? ': ' + c.error : ''}`).join('\n');
+    await sendAlertEmail(
+      '⚠️ ProofDeed Daily Health Check — Issues Detected',
+      `ProofDeed Daily System Report — ${new Date().toLocaleDateString()}\n\n${lines}\n\nAdmin: https://proofdeed.com/admin`
+    ).catch(() => {});
+    console.log(`[HealthMonitor] Daily summary sent — issues detected.`);
+  } else {
+    console.log(`[HealthMonitor] Daily check passed — all systems OK, no email sent.`);
+  }
 }, { timezone: 'Asia/Bangkok' });
 
-// Startup health check — fires 30s after deploy so every new deploy emails a report
+// Startup health check — fires 30s after deploy, only emails if issues found
 setTimeout(async () => {
   try {
     const checks = await runHealthChecks();
     const allOk = checks.every(c => c.ok);
-    const lines = checks.map(c => `${c.ok ? '✅' : '❌'} ${c.name}${c.error ? ': ' + c.error : ''}`).join('\n');
-    await sendAlertEmail(
-      allOk ? '✅ ProofDeed Deploy Check — All Systems OK' : '⚠️ ProofDeed Deploy Check — Issues Detected',
-      `ProofDeed System Report (post-deploy) — ${new Date().toLocaleDateString()}\n\n${lines}\n\nAdmin: https://proofdeed.com/admin`
-    ).catch(() => {});
+    if (!allOk) {
+      const lines = checks.map(c => `${c.ok ? '✅' : '❌'} ${c.name}${c.error ? ': ' + c.error : ''}`).join('\n');
+      await sendAlertEmail(
+        '⚠️ ProofDeed Deploy Check — Issues Detected',
+        `ProofDeed System Report (post-deploy) — ${new Date().toLocaleDateString()}\n\n${lines}\n\nAdmin: https://proofdeed.com/admin`
+      ).catch(() => {});
+    }
     console.log(`[HealthMonitor] Startup check complete. All OK: ${allOk}`);
   } catch (e) {
     console.error('[HealthMonitor] Startup check failed:', e.message);
