@@ -9394,8 +9394,8 @@ async function runHealthChecks() {
     const lastRun = leRow.rows[0].last_run;
     const hoursSince = lastRun ? (Date.now() - new Date(lastRun).getTime()) / 3600000 : null;
     // Allow up to 72h on weekends (engine only runs Mon-Fri CT)
-    const nowDay = new Date().toLocaleDateString('en-US', { timeZone: 'America/Chicago', weekday: 'long' });
-    const isWeekend = nowDay === 'Saturday' || nowDay === 'Sunday';
+    const ctDay = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', weekday: 'long' }).format(new Date());
+    const isWeekend = ctDay === 'Saturday' || ctDay === 'Sunday';
     const staleThreshold = isWeekend ? 96 : 48;
     if (!lastRun) {
       checks.push({ name: 'Lead Engine', ok: false, error: 'No new contacts added in last 7 days — lead engine may be stopped' });
@@ -9501,7 +9501,7 @@ app.get(['/api/admin/health-check', '/admin/health-check'], authRateLimit, async
 });
 
 // Clear alert streak for a named check — stops emails immediately
-app.post('/api/admin/clear-alert', authRateLimit, async (req, res) => {
+app.post(['/api/admin/clear-alert', '/admin/clear-alert'], authRateLimit, async (req, res) => {
   if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
   const { name } = req.body;
   if (name) {
