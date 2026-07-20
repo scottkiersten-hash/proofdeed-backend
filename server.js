@@ -4072,9 +4072,9 @@ cron.schedule("0 0 1 * *", async () => {
   }
 });
 
-/* ---------------- DAILY SYSTEM HEALTH CHECK ---------------- */
-// Runs daily at 13:00 UTC (8am CT) — checks DB, auth, Stripe, Resend; emails alert on failure
-cron.schedule("0 13 * * *", async () => {
+/* ---------------- DAILY SYSTEM HEALTH CHECK (REMOVED — superseded by runHealthChecks) ---------------- */
+// Disabled — replaced by the runHealthChecks() system below which covers all checks
+if (false) cron.schedule("0 13 * * *", async () => {
   const checks = [];
   let failed = false;
 
