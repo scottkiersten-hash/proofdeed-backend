@@ -501,6 +501,46 @@ app.get(["/user/certifications", "/api/user/certifications"], authenticateToken,
   }
 });
 
+/* ---------------- USER PROFILE (dashboard) ---------------- */
+app.get(["/api/user/profile"], authenticateToken, async (req, res) => {
+  try {
+    const { email } = req.user;
+    const userResult = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
+    const user = userResult.rows[0];
+    const userId = user?.id || 0;
+
+    const [certs, certCount, apiKeyRow, trustIds, passports, analyses] = await Promise.all([
+      pool.query("SELECT certification_id, hash, polygon_tx, created_at FROM certifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 20", [userId]),
+      pool.query("SELECT COUNT(*) FROM certifications WHERE user_id = $1 AND created_at > date_trunc('month', NOW())", [userId]),
+      pool.query("SELECT api_key, plan, monthly_limit, used_this_month, active FROM api_keys WHERE email = $1", [email]),
+      pool.query("SELECT trust_id, entity_name, entity_type, created_at FROM trust_ids WHERE email = $1 ORDER BY created_at DESC LIMIT 10", [email]).catch(() => ({ rows: [] })),
+      pool.query("SELECT passport_id, asset_type, make, model, serial_number, created_at FROM asset_passports WHERE owner_email = $1 ORDER BY created_at DESC LIMIT 10", [email]).catch(() => ({ rows: [] })),
+      pool.query("SELECT analysis_id, risk_level, confidence, summary, created_at FROM trust_analyses WHERE created_at > NOW() - INTERVAL '30 days' ORDER BY created_at DESC LIMIT 5").catch(() => ({ rows: [] })),
+    ]);
+
+    const plan = user?.subscription_id ? "pro" : "starter";
+    const used = parseInt(certCount.rows[0].count) || 0;
+    const limit = plan === "pro" ? 70 : 25;
+    const apiKey = apiKeyRow.rows[0] || null;
+
+    res.json({
+      email,
+      plan,
+      used,
+      limit,
+      certifications: certs.rows,
+      api_key: apiKey,
+      trust_ids: trustIds.rows,
+      asset_passports: passports.rows,
+      recent_analyses: analyses.rows,
+      has_subscription: !!user?.subscription_id,
+    });
+  } catch (err) {
+    console.error("/api/user/profile error:", err);
+    res.status(500).json({ error: "Server error." });
+  }
+});
+
 /* ---------------- ENTERPRISE - GENERATE API KEY ---------------- */
 app.post("/api/enterprise/generate-key", async (req, res) => {
   try {
