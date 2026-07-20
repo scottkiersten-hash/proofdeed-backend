@@ -9388,21 +9388,23 @@ async function runHealthChecks() {
     checks.push({ name: 'CRM (outreach_contacts)', ok: false, error: e.message });
   }
 
-  // 11. Lead engine — check last run was on last business day (Mon-Fri only)
+  // 11. Lead engine — only check on weekdays (engine runs Mon-Fri CT only)
   try {
-    const leRow = await pool.query(`SELECT MAX(created_at) AS last_run FROM outreach_contacts WHERE created_at > NOW() - INTERVAL '7 days'`);
-    const lastRun = leRow.rows[0].last_run;
-    const hoursSince = lastRun ? (Date.now() - new Date(lastRun).getTime()) / 3600000 : null;
-    // Allow up to 72h on weekends (engine only runs Mon-Fri CT)
     const ctDay = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', weekday: 'long' }).format(new Date());
     const isWeekend = ctDay === 'Saturday' || ctDay === 'Sunday';
-    const staleThreshold = isWeekend ? 96 : 48;
-    if (!lastRun) {
-      checks.push({ name: 'Lead Engine', ok: false, error: 'No new contacts added in last 7 days — lead engine may be stopped' });
-    } else if (hoursSince > staleThreshold) {
-      checks.push({ name: 'Lead Engine', ok: false, error: `Last contact added ${hoursSince.toFixed(0)}h ago — engine may be stalled` });
+    if (isWeekend) {
+      checks.push({ name: 'Lead Engine', ok: true, error: null, info: `Weekend — engine runs Mon–Fri only` });
     } else {
-      checks.push({ name: 'Lead Engine', ok: true, error: null, info: `Last run ${hoursSince.toFixed(0)}h ago${isWeekend ? ' (weekend — runs Mon–Fri)' : ''}` });
+      const leRow = await pool.query(`SELECT MAX(created_at) AS last_run FROM outreach_contacts WHERE created_at > NOW() - INTERVAL '7 days'`);
+      const lastRun = leRow.rows[0].last_run;
+      const hoursSince = lastRun ? (Date.now() - new Date(lastRun).getTime()) / 3600000 : null;
+      if (!lastRun) {
+        checks.push({ name: 'Lead Engine', ok: false, error: 'No new contacts added in last 7 days — lead engine may be stopped' });
+      } else if (hoursSince > 48) {
+        checks.push({ name: 'Lead Engine', ok: false, error: `Last contact added ${hoursSince.toFixed(0)}h ago — engine may be stalled` });
+      } else {
+        checks.push({ name: 'Lead Engine', ok: true, error: null, info: `Last run ${hoursSince.toFixed(0)}h ago` });
+      }
     }
   } catch (e) {
     checks.push({ name: 'Lead Engine', ok: false, error: e.message });
@@ -9474,23 +9476,16 @@ cron.schedule('0 8 * * *', async () => {
   }
 }, { timezone: 'Asia/Bangkok' });
 
-// Startup health check — fires 30s after deploy, only emails if issues found
+// Startup health check — runs silently, no email (avoids alert spam on every deploy)
 setTimeout(async () => {
   try {
     const checks = await runHealthChecks();
     const allOk = checks.every(c => c.ok);
-    if (!allOk) {
-      const lines = checks.map(c => `${c.ok ? '✅' : '❌'} ${c.name}${c.error ? ': ' + c.error : ''}`).join('\n');
-      await sendAlertEmail(
-        '⚠️ ProofDeed Deploy Check — Issues Detected',
-        `ProofDeed System Report (post-deploy) — ${new Date().toLocaleDateString()}\n\n${lines}\n\nAdmin: https://proofdeed.com/admin`
-      ).catch(() => {});
-    }
     console.log(`[HealthMonitor] Startup check complete. All OK: ${allOk}`);
   } catch (e) {
     console.error('[HealthMonitor] Startup check failed:', e.message);
   }
-}, 30000); // 30 second delay to let server fully initialize
+}, 30000);
 
 // Expose health check endpoint for manual trigger
 app.get(['/api/admin/health-check', '/admin/health-check'], authRateLimit, async (req, res) => {
