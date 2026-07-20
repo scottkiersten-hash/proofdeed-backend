@@ -493,7 +493,7 @@ app.get(["/user/certifications", "/api/user/certifications"], authenticateToken,
 });
 
 /* ---------------- USER PROFILE (dashboard) ---------------- */
-app.get(["/api/user/profile"], authenticateToken, async (req, res) => {
+app.get(["/api/user/profile", "/user/profile"], authenticateToken, async (req, res) => {
   try {
     const { email } = req.user;
     const userResult = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
