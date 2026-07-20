@@ -372,15 +372,6 @@ app.get("/api/health/auth", async (req, res) => {
 });
 
 /* ---------------- Test Certification ---------------- */
-app.get("/api/test-cert", async (req, res) => {
-  try {
-    const testDocument = "ProofDeed test document " + Date.now();
-    const hash = crypto.createHash("sha256").update(testDocument).digest("hex");
-    res.json({ document: testDocument, hash });
-  } catch (error) {
-    res.status(500).json({ error: "Internal server error." });
-  }
-});
 
 /* ---------------- MAGIC LINK - SEND ---------------- */
 app.post(["/auth/magic-link", "/api/auth/magic-link"], authRateLimit, async (req, res) => {
@@ -553,10 +544,7 @@ app.get(["/api/user/profile"], authenticateToken, async (req, res) => {
 /* ---------------- ENTERPRISE - GENERATE API KEY ---------------- */
 app.post("/api/enterprise/generate-key", async (req, res) => {
   try {
-    const adminSecret = req.headers["x-admin-secret"];
-    if (adminSecret !== process.env.ADMIN_SECRET) {
-      return res.status(401).json({ error: "Unauthorized." });
-    }
+    if (!verifyAdminAuth(req)) return res.status(401).json({ error: "Unauthorized." });
 
     const { email, monthly_limit, custom_price_per_cert, organization_name, contract_notes } = req.body;
     if (!email) return res.status(400).json({ error: "Email required." });
@@ -726,10 +714,11 @@ app.post("/api/v1/certify/fields", authenticateApiKey, async (req, res) => {
       [proofId, rootHash, req.apiKey.email, req.ip || req.headers['x-forwarded-for'] || null]
     );
 
-    await pool.query(
-      'UPDATE api_keys SET used_this_month = used_this_month + 1 WHERE api_key = $1',
+    const updatedFieldKey = await pool.query(
+      'UPDATE api_keys SET used_this_month = used_this_month + 1 WHERE api_key = $1 RETURNING *',
       [req.apiKey.api_key]
     );
+    checkAndNotifyUsage(updatedFieldKey.rows[0]).catch(() => {});
 
     if (req.apiKey.stripe_subscription_item_id) {
       await reportUsageToStripe(req.apiKey.stripe_subscription_item_id, 1);
@@ -828,10 +817,11 @@ app.post("/api/v1/webhooks/dms", authenticateApiKey, async (req, res) => {
        VALUES ($1, $2, NULL, $3, $4, NOW()) ON CONFLICT (certification_id) DO NOTHING`,
       [proofId, rootHash, req.apiKey.email, req.ip || req.headers['x-forwarded-for'] || null]
     );
-    await pool.query(
-      'UPDATE api_keys SET used_this_month = used_this_month + 1 WHERE api_key = $1',
+    const updatedDmsKey = await pool.query(
+      'UPDATE api_keys SET used_this_month = used_this_month + 1 WHERE api_key = $1 RETURNING *',
       [req.apiKey.api_key]
     );
+    checkAndNotifyUsage(updatedDmsKey.rows[0]).catch(() => {});
     if (req.apiKey.stripe_subscription_item_id) {
       await reportUsageToStripe(req.apiKey.stripe_subscription_item_id, 1);
     }
@@ -920,7 +910,8 @@ app.post('/api/v1/asset-passport', authenticateApiKey, async (req, res) => {
        VALUES ($1,$2,NULL,$3,$4,NOW()) ON CONFLICT (certification_id) DO NOTHING`,
       [proofId, rootHash, req.apiKey.email, req.ip || req.headers['x-forwarded-for'] || null]
     );
-    await pool.query('UPDATE api_keys SET used_this_month = used_this_month + 1 WHERE api_key = $1', [req.apiKey.api_key]);
+    const updatedKeyUsage = await pool.query('UPDATE api_keys SET used_this_month = used_this_month + 1 WHERE api_key = $1 RETURNING *', [req.apiKey.api_key]);
+    checkAndNotifyUsage(updatedKeyUsage.rows[0]).catch(() => {});
     if (req.apiKey.stripe_subscription_item_id) await reportUsageToStripe(req.apiKey.stripe_subscription_item_id, 1);
 
     const publicUrl = `https://proofdeed.com/passport/${passportId}`;
@@ -972,7 +963,8 @@ app.post('/api/v1/asset-passport/:id/event', authenticateApiKey, async (req, res
        VALUES ($1,$2,NULL,$3,$4,NOW()) ON CONFLICT (certification_id) DO NOTHING`,
       [proofId, rootHash, req.apiKey.email, req.ip || req.headers['x-forwarded-for'] || null]
     );
-    await pool.query('UPDATE api_keys SET used_this_month = used_this_month + 1 WHERE api_key = $1', [req.apiKey.api_key]);
+    const updatedKeyUsage = await pool.query('UPDATE api_keys SET used_this_month = used_this_month + 1 WHERE api_key = $1 RETURNING *', [req.apiKey.api_key]);
+    checkAndNotifyUsage(updatedKeyUsage.rows[0]).catch(() => {});
     if (req.apiKey.stripe_subscription_item_id) await reportUsageToStripe(req.apiKey.stripe_subscription_item_id, 1);
 
     res.json({ passportId: id, proofId, timestamp, event_type, event_label: event_label || event_type,
@@ -1188,7 +1180,8 @@ app.post('/api/v1/trust-id', authenticateApiKey, async (req, res) => {
        JSON.stringify(metadata || {}), req.apiKey.email]
     );
 
-    await pool.query('UPDATE api_keys SET used_this_month = used_this_month + 1 WHERE api_key = $1', [req.apiKey.api_key]);
+    const updatedKeyUsage = await pool.query('UPDATE api_keys SET used_this_month = used_this_month + 1 WHERE api_key = $1 RETURNING *', [req.apiKey.api_key]);
+    checkAndNotifyUsage(updatedKeyUsage.rows[0]).catch(() => {});
 
     res.status(201).json({
       trust_id: trustId,
@@ -1244,7 +1237,8 @@ app.post('/api/v1/trust-id/:id/record', authenticateApiKey, async (req, res) => 
        VALUES ($1,$2,NULL,$3,$4,NOW()) ON CONFLICT (certification_id) DO NOTHING`,
       [proofId, rootHash, req.apiKey.email, req.ip || req.headers['x-forwarded-for'] || null]
     );
-    await pool.query('UPDATE api_keys SET used_this_month = used_this_month + 1 WHERE api_key = $1', [req.apiKey.api_key]);
+    const updatedKeyUsage = await pool.query('UPDATE api_keys SET used_this_month = used_this_month + 1 WHERE api_key = $1 RETURNING *', [req.apiKey.api_key]);
+    checkAndNotifyUsage(updatedKeyUsage.rows[0]).catch(() => {});
     if (req.apiKey.stripe_subscription_item_id) await reportUsageToStripe(req.apiKey.stripe_subscription_item_id, 1);
 
     res.json({ trust_id: id, proofId, rootHash, record_type, record_label: record_label || record_type,
@@ -2516,10 +2510,7 @@ function generateResellerApiKey() {
 
 /* POST /api/v1/reseller/register — Admin only, creates a new reseller account */
 app.post('/api/v1/reseller/register', async (req, res) => {
-  const adminSecret = req.headers['x-admin-secret'];
-  if (!adminSecret || adminSecret !== process.env.ADMIN_SECRET) {
-    return res.status(401).json({ error: 'Unauthorized.' });
-  }
+  if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
   try {
     const { company_name, contact_email, slug, commission_rate, brand_color, brand_logo_url } = req.body;
     if (!company_name || !contact_email || !slug) {
@@ -5436,7 +5427,7 @@ app.get('/api/partner/:code/config', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ── Affiliate monthly payout reminder — runs daily at 8am PT, fires on payout day
+// ── Affiliate monthly payout reminder — runs daily at 8am CT, fires on payout day
 cron.schedule('0 8 * * *', async () => {
   try {
     const row = await pool.query("SELECT value FROM lead_engine_state WHERE key='affiliate_payout_day'").catch(() => ({ rows: [] }));
