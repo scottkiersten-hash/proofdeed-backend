@@ -9388,20 +9388,22 @@ async function runHealthChecks() {
     checks.push({ name: 'CRM (outreach_contacts)', ok: false, error: e.message });
   }
 
-  // 11. Lead engine — runs Mon-Fri CT only, but health check runs 7 days
-  // On weekends: pass if engine ran any time since last Monday (it ran Friday)
-  // On weekdays: fail if no new contacts in last 48h
+  // 11. Lead engine — Mon-Fri CT only. Weekends: always OK (engine is intentionally off).
+  // Weekdays: fail only if no email was sent in the last 25h (covers overnight gaps between runs).
   try {
     const ctDay = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', weekday: 'long' }).format(new Date());
     const isWeekend = ctDay === 'Saturday' || ctDay === 'Sunday';
-    const lookback = isWeekend ? '7 days' : '2 days';
-    const leRow = await pool.query(`SELECT MAX(created_at) AS last_run FROM outreach_contacts WHERE created_at > NOW() - INTERVAL '${lookback}'`);
-    const lastRun = leRow.rows[0].last_run;
-    const hoursSince = lastRun ? (Date.now() - new Date(lastRun).getTime()) / 3600000 : null;
-    if (!lastRun) {
-      checks.push({ name: 'Lead Engine', ok: false, error: `No contacts added in last ${lookback} — engine may be stopped` });
+    if (isWeekend) {
+      checks.push({ name: 'Lead Engine', ok: true, error: null, info: 'Engine paused weekends — skipping check' });
     } else {
-      checks.push({ name: 'Lead Engine', ok: true, error: null, info: `Last ran ${hoursSince.toFixed(0)}h ago${isWeekend ? ' (engine paused weekends)' : ''}` });
+      const leRow = await pool.query(`SELECT MAX(last_contact_at) AS last_sent FROM outreach_contacts WHERE last_contact_at > NOW() - INTERVAL '25 hours'`);
+      const lastSent = leRow.rows[0].last_sent;
+      const hoursSince = lastSent ? (Date.now() - new Date(lastSent).getTime()) / 3600000 : null;
+      if (!lastSent) {
+        checks.push({ name: 'Lead Engine', ok: false, error: 'No emails sent in last 25h — engine may be stopped' });
+      } else {
+        checks.push({ name: 'Lead Engine', ok: true, error: null, info: `Last sent ${hoursSince.toFixed(0)}h ago` });
+      }
     }
   } catch (e) {
     checks.push({ name: 'Lead Engine', ok: false, error: e.message });
