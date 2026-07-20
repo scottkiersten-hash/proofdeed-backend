@@ -4109,13 +4109,16 @@ cron.schedule("0 13 * * *", async () => {
     failed = true;
   }
 
-  // 4. Resend API
+  // 4. Resend API — actually send a test email to confirm delivery works
   try {
-    const r = await resend.domains.list();
-    if (!r || r.error) throw new Error(r?.error?.message || "no response");
-    checks.push("✅ Resend API: OK");
+    const result = await sendEmail({
+      to: process.env.ALERT_EMAIL || 'sjjk@pm.me',
+      subject: '✅ ProofDeed Email Delivery Test',
+      text: 'This is an automated delivery test from the ProofDeed health monitor. Email is working correctly.'
+    });
+    checks.push("✅ Resend API: email delivery confirmed");
   } catch (e) {
-    checks.push(`❌ Resend API: FAILED — ${e.message}`);
+    checks.push(`❌ Resend API: email delivery FAILED — ${e.message}`);
     failed = true;
   }
 
