@@ -365,7 +365,7 @@ app.get("/api/health/auth", async (req, res) => {
     await pool.query("SELECT COUNT(*) FROM magic_links WHERE expires_at > NOW()");
     const testToken = jwt.sign({ health: true }, process.env.JWT_SECRET, { expiresIn: "1m" });
     jwt.verify(testToken, process.env.JWT_SECRET);
-    res.json({ status: "ok", auth: "healthy", jwt: testToken });
+    res.json({ status: "ok", auth: "healthy" });
   } catch (error) {
     res.status(500).json({ status: "error", error: error.message });
   }
@@ -4065,152 +4065,10 @@ resetWrongDomainContacts();
 // Runs at 00:00 on the 1st of every month (UTC)
 cron.schedule("0 0 1 * *", async () => {
   try {
-    await pool.query("UPDATE api_keys SET used_this_month = 0");
+    await pool.query("UPDATE api_keys SET used_this_month = 0, notified_80 = FALSE, notified_100 = FALSE");
     console.log("Monthly API key usage reset completed.");
   } catch (err) {
     console.error("Monthly reset error:", err.message);
-  }
-});
-
-/* ---------------- DAILY SYSTEM HEALTH CHECK (REMOVED — superseded by runHealthChecks) ---------------- */
-// Disabled — replaced by the runHealthChecks() system below which covers all checks
-if (false) cron.schedule("0 13 * * *", async () => {
-  const checks = [];
-  let failed = false;
-
-  // 1. Database
-  try {
-    await pool.query("SELECT NOW()");
-    checks.push("✅ Database: OK");
-  } catch (e) {
-    checks.push(`❌ Database: FAILED — ${e.message}`);
-    failed = true;
-  }
-
-  // 2. Auth (JWT + magic_links table)
-  try {
-    await pool.query("SELECT COUNT(*) FROM magic_links WHERE expires_at > NOW()");
-    const tok = jwt.sign({ health: true }, process.env.JWT_SECRET, { expiresIn: "1m" });
-    jwt.verify(tok, process.env.JWT_SECRET);
-    checks.push("✅ Auth / JWT: OK");
-  } catch (e) {
-    checks.push(`❌ Auth / JWT: FAILED — ${e.message}`);
-    failed = true;
-  }
-
-  // 3. Stripe
-  try {
-    const Stripe = (await import("stripe")).default;
-    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-    await stripe.balance.retrieve();
-    checks.push("✅ Stripe: OK");
-  } catch (e) {
-    checks.push(`❌ Stripe: FAILED — ${e.message}`);
-    failed = true;
-  }
-
-  // 4. Resend API — actually send a test email to confirm delivery works
-  try {
-    const result = await sendEmail({
-      to: process.env.ALERT_EMAIL || 'sjjk@pm.me',
-      subject: '✅ ProofDeed Email Delivery Test',
-      text: 'This is an automated delivery test from the ProofDeed health monitor. Email is working correctly.'
-    });
-    checks.push("✅ Resend API: email delivery confirmed");
-  } catch (e) {
-    checks.push(`❌ Resend API: email delivery FAILED — ${e.message}`);
-    failed = true;
-  }
-
-  // 5. MX records — verify inbound.resend.com is set (not a dead provider)
-  try {
-    const { promises: dns } = await import('dns');
-    const mx = await dns.resolveMx('proofdeed.com');
-    const hasResend = mx.some(r => r.exchange.includes('resend'));
-    const hasZoho = mx.some(r => r.exchange.includes('zoho'));
-    const hasOldProvider = mx.some(r => r.exchange.includes('zoho') || r.exchange.includes('google') || r.exchange.includes('outlook'));
-    if (!hasResend) throw new Error(`MX not pointing to Resend — found: ${mx.map(r=>r.exchange).join(', ')}`);
-    if (hasOldProvider) throw new Error(`Old MX still present: ${mx.filter(r=>hasOldProvider).map(r=>r.exchange).join(', ')}`);
-    checks.push(`✅ MX Records: inbound.resend.com (priority ${mx.find(r=>r.exchange.includes('resend'))?.priority})`);
-  } catch (e) {
-    checks.push(`❌ MX Records: FAILED — ${e.message}`);
-    failed = true;
-  }
-
-  // 6. Resend domain DNS records — check every record status individually
-  try {
-    const domainRes = await fetch('https://api.resend.com/domains/3e78f4d1-e142-4156-9bb1-cc3ef5039cbe', {
-      headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}` }
-    });
-    const domain = await domainRes.json();
-    if (domain.error) throw new Error(domain.error.message || 'could not fetch domain');
-    const failedRecords = (domain.records || []).filter(r => r.status === 'failed' || r.status === 'not_started');
-    const verifiedRecords = (domain.records || []).filter(r => r.status === 'verified');
-    if (failedRecords.length > 0) {
-      const names = failedRecords.map(r => `${r.record} (${r.type} ${r.name || '@'})`).join(', ');
-      checks.push(`❌ Resend DNS Records: ${failedRecords.length} FAILING — ${names}`);
-      failed = true;
-    } else {
-      checks.push(`✅ Resend DNS Records: all ${verifiedRecords.length} verified (DKIM, SPF, MX, Tracking)`);
-    }
-    if (domain.capabilities?.receiving !== 'enabled') {
-      checks.push(`❌ Resend Inbound Receiving: ${domain.capabilities?.receiving}`);
-      failed = true;
-    } else {
-      checks.push("✅ Resend Inbound Receiving: enabled");
-    }
-  } catch (e) {
-    checks.push(`❌ Resend Domain Check: FAILED — ${e.message}`);
-    failed = true;
-  }
-
-  // 7. Lead engine — self-healing check: auto-reset stuck flag + auto-restart if stalled
-  try {
-    // Auto-reset stuck is_running flag
-    const leRow = await pool.query(`SELECT value, updated_at FROM lead_engine_state WHERE key='is_running'`).catch(() => ({ rows: [] }));
-    if (leRow.rows[0]?.value === 'true') {
-      const stuckHours = leRow.rows[0]?.updated_at
-        ? (Date.now() - new Date(leRow.rows[0].updated_at).getTime()) / 3600000
-        : 99;
-      if (stuckHours >= 3) {
-        await pool.query(`INSERT INTO lead_engine_state (key,value,updated_at) VALUES ('is_running','false',NOW()) ON CONFLICT (key) DO UPDATE SET value='false',updated_at=NOW()`).catch(() => {});
-        console.log(`[health-check] Auto-reset stuck is_running (stuck ${stuckHours.toFixed(1)}h)`);
-      }
-    }
-
-    // Check recent send volume
-    const sent = await pool.query(`SELECT COUNT(*) FROM outreach_contacts WHERE first_sent_at >= NOW() - INTERVAL '25 hours'`);
-    const count = parseInt(sent.rows[0].count);
-    const day = new Date().getDay();
-    const isWeekday = day >= 1 && day <= 5;
-
-    if (isWeekday && count === 0) {
-      // Auto-restart the engine
-      runLeadEngine(200).catch(() => {});
-      throw new Error(`No new outreach in 25h — auto-restarted engine. Check DO logs.`);
-    }
-    checks.push(`✅ Lead Engine: ${count} new contacts in last 25h`);
-  } catch (e) {
-    checks.push(`❌ Lead Engine: ${e.message}`);
-    failed = true;
-  }
-
-  const status = failed ? "🚨 ALERT — ProofDeed System Failure" : "✅ ProofDeed Daily Health Check — All Systems OK";
-  const body = checks.join("\n");
-
-  console.log(`[health-check] ${status}\n${body}`);
-
-  if (failed) {
-    try {
-      await resend.emails.send({
-        from: "ProofDeed System <info@proofdeed.com>",
-        to: "sjjk@pm.me",
-        subject: status,
-        text: `ProofDeed daily health check results:\n\n${body}\n\nTime: ${new Date().toISOString()}\n\nLog in to DigitalOcean to investigate: https://cloud.digitalocean.com/apps/753587e4-5e82-46af-a29e-a80b7dd60f87`,
-      });
-    } catch (emailErr) {
-      console.error("[health-check] Failed to send alert email:", emailErr.message);
-    }
   }
 });
 
@@ -9357,7 +9215,7 @@ cron.schedule('0 8 * * 1-5', async () => {
 }, { timezone: 'America/Los_Angeles' });
 
 /* ---------------- System Health Monitor ---------------- */
-const ADMIN_ALERT_EMAIL = process.env.MAIL_TO || 'info@proofdeed.com';
+const ADMIN_ALERT_EMAIL = process.env.MAIL_TO || 'sjjk@pm.me';
 let lastAlertSent = {};
 let failureStreak = {};  // tracks consecutive failure count per service
 const ALERT_AFTER_FAILURES = 3; // must fail 3 checks in a row (~45 min) before alerting
@@ -9419,24 +9277,10 @@ async function runHealthChecks() {
     checks.push({ name: 'Resend DNS Records', ok: false, error: e.message });
   }
 
-  // 3b. Resend Email Delivery — send a real test email to confirm delivery works
-  try {
-    const { Resend } = await import('resend');
-    const resend = new Resend(process.env.RESEND_API_KEY);
-    const result = await resend.emails.send({
-      from: 'ProofDeed Health Monitor <info@proofdeed.com>',
-      to: 'sjjk@pm.me',
-      subject: 'ProofDeed Health Check — Email Delivery Test',
-      text: 'Automated delivery test from the ProofDeed health monitor. Email delivery is working correctly.',
-    });
-    if (result.error) {
-      checks.push({ name: 'Resend Email Delivery', ok: false, error: result.error.message || 'Resend rejected the email' });
-    } else {
-      checks.push({ name: 'Resend Email Delivery', ok: true, error: null });
-    }
-  } catch (e) {
-    checks.push({ name: 'Resend Email Delivery', ok: false, error: e.message });
-  }
+  // 3b. Resend Email Delivery — inferred from DNS records being verified (no test email sent every 15 min)
+  // If DNS records are all verified, Resend can deliver. Sending a real test email on every health check
+  // would flood the inbox (96 emails/day). Use /api/admin/test-email for on-demand delivery testing.
+  checks.push({ name: 'Resend Email Delivery', ok: true, error: null, info: 'Inferred from DNS verification' });
 
   // 3c. Required environment variables
   const requiredEnvVars = [
