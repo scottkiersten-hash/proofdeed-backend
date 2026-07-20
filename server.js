@@ -4137,16 +4137,30 @@ cron.schedule("0 13 * * *", async () => {
     failed = true;
   }
 
-  // 6. Resend domain receiving enabled
+  // 6. Resend domain DNS records — check every record status individually
   try {
     const domainRes = await fetch('https://api.resend.com/domains/3e78f4d1-e142-4156-9bb1-cc3ef5039cbe', {
       headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}` }
     });
     const domain = await domainRes.json();
-    if (domain.capabilities?.receiving !== 'enabled') throw new Error(`receiving is ${domain.capabilities?.receiving}`);
-    checks.push("✅ Resend Inbound Receiving: enabled");
+    if (domain.error) throw new Error(domain.error.message || 'could not fetch domain');
+    const failedRecords = (domain.records || []).filter(r => r.status === 'failed' || r.status === 'not_started');
+    const verifiedRecords = (domain.records || []).filter(r => r.status === 'verified');
+    if (failedRecords.length > 0) {
+      const names = failedRecords.map(r => `${r.record} (${r.type} ${r.name || '@'})`).join(', ');
+      checks.push(`❌ Resend DNS Records: ${failedRecords.length} FAILING — ${names}`);
+      failed = true;
+    } else {
+      checks.push(`✅ Resend DNS Records: all ${verifiedRecords.length} verified (DKIM, SPF, MX, Tracking)`);
+    }
+    if (domain.capabilities?.receiving !== 'enabled') {
+      checks.push(`❌ Resend Inbound Receiving: ${domain.capabilities?.receiving}`);
+      failed = true;
+    } else {
+      checks.push("✅ Resend Inbound Receiving: enabled");
+    }
   } catch (e) {
-    checks.push(`❌ Resend Inbound Receiving: FAILED — ${e.message}`);
+    checks.push(`❌ Resend Domain Check: FAILED — ${e.message}`);
     failed = true;
   }
 
@@ -9388,15 +9402,56 @@ async function runHealthChecks() {
     checks.push({ name: 'Stripe', ok: false, error: e.message });
   }
 
-  // 3. Resend API
+  // 3a. Resend DNS Records — check every record is verified
   try {
-    const r = await fetch('https://api.resend.com/emails', {
-      method: 'GET',
+    const domainRes = await fetch('https://api.resend.com/domains/3e78f4d1-e142-4156-9bb1-cc3ef5039cbe', {
       headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}` },
     });
-    checks.push({ name: 'Resend', ok: r.status !== 500, error: r.status >= 500 ? `HTTP ${r.status}` : null });
+    const domain = await domainRes.json();
+    const failedRecords = (domain.records || []).filter(r => r.status === 'failed' || r.status === 'not_started' || r.status === 'temporary_failure');
+    if (failedRecords.length > 0) {
+      const names = failedRecords.map(r => `${r.record} (${r.type} ${r.name || '@'})`).join(', ');
+      checks.push({ name: 'Resend DNS Records', ok: false, error: `${failedRecords.length} record(s) not verified: ${names}` });
+    } else {
+      checks.push({ name: 'Resend DNS Records', ok: true, error: null });
+    }
   } catch (e) {
-    checks.push({ name: 'Resend', ok: false, error: e.message });
+    checks.push({ name: 'Resend DNS Records', ok: false, error: e.message });
+  }
+
+  // 3b. Resend Email Delivery — send a real test email to confirm delivery works
+  try {
+    const { Resend } = await import('resend');
+    const resend = new Resend(process.env.RESEND_API_KEY);
+    const result = await resend.emails.send({
+      from: 'ProofDeed Health Monitor <info@proofdeed.com>',
+      to: 'sjjk@pm.me',
+      subject: 'ProofDeed Health Check — Email Delivery Test',
+      text: 'Automated delivery test from the ProofDeed health monitor. Email delivery is working correctly.',
+    });
+    if (result.error) {
+      checks.push({ name: 'Resend Email Delivery', ok: false, error: result.error.message || 'Resend rejected the email' });
+    } else {
+      checks.push({ name: 'Resend Email Delivery', ok: true, error: null });
+    }
+  } catch (e) {
+    checks.push({ name: 'Resend Email Delivery', ok: false, error: e.message });
+  }
+
+  // 3c. Required environment variables
+  const requiredEnvVars = [
+    'RESEND_API_KEY', 'STRIPE_SECRET_KEY', 'DATABASE_URL', 'JWT_SECRET',
+    'PRICE_PROFESSIONAL_MONTHLY', 'PRICE_BUSINESS_MONTHLY', 'PRICE_GOVERNMENT_MONTHLY',
+    'PRICE_API_MONTHLY', 'PRICE_GOVERNMENT_PILOT', 'POLYGON_RPC_URL',
+  ];
+  const missingEnvVars = requiredEnvVars.filter(v => !process.env[v]);
+  const deadEnvVars = ['MAILGUN_API_KEY', 'MAILGUN_DOMAIN'].filter(v => !!process.env[v]);
+  if (missingEnvVars.length > 0) {
+    checks.push({ name: 'Environment Variables', ok: false, error: `Missing: ${missingEnvVars.join(', ')}` });
+  } else if (deadEnvVars.length > 0) {
+    checks.push({ name: 'Environment Variables', ok: true, error: null, info: `Dead vars still set (cleanup): ${deadEnvVars.join(', ')}` });
+  } else {
+    checks.push({ name: 'Environment Variables', ok: true, error: null });
   }
 
   // 4. Key Site Pages (frontend)
@@ -9466,6 +9521,55 @@ async function runHealthChecks() {
     checks.push({ name: 'Usage tracking (certifications table)', ok: true, error: null, info: `${totalCerts} total certs` });
   } catch (e) {
     checks.push({ name: 'Usage tracking (certifications table)', ok: false, error: e.message });
+  }
+
+  // 10. CRM — outreach pipeline stats
+  try {
+    const crmRow = await pool.query(`
+      SELECT
+        COUNT(*) AS total,
+        COUNT(*) FILTER (WHERE status = 'sent') AS sent,
+        COUNT(*) FILTER (WHERE status = 'bounced') AS bounced,
+        COUNT(*) FILTER (WHERE status = 'replied') AS replied,
+        COUNT(*) FILTER (WHERE suppressed = true) AS suppressed
+      FROM outreach_contacts
+    `);
+    const r = crmRow.rows[0];
+    const bounceRate = r.total > 0 ? ((r.bounced / r.total) * 100).toFixed(1) : '0';
+    const bounceHigh = parseFloat(bounceRate) > 20;
+    checks.push({
+      name: 'CRM (outreach_contacts)',
+      ok: !bounceHigh,
+      error: bounceHigh ? `Bounce rate ${bounceRate}% exceeds 20% — check suppression list` : null,
+      info: `${r.total} total | ${r.sent} sent | ${r.replied} replied | ${r.bounced} bounced (${bounceRate}%) | ${r.suppressed} suppressed`,
+    });
+  } catch (e) {
+    checks.push({ name: 'CRM (outreach_contacts)', ok: false, error: e.message });
+  }
+
+  // 11. Lead engine — check last run was recent (within 48h)
+  try {
+    const leRow = await pool.query(`SELECT MAX(created_at) AS last_run FROM outreach_contacts WHERE created_at > NOW() - INTERVAL '7 days'`);
+    const lastRun = leRow.rows[0].last_run;
+    const hoursSince = lastRun ? (Date.now() - new Date(lastRun).getTime()) / 3600000 : null;
+    if (!lastRun) {
+      checks.push({ name: 'Lead Engine', ok: false, error: 'No new contacts added in last 7 days — lead engine may be stopped' });
+    } else if (hoursSince > 48) {
+      checks.push({ name: 'Lead Engine', ok: false, error: `Last contact added ${hoursSince.toFixed(0)}h ago — engine may be stalled` });
+    } else {
+      checks.push({ name: 'Lead Engine', ok: true, error: null, info: `Last run ${hoursSince.toFixed(0)}h ago` });
+    }
+  } catch (e) {
+    checks.push({ name: 'Lead Engine', ok: false, error: e.message });
+  }
+
+  // 12. Users table — active user count
+  try {
+    const userRow = await pool.query(`SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE plan IS NOT NULL AND plan != 'free') AS paid FROM users`);
+    const r = userRow.rows[0];
+    checks.push({ name: 'Users', ok: true, error: null, info: `${r.total} total | ${r.paid} paid` });
+  } catch (e) {
+    checks.push({ name: 'Users', ok: false, error: e.message });
   }
 
   const failures = checks.filter(c => !c.ok);
