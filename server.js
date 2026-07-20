@@ -9619,7 +9619,7 @@ async function runHealthChecks() {
   return checks;
 }
 
-// Check every 15 minutes
+// Health monitor — checks every 15 minutes
 cron.schedule('*/15 * * * *', () => runHealthChecks());
 
 // Daily summary at 8am PT
