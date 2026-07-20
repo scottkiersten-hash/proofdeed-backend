@@ -476,8 +476,12 @@ app.get(["/user/certifications", "/api/user/certifications"], authenticateToken,
   try {
     const { email } = req.user;
 
-    const userResult = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
+    const [userResult, apiKeyResult] = await Promise.all([
+      pool.query("SELECT * FROM users WHERE email = $1", [email]),
+      pool.query("SELECT plan, monthly_limit FROM api_keys WHERE email = $1 AND active = TRUE", [email]),
+    ]);
     const user = userResult.rows[0];
+    const apiKey = apiKeyResult.rows[0];
 
     const certs = await pool.query(
       "SELECT certification_id, hash, polygon_tx, created_at FROM certifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50",
@@ -490,8 +494,8 @@ app.get(["/user/certifications", "/api/user/certifications"], authenticateToken,
     );
 
     const used = parseInt(certCount.rows[0].count) || 0;
-    const plan = user?.subscription_id ? "pro" : "starter";
-    const limit = plan === "pro" ? 70 : 25;
+    const plan = apiKey?.plan || (user?.subscription_id ? "professional-monthly" : "starter");
+    const limit = apiKey?.monthly_limit || (user?.subscription_id ? 250 : 25);
 
     res.json({ certifications: certs.rows, used, limit, plan });
 
@@ -512,16 +516,16 @@ app.get(["/api/user/profile"], authenticateToken, async (req, res) => {
     const [certs, certCount, apiKeyRow, trustIds, passports, analyses] = await Promise.all([
       pool.query("SELECT certification_id, hash, polygon_tx, created_at FROM certifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 20", [userId]),
       pool.query("SELECT COUNT(*) FROM certifications WHERE user_id = $1 AND created_at > date_trunc('month', NOW())", [userId]),
-      pool.query("SELECT api_key, plan, monthly_limit, used_this_month, active FROM api_keys WHERE email = $1", [email]),
+      pool.query("SELECT api_key, plan, monthly_limit, used_this_month, active FROM api_keys WHERE email = $1 AND active = TRUE", [email]),
       pool.query("SELECT trust_id, entity_name, entity_type, created_at FROM trust_ids WHERE email = $1 ORDER BY created_at DESC LIMIT 10", [email]).catch(() => ({ rows: [] })),
       pool.query("SELECT passport_id, asset_type, make, model, serial_number, created_at FROM asset_passports WHERE owner_email = $1 ORDER BY created_at DESC LIMIT 10", [email]).catch(() => ({ rows: [] })),
       pool.query("SELECT analysis_id, risk_level, confidence, summary, created_at FROM trust_analyses WHERE created_at > NOW() - INTERVAL '30 days' ORDER BY created_at DESC LIMIT 5").catch(() => ({ rows: [] })),
     ]);
 
-    const plan = user?.subscription_id ? "pro" : "starter";
-    const used = parseInt(certCount.rows[0].count) || 0;
-    const limit = plan === "pro" ? 70 : 25;
     const apiKey = apiKeyRow.rows[0] || null;
+    const used = parseInt(certCount.rows[0].count) || 0;
+    const plan = apiKey?.plan || (user?.subscription_id ? "professional-monthly" : "starter");
+    const limit = apiKey?.monthly_limit || (user?.subscription_id ? 250 : 25);
 
     res.json({
       email,
@@ -1811,16 +1815,20 @@ app.post(["/create-proof", "/api/create-proof"], async (req, res) => {
       return res.status(401).json({ error: "Invalid or expired session. Please sign in again." });
     }
 
-    const userResult = await pool.query("SELECT * FROM users WHERE email = $1", [decoded.email]);
+    const [userResult, apiKeyResult] = await Promise.all([
+      pool.query("SELECT * FROM users WHERE email = $1", [decoded.email]),
+      pool.query("SELECT plan, monthly_limit FROM api_keys WHERE email = $1 AND active = TRUE", [decoded.email]),
+    ]);
     if (userResult.rows.length === 0) {
       return res.status(401).json({ error: "User not found." });
     }
     const user = userResult.rows[0];
     const userId = user.id;
+    const apiKey = apiKeyResult.rows[0];
 
-    // Enforce plan limits
-    const plan = user.subscription_id ? "pro" : "starter";
-    const certLimit = plan === "pro" ? 70 : 25;
+    // Enforce real plan limits from api_keys table
+    const plan = apiKey?.plan || (user.subscription_id ? "professional-monthly" : "starter");
+    const certLimit = apiKey?.monthly_limit || (user.subscription_id ? 250 : 25);
     const usedCount = await pool.query(
       "SELECT COUNT(*) FROM certifications WHERE user_id = $1 AND created_at > date_trunc('month', NOW())",
       [userId]
