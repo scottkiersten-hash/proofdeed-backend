@@ -9366,12 +9366,11 @@ async function runHealthChecks() {
 
   // 6. All Checkout Plans (creates real Stripe sessions — no charge until customer pays)
   const checkoutPlans = [
-    { name: 'Checkout starter-monthly', mode: 'subscription', price: process.env.PRICE_STARTER_MONTHLY },
-    { name: 'Checkout starter-annual',  mode: 'subscription', price: process.env.PRICE_STARTER_YEARLY },
-    { name: 'Checkout pro-monthly',     mode: 'subscription', price: process.env.PRICE_PRO_MONTHLY },
-    { name: 'Checkout pro-annual',      mode: 'subscription', price: process.env.PRICE_PRO_YEARLY },
-    { name: 'Checkout enterprise',      mode: 'subscription', price: process.env.PRICE_ENTERPRISE },
-    { name: 'Checkout government-pilot',mode: 'payment',      price: process.env.PRICE_GOVERNMENT_PILOT },
+    { name: 'Checkout professional-monthly', mode: 'subscription', price: process.env.PRICE_PROFESSIONAL_MONTHLY },
+    { name: 'Checkout business-monthly',     mode: 'subscription', price: process.env.PRICE_BUSINESS_MONTHLY },
+    { name: 'Checkout government-monthly',   mode: 'subscription', price: process.env.PRICE_GOVERNMENT_MONTHLY },
+    { name: 'Checkout api-monthly',          mode: 'subscription', price: process.env.PRICE_API_MONTHLY },
+    { name: 'Checkout government-pilot',     mode: 'payment',      price: process.env.PRICE_GOVERNMENT_PILOT },
   ];
   for (const plan of checkoutPlans) {
     try {
@@ -9582,28 +9581,27 @@ app.get(["/health-check", "/api/health-check"], async (req, res) => {
     else failed.push(`${page} → ${r.status || r.error}`);
   }
 
-  // Test all 6 checkout plans
-  const plans = ["starter-monthly", "starter-annual", "pro-monthly", "pro-annual", "enterprise", "government-pilot"];
+  // Test active checkout plans
+  const plans = [
+    { key: "professional-monthly", mode: "subscription", price: process.env.PRICE_PROFESSIONAL_MONTHLY },
+    { key: "business-monthly",     mode: "subscription", price: process.env.PRICE_BUSINESS_MONTHLY },
+    { key: "government-monthly",   mode: "subscription", price: process.env.PRICE_GOVERNMENT_MONTHLY },
+    { key: "api-monthly",          mode: "subscription", price: process.env.PRICE_API_MONTHLY },
+    { key: "government-pilot",     mode: "payment",      price: process.env.PRICE_GOVERNMENT_PILOT },
+  ];
   for (const plan of plans) {
     try {
       const session = await stripe.checkout.sessions.create({
-        mode: plan === "government-pilot" ? "payment" : "subscription",
-        ...(plan !== "government-pilot" ? { payment_method_types: ["card"] } : {}),
-        line_items: [{ price: {
-          "starter-monthly": process.env.PRICE_STARTER_MONTHLY,
-          "starter-annual":  process.env.PRICE_STARTER_YEARLY,
-          "pro-monthly":     process.env.PRICE_PRO_MONTHLY,
-          "pro-annual":      process.env.PRICE_PRO_YEARLY,
-          "enterprise":      process.env.PRICE_ENTERPRISE,
-          "government-pilot":process.env.PRICE_GOVERNMENT_PILOT,
-        }[plan], quantity: 1 }],
+        mode: plan.mode,
+        ...(plan.mode === "subscription" ? { payment_method_types: ["card"] } : {}),
+        line_items: [{ price: plan.price, quantity: 1 }],
         success_url: "https://proofdeed.com/success",
         cancel_url: "https://proofdeed.com",
       });
-      if (session.url) passed.push(`Checkout ${plan} → OK`);
-      else failed.push(`Checkout ${plan} → no URL`);
+      if (session.url) passed.push(`Checkout ${plan.key} → OK`);
+      else failed.push(`Checkout ${plan.key} → no URL`);
     } catch (err) {
-      failed.push(`Checkout ${plan} → ${err.message}`);
+      failed.push(`Checkout ${plan.key} → ${err.message}`);
     }
   }
 
