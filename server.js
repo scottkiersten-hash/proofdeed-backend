@@ -3416,6 +3416,30 @@ app.delete(["/admin/delete-test-user", "/api/admin/delete-test-user"], async (re
   }
 });
 
+/* ---------------- ADMIN CREATE USER ---------------- */
+app.post(["/admin/create-user", "/api/admin/create-user"], async (req, res) => {
+  try {
+    if (!verifyAdminAuth(req)) return res.status(401).json({ error: "Unauthorized." });
+    const { email, plan } = req.body;
+    if (!email) return res.status(400).json({ error: "Email required." });
+    const existing = await pool.query("SELECT id FROM users WHERE email = $1", [email]);
+    if (existing.rows.length > 0) return res.status(409).json({ error: "User already exists." });
+    await pool.query("INSERT INTO users (email, created_at) VALUES ($1, NOW())", [email]);
+    if (plan) {
+      const limits = { 'professional-monthly': 250, 'business-monthly': 500, 'government-monthly': 1000, 'api-monthly': 10000 };
+      const limit = limits[plan] || 25;
+      await pool.query(
+        "INSERT INTO api_keys (email, api_key, plan, monthly_limit, is_active, created_at) VALUES ($1, $2, $3, $4, true, NOW()) ON CONFLICT (email) DO UPDATE SET plan=$3, monthly_limit=$4",
+        [email, 'ak_' + Math.random().toString(36).slice(2,18), plan, limit]
+      );
+    }
+    res.json({ success: true, message: `User ${email} created.` });
+  } catch (err) {
+    console.error("/api/admin/create-user error:", err);
+    res.status(500).json({ error: "Server error." });
+  }
+});
+
 /* ---------------- ADMIN IMPERSONATE ---------------- */
 app.post(["/admin/impersonate", "/api/admin/impersonate"], authRateLimit, async (req, res) => {
   try {
