@@ -9528,10 +9528,10 @@ async function runHealthChecks() {
     const crmRow = await pool.query(`
       SELECT
         COUNT(*) AS total,
-        COUNT(*) FILTER (WHERE status = 'sent') AS sent,
+        COUNT(*) FILTER (WHERE status NOT IN ('bounced','suppressed','complained','unsubscribed')) AS active,
         COUNT(*) FILTER (WHERE status = 'bounced') AS bounced,
         COUNT(*) FILTER (WHERE status = 'replied') AS replied,
-        COUNT(*) FILTER (WHERE suppressed = true) AS suppressed
+        COUNT(*) FILTER (WHERE status IN ('suppressed','complained','unsubscribed')) AS suppressed
       FROM outreach_contacts
     `);
     const r = crmRow.rows[0];
@@ -9541,7 +9541,7 @@ async function runHealthChecks() {
       name: 'CRM (outreach_contacts)',
       ok: !bounceHigh,
       error: bounceHigh ? `Bounce rate ${bounceRate}% exceeds 20% — check suppression list` : null,
-      info: `${r.total} total | ${r.sent} sent | ${r.replied} replied | ${r.bounced} bounced (${bounceRate}%) | ${r.suppressed} suppressed`,
+      info: `${r.total} total | ${r.active} active | ${r.replied} replied | ${r.bounced} bounced (${bounceRate}%) | ${r.suppressed} suppressed`,
     });
   } catch (e) {
     checks.push({ name: 'CRM (outreach_contacts)', ok: false, error: e.message });
@@ -9565,7 +9565,7 @@ async function runHealthChecks() {
 
   // 12. Users table — active user count
   try {
-    const userRow = await pool.query(`SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE plan IS NOT NULL AND plan != 'free') AS paid FROM users`);
+    const userRow = await pool.query(`SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE subscription_id IS NOT NULL) AS paid FROM users`);
     const r = userRow.rows[0];
     checks.push({ name: 'Users', ok: true, error: null, info: `${r.total} total | ${r.paid} paid` });
   } catch (e) {
