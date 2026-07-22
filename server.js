@@ -9043,7 +9043,7 @@ Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
 info@proofdeed.com | proofdeed.com`;
-    subject = `Re: Quick question for ${contact.company}`;
+    subject = `Still thinking about ${contact.company}`;
   } else if (day === 14) {
     text = `Hi ${first},
 
@@ -9063,7 +9063,7 @@ Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
 info@proofdeed.com | proofdeed.com`;
-    subject = `Re: Quick question for ${contact.company}`;
+    subject = `One more thought — ${contact.company}`;
   } else {
     text = `Hi ${first},
 
@@ -9081,7 +9081,7 @@ Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
 info@proofdeed.com | proofdeed.com`;
-    subject = `Re: Quick question for ${contact.company}`;
+    subject = `Closing the loop — ${contact.company}`;
   }
 
   const replyTag = crypto.randomBytes(8).toString('hex');
@@ -9097,7 +9097,7 @@ info@proofdeed.com | proofdeed.com`;
   });
 
   await pool.query(
-    `UPDATE outreach_contacts SET status='sent', last_contact_at=NOW(), reply_to_tag=$1, auto_replied=true WHERE id=$2`,
+    `UPDATE outreach_contacts SET status='sent', last_contact_at=NOW(), reply_to_tag=$1 WHERE id=$2`,
     [replyTag, contact.id]
   );
   await pool.query(
@@ -9131,18 +9131,18 @@ cron.schedule('0 8 * * 1-5', async () => {
     const BASE_FILTER = `
       status NOT IN ('replied','in_talks','closed_won','closed_lost','bounced','complained','unsubscribed')
       AND pipeline_stage NOT IN ('pilot_discussed','pilot_sent','pilot_approved','closed','qualified','suppressed')
-      AND auto_replied = false
       AND company NOT LIKE '[PDF]%'
       AND length(split_part(email, '@', 1)) > 3
     `;
 
     // Day 21 breakup first — highest priority, closes the loop
-    // Window: 21+ days since first send, no follow-up yet
+    // Window: 21+ days since first send, breakup not yet sent
     const day21 = await pool.query(`
       SELECT * FROM outreach_contacts
       WHERE ${BASE_FILTER}
       AND first_sent_at <= NOW() - INTERVAL '21 days'
       AND first_sent_at > NOW() - INTERVAL '60 days'
+      AND NOT EXISTS (SELECT 1 FROM outreach_events e WHERE e.contact_id=outreach_contacts.id AND e.event_type='breakup')
       ORDER BY first_sent_at ASC
       LIMIT 30
     `);
@@ -9151,19 +9151,20 @@ cron.schedule('0 8 * * 1-5', async () => {
       try {
         await sendOutreachFollowUp(c, 21);
         autopilotSent++;
-        await pool.query(`UPDATE outreach_contacts SET status='closed_lost', auto_replied=true WHERE id=$1`, [c.id]);
+        await pool.query(`UPDATE outreach_contacts SET status='closed_lost' WHERE id=$1`, [c.id]);
         console.log(`[Autopilot] Day 21 breakup → ${c.name}`);
       }
       catch (e) { console.error(`[Autopilot] Day 21 fail ${c.email}:`, e.message); }
       await new Promise(r => setTimeout(r, 2000));
     }
 
-    // Day 14: second follow-up — 14–20 days since first send, no follow-up yet
+    // Day 14: second follow-up — 14–20 days since first send, follow_up_2 not yet sent
     const day14 = await pool.query(`
       SELECT * FROM outreach_contacts
       WHERE ${BASE_FILTER}
       AND first_sent_at <= NOW() - INTERVAL '14 days'
       AND first_sent_at > NOW() - INTERVAL '21 days'
+      AND NOT EXISTS (SELECT 1 FROM outreach_events e WHERE e.contact_id=outreach_contacts.id AND e.event_type='follow_up_2')
       ORDER BY first_sent_at ASC
       LIMIT 30
     `);
@@ -9174,12 +9175,13 @@ cron.schedule('0 8 * * 1-5', async () => {
       await new Promise(r => setTimeout(r, 2000));
     }
 
-    // Day 7: first follow-up — 7–13 days since first send, no follow-up yet
+    // Day 7: first follow-up — 7–13 days since first send, follow_up_1 not yet sent
     const day7 = await pool.query(`
       SELECT * FROM outreach_contacts
       WHERE ${BASE_FILTER}
       AND first_sent_at <= NOW() - INTERVAL '7 days'
       AND first_sent_at > NOW() - INTERVAL '14 days'
+      AND NOT EXISTS (SELECT 1 FROM outreach_events e WHERE e.contact_id=outreach_contacts.id AND e.event_type='follow_up_1')
       ORDER BY first_sent_at ASC
       LIMIT 30
     `);
