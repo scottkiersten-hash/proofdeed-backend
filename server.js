@@ -8442,10 +8442,9 @@ function queryNeedsGeo(query) {
 }
 
 async function searchLeadsViaGoogle(target, targetIndex = 0) {
-  const apiKey = process.env.GOOGLE_API_KEY;
-  const cseId = process.env.GOOGLE_CSE_ID;
-  if (!apiKey || !cseId) {
-    console.log('[LeadEngine] Missing GOOGLE_API_KEY or GOOGLE_CSE_ID — skipping');
+  const apiKey = process.env.BING_API_KEY;
+  if (!apiKey) {
+    console.log('[LeadEngine] Missing BING_API_KEY — skipping');
     return [];
   }
 
@@ -8458,21 +8457,20 @@ async function searchLeadsViaGoogle(target, targetIndex = 0) {
   if (geoSuffix) console.log(`[LeadEngine] Geo-rotated query: "${query}"`);
 
   try {
-    // 2 pages of Google CSE results (10 per page = 20 URLs to mine, costs 2 of 100 daily quota)
+    // 2 pages of Bing results (10 per page = 20 URLs to mine)
     for (let page = 0; page <= 1; page++) {
-      const start = page * 10 + 1;
-      const url = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${cseId}&q=${encodeURIComponent(query)}&num=10&start=${start}`;
-      const res = await fetch(url);
-      if (!res.ok) { console.log(`[LeadEngine] Google CSE error ${res.status}`); break; }
+      const offset = page * 10;
+      const url = `https://api.bing.microsoft.com/v7.0/search?q=${encodeURIComponent(query)}&count=10&offset=${offset}&mkt=en-US`;
+      const res = await fetch(url, { headers: { 'Ocp-Apim-Subscription-Key': apiKey } });
+      if (!res.ok) { console.log(`[LeadEngine] Bing API error ${res.status}`); break; }
       const data = await res.json();
-      if (data.error) { console.log(`[LeadEngine] Google CSE error: ${data.error.message}`); break; }
-      const items = data.items || [];
+      const items = data.webPages?.value || [];
       if (!items.length) break;
       const mappedItems = items.map(item => ({
-        title: item.title || '',
+        title: item.name || '',
         snippet: item.snippet || '',
-        link: item.link || '',
-        displayLink: item.displayLink || '',
+        link: item.url || '',
+        displayLink: item.displayUrl || '',
       }));
 
       for (const item of mappedItems) {
@@ -8800,8 +8798,8 @@ async function recordEmailEvent(email, event) {
 }
 
 async function runLeadEngine(targetsPerRun = 3) {
-  if (!process.env.GOOGLE_API_KEY || !process.env.GOOGLE_CSE_ID || !process.env.RESEND_API_KEY) {
-    console.log(`[LeadEngine] Missing API keys — GOOGLE_API_KEY: ${!!process.env.GOOGLE_API_KEY}, GOOGLE_CSE_ID: ${!!process.env.GOOGLE_CSE_ID}, RESEND: ${!!process.env.RESEND_API_KEY}`);
+  if (!process.env.BING_API_KEY || !process.env.RESEND_API_KEY) {
+    console.log(`[LeadEngine] Missing API keys — BING_API_KEY: ${!!process.env.BING_API_KEY}, RESEND: ${!!process.env.RESEND_API_KEY}`);
     return;
   }
 
@@ -9012,8 +9010,7 @@ app.get(['/api/admin/lead-engine', '/admin/lead-engine'], authRateLimit, async (
       nextTarget: LEAD_TARGETS[parseInt(state.rotation_index?.value || '0') % LEAD_TARGETS.length],
       schedule: 'Tue/Wed/Thu 8am PT',
       envCheck: {
-        GOOGLE_API_KEY: !!process.env.GOOGLE_API_KEY,
-        GOOGLE_CSE_ID: !!process.env.GOOGLE_CSE_ID,
+        BING_API_KEY: !!process.env.BING_API_KEY,
         RESEND_API_KEY: !!process.env.RESEND_API_KEY,
       },
     });
