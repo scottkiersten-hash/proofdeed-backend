@@ -3048,7 +3048,7 @@ app.post(["/stripe-webhook", "/api/stripe-webhook"], express.raw({ type: "applic
   try {
     event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
   } catch (err) {
-    console.error("Webhook signature failed:", err.message);
+    // Silently drop — bad signature means not a real Stripe event
     return res.status(400).send("Webhook Error: " + err.message);
   }
 
@@ -8442,9 +8442,10 @@ function queryNeedsGeo(query) {
 }
 
 async function searchLeadsViaGoogle(target, targetIndex = 0) {
-  const apiKey = process.env.SERPER_API_KEY;
-  if (!apiKey) {
-    console.log('[LeadEngine] Missing SERPER_API_KEY — skipping');
+  const apiKey = process.env.GOOGLE_API_KEY;
+  const cseId = process.env.GOOGLE_CSE_ID;
+  if (!apiKey || !cseId) {
+    console.log('[LeadEngine] Missing GOOGLE_API_KEY or GOOGLE_CSE_ID — skipping');
     return [];
   }
 
@@ -8457,23 +8458,21 @@ async function searchLeadsViaGoogle(target, targetIndex = 0) {
   if (geoSuffix) console.log(`[LeadEngine] Geo-rotated query: "${query}"`);
 
   try {
-    // 2 pages of Serper results = up to 20 URLs to mine
-    for (let page = 1; page <= 2; page++) {
-      const res = await fetch('https://google.serper.dev/search', {
-        method: 'POST',
-        headers: { 'X-API-KEY': apiKey, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ q: query, num: 10, page }),
-      });
-      if (!res.ok) { console.log(`[LeadEngine] Serper API error ${res.status}`); break; }
+    // 2 pages of Google CSE results (10 per page = 20 URLs to mine, costs 2 of 100 daily quota)
+    for (let page = 0; page <= 1; page++) {
+      const start = page * 10 + 1;
+      const url = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${cseId}&q=${encodeURIComponent(query)}&num=10&start=${start}`;
+      const res = await fetch(url);
+      if (!res.ok) { console.log(`[LeadEngine] Google CSE error ${res.status}`); break; }
       const data = await res.json();
-      const items = data.organic || [];
+      if (data.error) { console.log(`[LeadEngine] Google CSE error: ${data.error.message}`); break; }
+      const items = data.items || [];
       if (!items.length) break;
-      // Map Serper format to same structure as Google CSE
       const mappedItems = items.map(item => ({
         title: item.title || '',
         snippet: item.snippet || '',
         link: item.link || '',
-        displayLink: item.link ? new URL(item.link).hostname : '',
+        displayLink: item.displayLink || '',
       }));
 
       for (const item of mappedItems) {
@@ -8801,8 +8800,8 @@ async function recordEmailEvent(email, event) {
 }
 
 async function runLeadEngine(targetsPerRun = 3) {
-  if (!process.env.SERPER_API_KEY || !process.env.RESEND_API_KEY) {
-    console.log(`[LeadEngine] Missing API keys — SERPER: ${!!process.env.SERPER_API_KEY}, RESEND: ${!!process.env.RESEND_API_KEY}`);
+  if (!process.env.GOOGLE_API_KEY || !process.env.GOOGLE_CSE_ID || !process.env.RESEND_API_KEY) {
+    console.log(`[LeadEngine] Missing API keys — GOOGLE_API_KEY: ${!!process.env.GOOGLE_API_KEY}, GOOGLE_CSE_ID: ${!!process.env.GOOGLE_CSE_ID}, RESEND: ${!!process.env.RESEND_API_KEY}`);
     return;
   }
 
@@ -9013,7 +9012,8 @@ app.get(['/api/admin/lead-engine', '/admin/lead-engine'], authRateLimit, async (
       nextTarget: LEAD_TARGETS[parseInt(state.rotation_index?.value || '0') % LEAD_TARGETS.length],
       schedule: 'Tue/Wed/Thu 8am PT',
       envCheck: {
-        SERPER_API_KEY: !!process.env.SERPER_API_KEY,
+        GOOGLE_API_KEY: !!process.env.GOOGLE_API_KEY,
+        GOOGLE_CSE_ID: !!process.env.GOOGLE_CSE_ID,
         RESEND_API_KEY: !!process.env.RESEND_API_KEY,
       },
     });
