@@ -5058,7 +5058,13 @@ app.post(['/api/admin/import/send-pending', '/admin/import/send-pending'], authR
             : INITIAL_EMAIL(contact.name, contact.company, contact.industry, contact.role || industryDefaultRole);
           const subject = isUAE
             ? `Aligning ${contact.company} with Dubai's 2026 Paperless Mandate`
-            : `Quick question for ${contact.company}`;
+            : [
+                `${contact.company} — document integrity`,
+                `How does ${contact.company} prove a record hasn't been altered?`,
+                `Tamper-proof records for ${contact.company}`,
+                `${contact.company} — protecting document authenticity`,
+                `Question about ${contact.company}'s document workflow`,
+              ][contact.email.split('').reduce((a, c) => a + c.charCodeAt(0), 0) % 5];
           const fromAddr = (contact.industry === 'government' || contact.industry === 'gov_regulator')
             ? 'Scott Kiersten <gov@proofdeed.com>'
             : 'Scott Kiersten <info@proofdeed.com>';
@@ -8624,6 +8630,23 @@ const BLOCKED_EXACT = new Set([
   'paperworkreductionact@sec.gov','license@tdi.texas.gov',
 ]);
 
+const DISPOSABLE_DOMAINS = new Set([
+  'mailinator.com','guerrillamail.com','guerrillamail.net','guerrillamail.org',
+  'tempmail.com','temp-mail.org','throwam.com','throwaway.email',
+  'yopmail.com','yopmail.fr','cool.fr.nf','jetable.fr.nf','nospam.ze.tc',
+  'nomail.xl.cx','mega.zik.dj','speed.1s.fr','courriel.fr.nf',
+  'moncourrier.fr.nf','monemail.fr.nf','monmail.fr.nf',
+  'maildrop.cc','dispostable.com','sharklasers.com','guerrillamailblock.com',
+  'grr.la','guerrillamail.info','spam4.me','trashmail.at','trashmail.io',
+  'trashmail.me','trashmail.net','fakeinbox.com','mailnull.com',
+  'spamgourmet.com','spamgourmet.net','spamgourmet.org','spaml.com',
+  'mailexpire.com','spamex.com','spamfree24.org','trashmail.com',
+  'mailnew.com','spamhole.com','spamoff.de','spamstack.net',
+  'owlpic.com','cuvox.de','dayrep.com','einrot.com','fleckens.hu',
+  'gustr.com','iubridge.com','krovatka.su','kurzepost.de','objectmail.com',
+  'obobbo.com','rmqkr.net','superrito.com','teleworm.us',
+]);
+
 // Patterns that suggest a real person (firstname.lastname or firstinitial.lastname)
 const PERSONAL_PATTERN = /^[a-z]{2,}[._-][a-z]{2,}(\d{0,3})?$/;
 const FIRSTNAME_ONLY = /^[a-z]{3,12}(\d{0,2})?$/;
@@ -8668,6 +8691,7 @@ async function scoreEmail(email) {
   const domain = clean.slice(atIdx + 1);
 
   if (BLOCKED_EXACT.has(clean)) return { score: 0, reason: 'blocked_exact' };
+  if (DISPOSABLE_DOMAINS.has(domain)) return { score: 0, reason: 'disposable_domain' };
 
   // Check blocked prefixes — exact match or starts-with for compound prefixes
   const localBase = local.split(/[._+]/)[0];
@@ -8727,8 +8751,8 @@ async function scoreEmail(email) {
 // Backward-compat wrapper used by existing send logic
 async function isEmailDeliverable(email) {
   const { score, reason } = await scoreEmail(email);
-  if (score < 45) console.log(`[EmailScore] Skip ${email} — score ${score} (${reason})`);
-  return score >= 45;
+  if (score < 55) console.log(`[EmailScore] Skip ${email} — score ${score} (${reason})`);
+  return score >= 55;
 }
 
 // Called by bounce webhook to keep domain_reputation current
@@ -8885,7 +8909,13 @@ async function runLeadEngine(targetsPerRun = 3) {
               ? `${lead.company} — Dubai 2026 paperless mandate`
               : isSandbox
                 ? `Document integrity pilot — ${lead.company}`
-                : `Quick question for ${lead.company}`;
+                : [
+                    `${lead.company} — document integrity`,
+                    `How does ${lead.company} prove a record hasn't been altered?`,
+                    `Tamper-proof records for ${lead.company}`,
+                    `${lead.company} — protecting document authenticity`,
+                    `Question about ${lead.company}'s document workflow`,
+                  ][lead.email.split('').reduce((a, c) => a + c.charCodeAt(0), 0) % 5];
 
           try {
             const fromAddr = target.industry === 'government'
