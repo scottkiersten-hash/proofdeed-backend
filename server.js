@@ -8459,17 +8459,17 @@ async function searchLeadsViaGoogle(target, targetIndex = 0) {
   try {
     // 2 pages of Searlo results (10 per page = 20 URLs to mine)
     for (let page = 0; page <= 1; page++) {
-      const url = `https://api.searlo.tech/search?q=${encodeURIComponent(query)}&num=10&page=${page + 1}`;
-      const res = await fetch(url, { headers: { 'Authorization': `Bearer ${apiKey}` } });
+      const url = `https://api.searlo.tech/api/v1/search?q=${encodeURIComponent(query)}&num=10&page=${page + 1}`;
+      const res = await fetch(url, { headers: { 'x-api-key': apiKey } });
       if (!res.ok) { console.log(`[LeadEngine] Searlo API error ${res.status}`); break; }
       const data = await res.json();
-      const items = data.results || data.organic || data.webPages?.value || [];
+      const items = data.organic || data.results || [];
       if (!items.length) break;
       const mappedItems = items.map(item => ({
-        title: item.name || '',
+        title: item.title || '',
         snippet: item.snippet || '',
-        link: item.url || '',
-        displayLink: item.displayUrl || '',
+        link: item.link || '',
+        displayLink: item.displayedLink || '',
       }));
 
       for (const item of mappedItems) {
