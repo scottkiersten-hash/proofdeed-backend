@@ -2010,7 +2010,16 @@ app.get(["/verify/:certId", "/api/verify/:certId"], async (req, res) => {
       [certId]
     );
 
-    res.json({ success: true, certification: { ...cert, events: events.rows } });
+    // Fetch linked entities (Trust Graph)
+    const relationships = await pool.query(
+      `SELECT te.entity_id, te.entity_type, te.name, te.subtype, tr.relationship_type
+       FROM trust_relationships tr
+       JOIN trust_entities te ON te.entity_id = tr.entity_id
+       WHERE tr.certification_id = $1 ORDER BY tr.created_at ASC`,
+      [certId]
+    );
+
+    res.json({ success: true, certification: { ...cert, events: events.rows, relationships: relationships.rows } });
 
   } catch (error) {
     console.error("Verify error:", error);
@@ -2106,6 +2115,98 @@ app.get(['/verify/:certId/evidence', '/api/verify/:certId/evidence'], async (req
   } catch (err) {
     console.error('[Evidence] Error:', err.message);
     if (!res.headersSent) res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/* ============================================================
+   TRUST GRAPH — Entity and Relationship endpoints
+   ============================================================ */
+
+// POST /api/entities — create a named entity (authenticated)
+app.post(['/api/entities', '/entities'], authenticateApiKey, async (req, res) => {
+  try {
+    const { entity_type, name, subtype, metadata } = req.body;
+    if (!entity_type || !name) return res.status(400).json({ success: false, error: 'entity_type and name required.' });
+    const validTypes = ['organization','person','asset','record','event'];
+    if (!validTypes.includes(entity_type)) return res.status(400).json({ success: false, error: `entity_type must be one of: ${validTypes.join(', ')}` });
+    const entityId = 'TE-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase();
+    await pool.query(
+      `INSERT INTO trust_entities (entity_id, entity_type, name, subtype, metadata, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [entityId, entity_type, name.trim(), subtype || null, JSON.stringify(metadata || {}), req.apiKey.email]
+    );
+    res.json({ success: true, entity_id: entityId, entity_type, name });
+  } catch (err) {
+    console.error('[TrustGraph] Create entity error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/certifications/:certId/relationships — link entity to cert (authenticated)
+app.post(['/api/certifications/:certId/relationships', '/certifications/:certId/relationships'], authenticateApiKey, async (req, res) => {
+  try {
+    const { certId } = req.params;
+    const { entity_id, relationship_type } = req.body;
+    if (!entity_id) return res.status(400).json({ success: false, error: 'entity_id required.' });
+
+    const certCheck = await pool.query('SELECT certification_id FROM certifications WHERE certification_id=$1', [certId]);
+    if (certCheck.rows.length === 0) return res.status(404).json({ success: false, error: 'Trust Record not found.' });
+
+    const entityCheck = await pool.query('SELECT entity_id, name, entity_type FROM trust_entities WHERE entity_id=$1', [entity_id]);
+    if (entityCheck.rows.length === 0) return res.status(404).json({ success: false, error: 'Entity not found.' });
+
+    await pool.query(
+      `INSERT INTO trust_relationships (certification_id, entity_id, relationship_type, created_by)
+       VALUES ($1, $2, $3, $4) ON CONFLICT (certification_id, entity_id) DO NOTHING`,
+      [certId, entity_id, relationship_type || 'related_to', req.apiKey.email]
+    );
+
+    logCertEvent(certId, 'relationship_added', `Linked: ${entityCheck.rows[0].name}`, { entity_id, entity_type: entityCheck.rows[0].entity_type });
+
+    res.json({ success: true, certification_id: certId, entity_id, relationship_type: relationship_type || 'related_to' });
+  } catch (err) {
+    console.error('[TrustGraph] Link entity error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/certifications/:certId/relationships — public, returns linked entities
+app.get(['/api/certifications/:certId/relationships', '/certifications/:certId/relationships'], async (req, res) => {
+  try {
+    const { certId } = req.params;
+    const result = await pool.query(
+      `SELECT te.entity_id, te.entity_type, te.name, te.subtype, te.metadata,
+              tr.relationship_type, tr.created_at
+       FROM trust_relationships tr
+       JOIN trust_entities te ON te.entity_id = tr.entity_id
+       WHERE tr.certification_id = $1
+       ORDER BY tr.created_at ASC`,
+      [certId]
+    );
+    res.json({ success: true, relationships: result.rows });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/entities/:entityId — public entity profile with linked certs
+app.get(['/api/entities/:entityId', '/entities/:entityId'], async (req, res) => {
+  try {
+    const { entityId } = req.params;
+    const entity = await pool.query('SELECT * FROM trust_entities WHERE entity_id=$1', [entityId]);
+    if (entity.rows.length === 0) return res.status(404).json({ success: false, error: 'Entity not found.' });
+
+    const linked = await pool.query(
+      `SELECT tr.certification_id, tr.relationship_type, tr.created_at,
+              c.label, c.created_at AS cert_created_at
+       FROM trust_relationships tr
+       JOIN certifications c ON c.certification_id = tr.certification_id
+       WHERE tr.entity_id = $1 ORDER BY tr.created_at DESC LIMIT 50`,
+      [entityId]
+    );
+    res.json({ success: true, entity: entity.rows[0], linked_records: linked.rows });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
@@ -4085,6 +4186,31 @@ async function ensureIndexes() {
       );
       CREATE INDEX IF NOT EXISTS idx_certification_events_cert ON certification_events(certification_id);
       CREATE INDEX IF NOT EXISTS idx_certification_events_occurred ON certification_events(occurred_at);
+
+      -- Trust Graph: entities and relationships
+      CREATE TABLE IF NOT EXISTS trust_entities (
+        id          SERIAL PRIMARY KEY,
+        entity_id   TEXT UNIQUE NOT NULL,
+        entity_type TEXT NOT NULL CHECK (entity_type IN ('organization','person','asset','record','event')),
+        name        TEXT NOT NULL,
+        subtype     TEXT,
+        metadata    JSONB DEFAULT '{}',
+        created_by  TEXT,
+        created_at  TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_trust_entities_type ON trust_entities(entity_type);
+
+      CREATE TABLE IF NOT EXISTS trust_relationships (
+        id                SERIAL PRIMARY KEY,
+        certification_id  TEXT NOT NULL,
+        entity_id         TEXT NOT NULL REFERENCES trust_entities(entity_id) ON DELETE CASCADE,
+        relationship_type TEXT DEFAULT 'related_to',
+        created_by        TEXT,
+        created_at        TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(certification_id, entity_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_trust_relationships_cert ON trust_relationships(certification_id);
+      CREATE INDEX IF NOT EXISTS idx_trust_relationships_entity ON trust_relationships(entity_id);
 
       CREATE TABLE IF NOT EXISTS trust_ids (
         id              SERIAL PRIMARY KEY,
