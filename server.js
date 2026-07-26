@@ -8442,9 +8442,9 @@ function queryNeedsGeo(query) {
 }
 
 async function searchLeadsViaGoogle(target, targetIndex = 0) {
-  const apiKey = process.env.BING_API_KEY;
+  const apiKey = process.env.SEARLO_API_KEY;
   if (!apiKey) {
-    console.log('[LeadEngine] Missing BING_API_KEY — skipping');
+    console.log('[LeadEngine] Missing SEARLO_API_KEY — skipping');
     return [];
   }
 
@@ -8457,14 +8457,13 @@ async function searchLeadsViaGoogle(target, targetIndex = 0) {
   if (geoSuffix) console.log(`[LeadEngine] Geo-rotated query: "${query}"`);
 
   try {
-    // 2 pages of Bing results (10 per page = 20 URLs to mine)
+    // 2 pages of Searlo results (10 per page = 20 URLs to mine)
     for (let page = 0; page <= 1; page++) {
-      const offset = page * 10;
-      const url = `https://api.bing.microsoft.com/v7.0/search?q=${encodeURIComponent(query)}&count=10&offset=${offset}&mkt=en-US`;
-      const res = await fetch(url, { headers: { 'Ocp-Apim-Subscription-Key': apiKey } });
-      if (!res.ok) { console.log(`[LeadEngine] Bing API error ${res.status}`); break; }
+      const url = `https://api.searlo.tech/search?q=${encodeURIComponent(query)}&num=10&page=${page + 1}`;
+      const res = await fetch(url, { headers: { 'Authorization': `Bearer ${apiKey}` } });
+      if (!res.ok) { console.log(`[LeadEngine] Searlo API error ${res.status}`); break; }
       const data = await res.json();
-      const items = data.webPages?.value || [];
+      const items = data.results || data.organic || data.webPages?.value || [];
       if (!items.length) break;
       const mappedItems = items.map(item => ({
         title: item.name || '',
@@ -8798,8 +8797,8 @@ async function recordEmailEvent(email, event) {
 }
 
 async function runLeadEngine(targetsPerRun = 3) {
-  if (!process.env.BING_API_KEY || !process.env.RESEND_API_KEY) {
-    console.log(`[LeadEngine] Missing API keys — BING_API_KEY: ${!!process.env.BING_API_KEY}, RESEND: ${!!process.env.RESEND_API_KEY}`);
+  if (!process.env.SEARLO_API_KEY || !process.env.RESEND_API_KEY) {
+    console.log(`[LeadEngine] Missing API keys — SEARLO_API_KEY: ${!!process.env.SEARLO_API_KEY}, RESEND: ${!!process.env.RESEND_API_KEY}`);
     return;
   }
 
@@ -9010,7 +9009,7 @@ app.get(['/api/admin/lead-engine', '/admin/lead-engine'], authRateLimit, async (
       nextTarget: LEAD_TARGETS[parseInt(state.rotation_index?.value || '0') % LEAD_TARGETS.length],
       schedule: 'Tue/Wed/Thu 8am PT',
       envCheck: {
-        BING_API_KEY: !!process.env.BING_API_KEY,
+        SEARLO_API_KEY: !!process.env.SEARLO_API_KEY,
         RESEND_API_KEY: !!process.env.RESEND_API_KEY,
       },
     });
