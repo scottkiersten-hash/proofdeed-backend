@@ -127,6 +127,15 @@ const { Pool } = pkg;
 const app = express();
 app.set("trust proxy", 1);
 
+// Log a provenance event for a certification — fire-and-forget, never throws
+function logCertEvent(certId, eventType, eventLabel, metadata = {}) {
+  pool.query(
+    `INSERT INTO certification_events (certification_id, event_type, event_label, metadata, occurred_at)
+     VALUES ($1, $2, $3, $4, NOW())`,
+    [certId, eventType, eventLabel, JSON.stringify(metadata)]
+  ).catch(() => {});
+}
+
 /* ---------------- CORS ---------------- */
 const configuredOrigins = [
   process.env.FRONTEND_URL,
@@ -657,6 +666,7 @@ app.post("/api/v1/certify", authenticateApiKey, async (req, res) => {
         "UPDATE certifications SET polygon_tx = $1 WHERE certification_id = $2",
         [txHash, proofId]
       );
+      logCertEvent(proofId, 'anchored', 'Provenance Anchored', { tx: txHash });
       if (req.apiKey.webhook_url) {
         fetch(req.apiKey.webhook_url, {
           method: "POST",
@@ -724,6 +734,7 @@ app.post("/api/v1/certify/fields", authenticateApiKey, async (req, res) => {
     // Anchor root hash to blockchain in background
     anchorToPolygon(rootHash).then(async (txHash) => {
       await pool.query('UPDATE certifications SET polygon_tx=$1 WHERE certification_id=$2', [txHash, proofId]);
+      logCertEvent(proofId, 'anchored', 'Provenance Anchored', { tx: txHash });
       if (req.apiKey.webhook_url) {
         fetch(req.apiKey.webhook_url, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -829,6 +840,7 @@ app.post("/api/v1/webhooks/dms", authenticateApiKey, async (req, res) => {
 
     anchorToPolygon(rootHash).then(async (txHash) => {
       await pool.query('UPDATE certifications SET polygon_tx=$1 WHERE certification_id=$2', [txHash, proofId]);
+      logCertEvent(proofId, 'anchored', 'Provenance Anchored', { tx: txHash });
       if (req.apiKey.webhook_url) {
         fetch(req.apiKey.webhook_url, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -1970,7 +1982,7 @@ app.get(["/verify/:certId", "/api/verify/:certId"], async (req, res) => {
 
     const result = await pool.query(
       `SELECT c.certification_id, c.hash, c.polygon_tx, c.created_at, c.document_data,
-              c.label, ak.organization_name
+              c.label, c.ai_provenance, ak.organization_name
        FROM certifications c
        LEFT JOIN api_keys ak ON ak.email = c.api_key_email
        WHERE c.certification_id = $1`,
@@ -2003,6 +2015,97 @@ app.get(["/verify/:certId", "/api/verify/:certId"], async (req, res) => {
   } catch (error) {
     console.error("Verify error:", error);
     res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/* ============================================================
+   EVIDENCE MODE — Public evidence report PDF for any Trust Record
+   ============================================================ */
+app.get(['/verify/:certId/evidence', '/api/verify/:certId/evidence'], async (req, res) => {
+  try {
+    const { certId } = req.params;
+    const result = await pool.query(
+      `SELECT c.certification_id, c.hash, c.polygon_tx, c.created_at, c.document_data,
+              c.label, c.ai_provenance, ak.organization_name
+       FROM certifications c
+       LEFT JOIN api_keys ak ON ak.email = c.api_key_email
+       WHERE c.certification_id = $1`,
+      [certId]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ success: false, error: 'Trust Record not found.' });
+    const cert = result.rows[0];
+
+    const events = await pool.query(
+      `SELECT event_type, event_label, actor, metadata, occurred_at
+       FROM certification_events WHERE certification_id = $1
+       ORDER BY occurred_at ASC`,
+      [certId]
+    );
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="ProofDeed-Evidence-${certId}.pdf"`);
+
+    const doc = new PDFDocument({ margin: 60, size: 'A4' });
+    doc.pipe(res);
+
+    // Header
+    doc.rect(0, 0, doc.page.width, 80).fill('#0f172a');
+    doc.fontSize(20).font('Helvetica-Bold').fillColor('#ffffff').text('PROOFDEED', 60, 24);
+    doc.fontSize(9).font('Helvetica').fillColor('#94a3b8').text('Evidence Verification Report', 60, 50);
+    doc.fontSize(8).fillColor('#64748b').text(`Generated: ${new Date().toUTCString()}`, doc.page.width - 260, 50, { width: 200, align: 'right' });
+
+    doc.moveDown(3);
+    doc.fontSize(14).font('Helvetica-Bold').fillColor('#0f172a').text('Chain of Custody Report', { align: 'center' });
+    doc.moveDown(0.4);
+    doc.fontSize(9).font('Helvetica').fillColor('#64748b').text('This report establishes the provenance, integrity, and verification history of the referenced Trust Record.', { align: 'center' });
+    doc.moveDown(1.5);
+    doc.moveTo(60, doc.y).lineTo(doc.page.width - 60, doc.y).strokeColor('#e2e8f0').lineWidth(1).stroke();
+    doc.moveDown(1);
+
+    // Record details
+    const fields = [
+      { label: 'Trust ID', value: cert.certification_id },
+      { label: 'Document Label', value: cert.label || (cert.document_data?.fileName) || '—' },
+      { label: 'SHA-256 Hash', value: cert.hash },
+      { label: 'Created (UTC)', value: new Date(cert.created_at).toUTCString() },
+      { label: 'Provenance Anchor', value: cert.polygon_tx || 'Pending' },
+      { label: 'Issuer', value: cert.organization_name || '—' },
+      { label: 'AI Provenance', value: cert.ai_provenance ? { human: 'Human Created', ai_assisted: 'AI Assisted', ai_generated: 'AI Generated' }[cert.ai_provenance] : 'Not declared' },
+      { label: 'Verification URL', value: `https://proofdeed.com/verify/${cert.certification_id}` },
+    ];
+    for (const f of fields) {
+      doc.fontSize(8).font('Helvetica-Bold').fillColor('#64748b').text(f.label.toUpperCase(), 60);
+      doc.fontSize(10).font('Helvetica').fillColor('#0f172a').text(f.value, 60, doc.y + 2, { width: doc.page.width - 120, lineBreak: true });
+      doc.moveDown(0.8);
+    }
+
+    doc.moveDown(0.5);
+    doc.moveTo(60, doc.y).lineTo(doc.page.width - 60, doc.y).strokeColor('#e2e8f0').lineWidth(1).stroke();
+    doc.moveDown(1);
+
+    // Provenance timeline
+    doc.fontSize(11).font('Helvetica-Bold').fillColor('#0f172a').text('Provenance Timeline');
+    doc.moveDown(0.5);
+    if (events.rows.length === 0) {
+      doc.fontSize(9).font('Helvetica').fillColor('#94a3b8').text('No events recorded.');
+    } else {
+      for (const ev of events.rows) {
+        doc.fontSize(9).font('Helvetica-Bold').fillColor('#032D60').text(`• ${ev.event_label}`);
+        doc.fontSize(8).font('Helvetica').fillColor('#64748b').text(`  ${new Date(ev.occurred_at).toUTCString()}`, { indent: 12 });
+        doc.moveDown(0.4);
+      }
+    }
+
+    doc.moveDown(1);
+    doc.moveTo(60, doc.y).lineTo(doc.page.width - 60, doc.y).strokeColor('#e2e8f0').lineWidth(1).stroke();
+    doc.moveDown(0.8);
+    doc.fontSize(8).font('Helvetica').fillColor('#94a3b8')
+      .text('This report was generated by ProofDeed Trust Infrastructure Platform. The SHA-256 hash and provenance anchor provide independent cryptographic proof of record existence and integrity. This document may be used as supporting evidence in legal, compliance, and audit proceedings.', 60, doc.y, { width: doc.page.width - 120, align: 'left' });
+
+    doc.end();
+  } catch (err) {
+    console.error('[Evidence] Error:', err.message);
+    if (!res.headersSent) res.status(500).json({ success: false, error: err.message });
   }
 });
 
@@ -3776,6 +3879,7 @@ async function ensureIndexes() {
       );
       ALTER TABLE certifications ADD COLUMN IF NOT EXISTS batch_id TEXT;
       ALTER TABLE certifications ADD COLUMN IF NOT EXISTS label TEXT;
+      ALTER TABLE certifications ADD COLUMN IF NOT EXISTS ai_provenance TEXT CHECK (ai_provenance IN ('human', 'ai_assisted', 'ai_generated'));
       ALTER TABLE certifications ADD COLUMN IF NOT EXISTS merkle_root TEXT;
       ALTER TABLE certifications ADD COLUMN IF NOT EXISTS merkle_proof JSONB;
       ALTER TABLE batches ADD COLUMN IF NOT EXISTS merkle_root TEXT;
