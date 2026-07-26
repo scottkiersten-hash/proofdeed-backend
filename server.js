@@ -1925,6 +1925,12 @@ app.post(["/api/demo/certify", "/demo/certify"], demoRateLimit, async (req, res)
       [proofId, hash, null, 'demo@proofdeed.com', timestamp, JSON.stringify(documentData)]
     );
 
+    pool.query(
+      `INSERT INTO certification_events (certification_id, event_type, event_label, occurred_at)
+       VALUES ($1, 'created', 'Trust Record Created', $2)`,
+      [proofId, timestamp]
+    ).catch(() => {});
+
     res.json({
       success: true,
       proofId,
@@ -1963,8 +1969,11 @@ app.get(["/verify/:certId", "/api/verify/:certId"], async (req, res) => {
     }
 
     const result = await pool.query(
-      `SELECT certification_id, hash, polygon_tx, created_at, document_data
-       FROM certifications WHERE certification_id = $1`,
+      `SELECT c.certification_id, c.hash, c.polygon_tx, c.created_at, c.document_data,
+              c.label, ak.organization_name
+       FROM certifications c
+       LEFT JOIN api_keys ak ON ak.email = c.api_key_email
+       WHERE c.certification_id = $1`,
       [certId]
     );
 
@@ -1972,7 +1981,24 @@ app.get(["/verify/:certId", "/api/verify/:certId"], async (req, res) => {
       return res.status(404).json({ success: false, error: "Certificate not found." });
     }
 
-    res.json({ success: true, certification: result.rows[0] });
+    const cert = result.rows[0];
+
+    // Log verification event
+    pool.query(
+      `INSERT INTO certification_events (certification_id, event_type, event_label, occurred_at)
+       VALUES ($1, 'verified', 'Record Verified', NOW())`,
+      [certId]
+    ).catch(() => {});
+
+    // Fetch provenance timeline
+    const events = await pool.query(
+      `SELECT event_type, event_label, actor, metadata, occurred_at
+       FROM certification_events WHERE certification_id = $1
+       ORDER BY occurred_at ASC`,
+      [certId]
+    );
+
+    res.json({ success: true, certification: { ...cert, events: events.rows } });
 
   } catch (error) {
     console.error("Verify error:", error);
@@ -3943,6 +3969,18 @@ async function ensureIndexes() {
       CREATE INDEX IF NOT EXISTS idx_asset_passports_id ON asset_passports(passport_id);
       CREATE INDEX IF NOT EXISTS idx_asset_passports_identifier ON asset_passports(asset_identifier);
       CREATE INDEX IF NOT EXISTS idx_asset_passport_events_passport ON asset_passport_events(passport_id);
+
+      CREATE TABLE IF NOT EXISTS certification_events (
+        id                SERIAL PRIMARY KEY,
+        certification_id  TEXT NOT NULL,
+        event_type        TEXT NOT NULL,
+        event_label       TEXT,
+        actor             TEXT,
+        metadata          JSONB DEFAULT '{}',
+        occurred_at       TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_certification_events_cert ON certification_events(certification_id);
+      CREATE INDEX IF NOT EXISTS idx_certification_events_occurred ON certification_events(occurred_at);
 
       CREATE TABLE IF NOT EXISTS trust_ids (
         id              SERIAL PRIMARY KEY,
