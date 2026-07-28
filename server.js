@@ -1677,6 +1677,83 @@ app.put("/api/v1/webhook", authenticateApiKeyNoLimit, async (req, res) => {
   }
 });
 
+/* ---------------- API KEY ROTATION ---------------- */
+app.post("/api/v1/keys/rotate", authenticateApiKeyNoLimit, async (req, res) => {
+  try {
+    const newKey = "pd_live_" + crypto.randomBytes(32).toString("hex");
+    await pool.query(
+      `UPDATE api_keys SET api_key = $1 WHERE api_key = $2`,
+      [newKey, req.apiKey.api_key]
+    );
+    res.json({
+      success: true,
+      api_key: newKey,
+      message: "Key rotated. Update your integration immediately — the previous key is now invalid.",
+    });
+  } catch (error) {
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+/* ---------------- API KEY REVOCATION ---------------- */
+app.delete("/api/v1/keys", authenticateApiKeyNoLimit, async (req, res) => {
+  try {
+    await pool.query(
+      `UPDATE api_keys SET active = FALSE WHERE api_key = $1`,
+      [req.apiKey.api_key]
+    );
+    res.json({ success: true, message: "API key revoked. All requests using this key will be rejected immediately." });
+  } catch (error) {
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+/* ---------------- BATCH VERIFY ---------------- */
+app.post("/api/v1/batch/verify", authenticateApiKeyNoLimit, async (req, res) => {
+  try {
+    const { trust_ids } = req.body;
+    if (!Array.isArray(trust_ids) || trust_ids.length === 0) {
+      return res.status(400).json({ error: "trust_ids must be a non-empty array." });
+    }
+    if (trust_ids.length > 1000) {
+      return res.status(400).json({ error: "Maximum 1,000 Trust IDs per batch verify request." });
+    }
+
+    const result = await pool.query(
+      `SELECT c.certification_id, c.hash, c.polygon_tx, c.created_at, c.label, ak.organization_name
+       FROM certifications c
+       LEFT JOIN api_keys ak ON ak.email = c.api_key_email
+       WHERE c.certification_id = ANY($1)`,
+      [trust_ids]
+    );
+
+    const found = new Map(result.rows.map(r => [r.certification_id, r]));
+    const results = trust_ids.map(id => {
+      const cert = found.get(id);
+      if (!cert) return { trust_id: id, status: "not_found" };
+      return {
+        trust_id: cert.certification_id,
+        status: "verified",
+        label: cert.label || null,
+        issued_by: cert.organization_name || null,
+        anchored: !!cert.polygon_tx,
+        polygon_tx: cert.polygon_tx || null,
+        created_at: cert.created_at,
+        verify_url: `https://proofdeed.com/verify/${cert.certification_id}`,
+      };
+    });
+
+    res.json({
+      total: trust_ids.length,
+      verified: results.filter(r => r.status === "verified").length,
+      not_found: results.filter(r => r.status === "not_found").length,
+      results,
+    });
+  } catch (error) {
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
 /* ---------------- LIST CERTIFICATIONS ---------------- */
 app.get("/api/v1/certificates", authenticateApiKeyNoLimit, async (req, res) => {
   try {
