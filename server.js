@@ -45,6 +45,7 @@ function getTOTPUri(secret) {
   return totp.toString();
 }
 import { anchorToPolygon } from "./polygon.js";
+import { analyzeDocument } from "./forensics.js";
 import multer from 'multer';
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -681,6 +682,167 @@ app.post("/api/v1/certify", authenticateApiKey, async (req, res) => {
 
   } catch (error) {
     console.error("Enterprise certify error:", error);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+/* ---------------- FILE CERTIFY (Enterprise API — with forensics) ---------------- */
+// Accepts the actual file, runs forensic analysis, hashes it, and certifies.
+// Returns Trust ID + forensic assessment in one call.
+app.post("/api/v1/certify/file", authenticateApiKey, upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded. Send the file as multipart/form-data with field name "file".' });
+
+    const { label, ai_provenance } = req.body;
+    const fileBuffer = req.file.buffer;
+    const mimetype = req.file.mimetype;
+
+    // Hash the file
+    const documentHash = crypto.createHash('sha256').update(fileBuffer).digest('hex');
+
+    // Run forensic analysis (non-blocking for response but awaited for DB write)
+    const forensics = await analyzeDocument(fileBuffer, mimetype);
+
+    const proofId = "PD-" + Date.now();
+    const timestamp = new Date().toISOString();
+
+    await pool.query(
+      `INSERT INTO certifications
+         (certification_id, hash, polygon_tx, api_key_email, ip_address, label, ai_provenance,
+          forensic_file_type, forensic_declared_created_at, forensic_declared_modified_at,
+          forensic_authoring_software, forensic_pdf_version_layers, forensic_post_creation_edits,
+          forensic_total_editing_minutes, forensic_anomalies, forensic_assessment, forensic_analyzed_at,
+          created_at)
+       VALUES ($1,$2,NULL,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,NOW())
+       ON CONFLICT (certification_id) DO NOTHING`,
+      [
+        proofId, documentHash, req.apiKey.email, req.ip || req.headers['x-forwarded-for'] || null,
+        label || req.file.originalname || null, ai_provenance || null,
+        forensics.file_type,
+        forensics.declared_created_at ? new Date(forensics.declared_created_at) : null,
+        forensics.declared_modified_at ? new Date(forensics.declared_modified_at) : null,
+        forensics.authoring_software,
+        forensics.pdf_version_layers,
+        forensics.post_creation_edits,
+        forensics.total_editing_minutes,
+        JSON.stringify(forensics.anomalies),
+        forensics.assessment,
+        new Date(forensics.analyzed_at),
+      ]
+    );
+
+    await pool.query(
+      "UPDATE api_keys SET used_this_month = used_this_month + 1 WHERE api_key = $1",
+      [req.apiKey.api_key]
+    );
+
+    logCertEvent(proofId, 'created', 'Trust Record Created', { forensic_assessment: forensics.assessment }).catch(() => {});
+
+    res.json({
+      proofId,
+      timestamp,
+      hash: documentHash,
+      polygon_tx: null,
+      verify_url: `https://proofdeed.com/verify/${proofId}`,
+      forensics: {
+        file_type: forensics.file_type,
+        declared_created_at: forensics.declared_created_at,
+        declared_modified_at: forensics.declared_modified_at,
+        authoring_software: forensics.authoring_software,
+        pdf_version_layers: forensics.pdf_version_layers,
+        post_creation_edits: forensics.post_creation_edits,
+        total_editing_minutes: forensics.total_editing_minutes,
+        anomalies: forensics.anomalies,
+        assessment: forensics.assessment,
+      },
+    });
+
+    // Background blockchain anchor
+    anchorToPolygon(documentHash).then(async (txHash) => {
+      await pool.query("UPDATE certifications SET polygon_tx = $1 WHERE certification_id = $2", [txHash, proofId]);
+      logCertEvent(proofId, 'anchored', 'Provenance Anchored', { tx: txHash }).catch(() => {});
+    }).catch((err) => console.error("Background anchor failed for", proofId, err.message));
+
+  } catch (err) {
+    console.error("File certify error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+/* ---------------- FILE CERTIFY (Dashboard — JWT auth, with forensics) ---------------- */
+app.post(["/api/certify-file", "/certify-file"], upload.single('file'), async (req, res) => {
+  try {
+    const authHeader = req.headers['authorization'];
+    if (!authHeader) return res.status(401).json({ error: 'Authentication required.' });
+
+    let decoded;
+    try {
+      decoded = jwt.verify(authHeader.split(' ')[1], process.env.JWT_SECRET);
+    } catch {
+      return res.status(401).json({ error: 'Invalid or expired session.' });
+    }
+
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
+
+    const userResult = await pool.query('SELECT * FROM users WHERE email = $1', [decoded.email]);
+    if (userResult.rows.length === 0) return res.status(401).json({ error: 'User not found.' });
+    const user = userResult.rows[0];
+
+    const fileBuffer = req.file.buffer;
+    const mimetype = req.file.mimetype;
+    const documentHash = crypto.createHash('sha256').update(fileBuffer).digest('hex');
+    const forensics = await analyzeDocument(fileBuffer, mimetype);
+
+    const proofId = "PD-" + Date.now();
+    const timestamp = new Date().toISOString();
+
+    await pool.query(
+      `INSERT INTO certifications
+         (certification_id, hash, polygon_tx, user_id, label,
+          forensic_file_type, forensic_declared_created_at, forensic_declared_modified_at,
+          forensic_authoring_software, forensic_pdf_version_layers, forensic_post_creation_edits,
+          forensic_total_editing_minutes, forensic_anomalies, forensic_assessment, forensic_analyzed_at,
+          created_at)
+       VALUES ($1,$2,NULL,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,NOW())
+       ON CONFLICT (certification_id) DO NOTHING`,
+      [
+        proofId, documentHash, user.id, req.file.originalname || null,
+        forensics.file_type,
+        forensics.declared_created_at ? new Date(forensics.declared_created_at) : null,
+        forensics.declared_modified_at ? new Date(forensics.declared_modified_at) : null,
+        forensics.authoring_software,
+        forensics.pdf_version_layers,
+        forensics.post_creation_edits,
+        forensics.total_editing_minutes,
+        JSON.stringify(forensics.anomalies),
+        forensics.assessment,
+        new Date(forensics.analyzed_at),
+      ]
+    );
+
+    logCertEvent(proofId, 'created', 'Trust Record Created', { forensic_assessment: forensics.assessment }).catch(() => {});
+
+    res.json({
+      proofId,
+      timestamp,
+      hash: documentHash,
+      polygon_tx: null,
+      verify_url: `https://proofdeed.com/verify/${proofId}`,
+      forensics: {
+        file_type: forensics.file_type,
+        declared_created_at: forensics.declared_created_at,
+        authoring_software: forensics.authoring_software,
+        anomalies: forensics.anomalies,
+        assessment: forensics.assessment,
+      },
+    });
+
+    anchorToPolygon(documentHash).then(async (txHash) => {
+      await pool.query("UPDATE certifications SET polygon_tx = $1 WHERE certification_id = $2", [txHash, proofId]);
+    }).catch((err) => console.error("Background anchor failed for", proofId, err.message));
+
+  } catch (err) {
+    console.error("Dashboard file certify error:", err);
     res.status(500).json({ error: "Internal server error." });
   }
 });
@@ -2071,14 +2233,29 @@ app.get(["/verify/:certId", "/api/verify/:certId"], async (req, res) => {
             { entity_id: 'TE-DEMO-003', entity_type: 'asset', name: '2847 Elm Street, Riverside CA', subtype: 'property', relationship_type: 'subject_property' },
             { entity_id: 'TE-DEMO-004', entity_type: 'record', name: 'Grant Deed #2026-0041882', subtype: 'deed', relationship_type: 'related_record' },
             { entity_id: 'TE-DEMO-005', entity_type: 'event', name: 'Title Transfer — April 9, 2026', subtype: 'transfer', relationship_type: 'triggering_event' },
-          ]
+          ],
+          forensics: {
+            file_type: 'pdf',
+            declared_created_at: '2026-04-09T10:40:11.000Z',
+            declared_modified_at: '2026-04-09T10:41:55.000Z',
+            authoring_software: 'Microsoft Word 16.x',
+            pdf_version_layers: 1,
+            post_creation_edits: 0,
+            total_editing_minutes: null,
+            anomalies: [],
+            assessment: 'clean',
+            analyzed_at: '2026-04-09T10:42:17.000Z',
+          }
         }
       });
     }
 
     const result = await pool.query(
       `SELECT c.certification_id, c.hash, c.polygon_tx, c.created_at, c.document_data,
-              c.label, c.ai_provenance, ak.organization_name
+              c.label, c.ai_provenance, ak.organization_name,
+              c.forensic_file_type, c.forensic_declared_created_at, c.forensic_declared_modified_at,
+              c.forensic_authoring_software, c.forensic_pdf_version_layers, c.forensic_post_creation_edits,
+              c.forensic_total_editing_minutes, c.forensic_anomalies, c.forensic_assessment, c.forensic_analyzed_at
        FROM certifications c
        LEFT JOIN api_keys ak ON ak.email = c.api_key_email
        WHERE c.certification_id = $1`,
@@ -2115,7 +2292,26 @@ app.get(["/verify/:certId", "/api/verify/:certId"], async (req, res) => {
       [certId]
     );
 
-    res.json({ success: true, certification: { ...cert, events: events.rows, relationships: relationships.rows } });
+    res.json({
+      success: true,
+      certification: {
+        ...cert,
+        events: events.rows,
+        relationships: relationships.rows,
+        forensics: cert.forensic_assessment ? {
+          file_type: cert.forensic_file_type,
+          declared_created_at: cert.forensic_declared_created_at,
+          declared_modified_at: cert.forensic_declared_modified_at,
+          authoring_software: cert.forensic_authoring_software,
+          pdf_version_layers: cert.forensic_pdf_version_layers,
+          post_creation_edits: cert.forensic_post_creation_edits,
+          total_editing_minutes: cert.forensic_total_editing_minutes,
+          anomalies: cert.forensic_anomalies || [],
+          assessment: cert.forensic_assessment,
+          analyzed_at: cert.forensic_analyzed_at,
+        } : null,
+      }
+    });
 
   } catch (error) {
     console.error("Verify error:", error);
@@ -4373,6 +4569,18 @@ async function ensureIndexes() {
       );
       CREATE INDEX IF NOT EXISTS idx_resellers_slug ON resellers(slug);
       CREATE INDEX IF NOT EXISTS idx_resellers_api_key ON resellers(api_key);
+
+      -- Document forensics columns
+      ALTER TABLE certifications ADD COLUMN IF NOT EXISTS forensic_file_type TEXT;
+      ALTER TABLE certifications ADD COLUMN IF NOT EXISTS forensic_declared_created_at TIMESTAMPTZ;
+      ALTER TABLE certifications ADD COLUMN IF NOT EXISTS forensic_declared_modified_at TIMESTAMPTZ;
+      ALTER TABLE certifications ADD COLUMN IF NOT EXISTS forensic_authoring_software TEXT;
+      ALTER TABLE certifications ADD COLUMN IF NOT EXISTS forensic_pdf_version_layers INTEGER;
+      ALTER TABLE certifications ADD COLUMN IF NOT EXISTS forensic_post_creation_edits INTEGER;
+      ALTER TABLE certifications ADD COLUMN IF NOT EXISTS forensic_total_editing_minutes INTEGER;
+      ALTER TABLE certifications ADD COLUMN IF NOT EXISTS forensic_anomalies JSONB;
+      ALTER TABLE certifications ADD COLUMN IF NOT EXISTS forensic_assessment TEXT CHECK (forensic_assessment IN ('clean', 'low', 'moderate', 'high'));
+      ALTER TABLE certifications ADD COLUMN IF NOT EXISTS forensic_analyzed_at TIMESTAMPTZ;
 
       CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
       CREATE INDEX IF NOT EXISTS idx_certifications_hash ON certifications(hash);
