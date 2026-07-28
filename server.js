@@ -1975,7 +1975,26 @@ app.get(["/verify/:certId", "/api/verify/:certId"], async (req, res) => {
           polygon_tx: '0x29bfe7c1d3a8f042e91bc7354d2a80f5e6c1d398',
           created_at: '2026-04-09T10:42:18.000Z',
           document_data: { fileName: 'Executed_Purchase_Agreement_v3.pdf' },
-          is_demo: true
+          label: 'Executed Purchase Agreement v3',
+          organization_name: 'Riverside County Recorder',
+          ai_provenance: 'human',
+          is_demo: true,
+          events: [
+            { event_type: 'created', event_label: 'Trust Record Created', occurred_at: '2026-04-09T10:42:18.000Z' },
+            { event_type: 'anchored', event_label: 'Provenance Anchored', occurred_at: '2026-04-09T10:42:31.000Z' },
+            { event_type: 'relationship_added', event_label: 'Linked: Riverside County Recorder', occurred_at: '2026-04-09T10:43:05.000Z' },
+            { event_type: 'relationship_added', event_label: 'Linked: 2847 Elm Street, Riverside CA', occurred_at: '2026-04-09T10:43:12.000Z' },
+            { event_type: 'verified', event_label: 'Record Verified', occurred_at: '2026-04-22T14:10:00.000Z' },
+            { event_type: 'verified', event_label: 'Record Verified', occurred_at: '2026-05-03T09:27:00.000Z' },
+            { event_type: 'verified', event_label: 'Record Verified', occurred_at: '2026-06-14T16:55:00.000Z' },
+          ],
+          relationships: [
+            { entity_id: 'TE-DEMO-001', entity_type: 'organization', name: 'Riverside County Recorder', subtype: 'government agency', relationship_type: 'issued_by' },
+            { entity_id: 'TE-DEMO-002', entity_type: 'person', name: 'Maria Torres', subtype: 'notary', relationship_type: 'notarized_by' },
+            { entity_id: 'TE-DEMO-003', entity_type: 'asset', name: '2847 Elm Street, Riverside CA', subtype: 'property', relationship_type: 'subject_property' },
+            { entity_id: 'TE-DEMO-004', entity_type: 'record', name: 'Grant Deed #2026-0041882', subtype: 'deed', relationship_type: 'related_record' },
+            { entity_id: 'TE-DEMO-005', entity_type: 'event', name: 'Title Transfer — April 9, 2026', subtype: 'transfer', relationship_type: 'triggering_event' },
+          ]
         }
       });
     }
