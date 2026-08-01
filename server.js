@@ -9394,7 +9394,7 @@ async function runLeadEngine(targetsPerRun = 3) {
   ).catch(() => {});
 
   const TARGETS_PER_RUN = targetsPerRun;
-  const ALL_TARGETS = [...LEAD_TARGETS, ...AFFILIATE_TARGETS];
+  const ALL_TARGETS = [...LEAD_TARGETS, ...AFFILIATE_TARGETS].filter(t => t.industry === 'government');
 
   // Get current rotation index
   const idxRow = await pool.query(`SELECT value FROM lead_engine_state WHERE key='rotation_index'`).catch(() => ({ rows: [] }));
