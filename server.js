@@ -51,32 +51,33 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 
 
 dotenv.config();
 
-/* ---------------- EMAIL HELPER (Resend — single source of truth for all transactional email) ---------------- */
+/* ---------------- EMAIL HELPER (Brevo SMTP via nodemailer) ---------------- */
 async function sendEmail({ to, from, subject, text, html }) {
-  if (!to || !process.env.RESEND_API_KEY) throw new Error('RESEND_API_KEY missing');
-  const { Resend } = await import('resend');
-  const resend = new Resend(process.env.RESEND_API_KEY);
-  const result = await resend.emails.send({
+  if (!to || !process.env.BREVO_SMTP_KEY) throw new Error('BREVO_SMTP_KEY missing');
+  const nodemailer = await import('nodemailer');
+  const transporter = nodemailer.default.createTransport({
+    host: 'smtp-relay.brevo.com',
+    port: 587,
+    secure: false,
+    auth: {
+      user: process.env.BREVO_SMTP_USER,
+      pass: process.env.BREVO_SMTP_KEY,
+    },
+  });
+  const result = await transporter.sendMail({
     from: from || 'ProofDeed <info@proofdeed.com>',
     to,
     subject,
     ...(html ? { html } : { text: text || '' }),
   });
-  if (result.error) {
-    console.error('sendEmail Resend error:', subject, result.error);
-    throw new Error(result.error.message || 'Resend rejected the email');
-  }
   return result;
 }
 
 async function sendAnchorConfirmationEmail({ to, proofId, txHash, fileName, verifyUrl }) {
-  if (!to || !process.env.RESEND_API_KEY) return;
+  if (!to || !process.env.BREVO_SMTP_KEY) return;
   try {
-    const { Resend } = await import('resend');
-    const resend = new Resend(process.env.RESEND_API_KEY);
     const label = fileName ? `<b>${fileName}</b>` : `Proof ID <b>${proofId}</b>`;
-    await resend.emails.send({
-      from: 'ProofDeed <info@proofdeed.com>',
+    await sendEmail({
       to,
       subject: `Your document is now on-chain — ${proofId}`,
       html: `
@@ -4903,12 +4904,9 @@ app.post(['/api/webhooks/resend-inbound', '/webhooks/resend-inbound'], async (re
         [contact.id, JSON.stringify({ from: fromEmail, subject, snippet: bodyText.substring(0,200), intent })]);
 
       // Forward to ProtonMail so Scott sees it in his inbox
-      const { Resend: ResendFwd } = await import('resend');
-      const resendFwd = new ResendFwd(process.env.RESEND_API_KEY);
-      await resendFwd.emails.send({
+      await sendEmail({
         from: `${fromName} via ProofDeed <info@proofdeed.com>`,
         to: 'sjjk@pm.me',
-        reply_to: fromEmail,
         subject: subject,
         text: `From: ${fromField}\nTo: ${toField}\n\n${bodyText}`,
       }).catch(() => {});
@@ -4946,12 +4944,9 @@ app.post(['/api/webhooks/resend-inbound', '/webhooks/resend-inbound'], async (re
     console.log(`✅ Reply detected from ${fromField} → contact #${contact.id} (${contact.name}) — intent: ${isHighIntent ? 'HIGH 🔥' : 'standard'}`);
 
     // Forward to ProtonMail so Scott sees the reply
-    const { Resend: ResendReply } = await import('resend');
-    const resendReply = new ResendReply(process.env.RESEND_API_KEY);
-    await resendReply.emails.send({
+    await sendEmail({
       from: `${contact.name} via ProofDeed <info@proofdeed.com>`,
       to: 'sjjk@pm.me',
-      reply_to: contact.email,
       subject: `Re: ${subject}`,
       text: `From: ${fromField}\nCompany: ${contact.company}\nIntent: ${isHighIntent ? '🔥 HIGH' : 'standard'}\n\n${textSnippet}`,
     }).catch(() => {});
@@ -5369,7 +5364,7 @@ app.post(['/api/admin/inbox/:id/reply', '/admin/inbox/:id/reply'], authRateLimit
     const { body, subject } = req.body;
     if (!body) return res.status(400).json({ error: 'Reply body required.' });
 
-    if (!process.env.RESEND_API_KEY) return res.status(500).json({ error: 'Email not configured.' });
+    if (!process.env.BREVO_SMTP_KEY) return res.status(500).json({ error: 'Email not configured.' });
 
     const replySubject = subject || (email.subject.startsWith('Re:') ? email.subject : `Re: ${email.subject}`);
 
@@ -5595,8 +5590,6 @@ app.post(['/api/admin/import/send-pending', '/admin/import/send-pending'], authR
     res.json({ success: true, queued: contacts.rows.length, message: `Sending to ${contacts.rows.length} pending contacts in background.` });
     // Fire and forget
     (async () => {
-      const { Resend } = await import('resend');
-      const resend = new Resend(process.env.RESEND_API_KEY);
       let sent = 0, failed = 0;
       for (const contact of contacts.rows) {
         // Skip generic "Team [Company]" contacts — no real person, high bounce/spam risk
@@ -5641,13 +5634,7 @@ app.post(['/api/admin/import/send-pending', '/admin/import/send-pending'], authR
             ? 'Scott Kiersten <gov@proofdeed.com>'
             : 'Scott Kiersten <info@proofdeed.com>';
 
-          await resend.emails.send({
-            from: fromAddr,
-            reply_to: fromAddr,
-            to: contact.email,
-            subject,
-            text: emailBody,
-          });
+          await sendEmail({ from: fromAddr, to: contact.email, subject, text: emailBody });
 
           await pool.query(
             "UPDATE outreach_contacts SET status='sent', reply_to_tag=$1, pipeline_stage='contacted', first_sent_at=NOW(), last_contact_at=NOW() WHERE id=$2",
@@ -6005,8 +5992,6 @@ cron.schedule('0 8 * * *', async () => {
     if (today.getDate() !== payoutDay) return; // not payout day, skip
 
     console.log('[AffiliatePayouts] Payout day — generating statements...');
-    const { Resend } = await import('resend');
-    const resend = new Resend(process.env.RESEND_API_KEY);
 
     // Get all affiliates with pending commissions
     const affiliates = await pool.query(`
@@ -6053,8 +6038,8 @@ cron.schedule('0 8 * * *', async () => {
         `  • ${r.referred_name || 'New Customer'} (${r.referred_company || 'N/A'}) — ${r.plan || 'Paid Plan'} — Commission: $${parseFloat(r.commission_amount).toFixed(2)}`
       ).join('\n');
 
-      await resend.emails.send({
-        from: 'Scott Kiersten <gov@proofdeed.com>',
+      await sendEmail({
+        from: 'Scott Kiersten <info@proofdeed.com>',
         to: aff.email,
         subject: `Your ProofDeed Commission Statement — ${month}`,
         text: `Hi ${aff.name.split(' ')[0]},
@@ -9369,8 +9354,8 @@ async function recordEmailEvent(email, event) {
 }
 
 async function runLeadEngine(targetsPerRun = 3) {
-  if (!process.env.SEARLO_API_KEY || !process.env.RESEND_API_KEY) {
-    console.log(`[LeadEngine] Missing API keys — SEARLO_API_KEY: ${!!process.env.SEARLO_API_KEY}, RESEND: ${!!process.env.RESEND_API_KEY}`);
+  if (!process.env.SEARLO_API_KEY || !process.env.BREVO_SMTP_KEY) {
+    console.log(`[LeadEngine] Missing API keys — SEARLO_API_KEY: ${!!process.env.SEARLO_API_KEY}, BREVO_SMTP_KEY: ${!!process.env.BREVO_SMTP_KEY}`);
     return;
   }
 
@@ -9410,11 +9395,9 @@ async function runLeadEngine(targetsPerRun = 3) {
     [String(nextIdx)]
   ).catch(() => {});
 
-  const { Resend } = await import('resend');
-  const resend = new Resend(process.env.RESEND_API_KEY);
 
-  // Hard daily send cap — 50,000/month Resend paid tier ÷ 22 weekdays
-  const DAILY_SEND_CAP = 2000;
+  // Hard daily send cap — reduced to 150 while Resend account is under review
+  const DAILY_SEND_CAP = 150;
   const todayStart = new Date(); todayStart.setHours(0,0,0,0);
   const sentTodayRow = await pool.query(
     `SELECT COUNT(*) FROM outreach_contacts WHERE first_sent_at >= $1`,
@@ -9490,21 +9473,14 @@ async function runLeadEngine(targetsPerRun = 3) {
               ? 'Scott Kiersten <gov@proofdeed.com>'
               : 'Scott Kiersten <info@proofdeed.com>';
             const emailHtml = `<div style="font-family:sans-serif;font-size:15px;line-height:1.6;color:#222;max-width:600px">${emailBody.replace(/\n\n/g,'</p><p>').replace(/\n/g,'<br>')}</div>`;
-            const result = await resend.emails.send({
-              from: fromAddr,
-              reply_to: fromAddr,
-              to: lead.email,
-              subject,
-              text: emailBody,
-              html: emailHtml,
-            });
+            await sendEmail({ from: fromAddr, to: lead.email, subject, text: emailBody, html: emailHtml });
 
             const pscore = calcPriorityScore(lead.title, lead.industry || target.industry, target.role);
             const useCase = `${target.title} — ${(lead.industry || target.industry).replace(/_/g,' ')}`;
             await pool.query(
               `INSERT INTO outreach_contacts (name, email, company, title, industry, tier, priority_score, pipeline_stage, pain_status, use_case, status, reply_to_tag, resend_message_id, requires_human, first_sent_at, last_contact_at)
                VALUES ($1,$2,$3,$4,$5,$6,$7,'contacted','unaware',$8,'sent',$9,$10,FALSE,NOW(),NOW())`,
-              [lead.name, lead.email.toLowerCase(), lead.company, lead.title, lead.industry || target.industry, target.tier || 'primary', pscore, useCase, replyTag, result.data?.id || null]
+              [lead.name, lead.email.toLowerCase(), lead.company, lead.title, lead.industry || target.industry, target.tier || 'primary', pscore, useCase, replyTag, null]
             );
             await pool.query(
               `INSERT INTO outreach_events (contact_id, event_type, event_source, metadata, occurred_at)
@@ -9582,7 +9558,7 @@ app.get(['/api/admin/lead-engine', '/admin/lead-engine'], authRateLimit, async (
       schedule: 'Tue/Wed/Thu 8am PT',
       envCheck: {
         SEARLO_API_KEY: !!process.env.SEARLO_API_KEY,
-        RESEND_API_KEY: !!process.env.RESEND_API_KEY,
+        BREVO_SMTP_KEY: !!process.env.BREVO_SMTP_KEY,
       },
     });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -9639,20 +9615,13 @@ let failureStreak = {};
 })();
 
 async function sendAlertEmail(subject, body) {
-  if (!process.env.RESEND_API_KEY) {
-    console.error('[HealthMonitor] RESEND_API_KEY not set — cannot send alert email');
+  if (!process.env.BREVO_SMTP_KEY) {
+    console.error('[HealthMonitor] BREVO_SMTP_KEY not set — cannot send alert email');
     return;
   }
   try {
-    const { Resend } = await import('resend');
-    const resend = new Resend(process.env.RESEND_API_KEY);
-    const result = await resend.emails.send({
-      from: 'ProofDeed System <noreply@proofdeed.com>',
-      to: ADMIN_ALERT_EMAIL,
-      subject,
-      text: body,
-    });
-    console.log(`[HealthMonitor] Alert email sent to ${ADMIN_ALERT_EMAIL}`, result?.data?.id || '');
+    await sendEmail({ from: 'ProofDeed System <info@proofdeed.com>', to: ADMIN_ALERT_EMAIL, subject, text: body });
+    console.log(`[HealthMonitor] Alert email sent to ${ADMIN_ALERT_EMAIL}`);
   } catch (e) {
     console.error('[HealthMonitor] Failed to send alert email:', e.message);
   }
@@ -9678,31 +9647,16 @@ async function runHealthChecks() {
     checks.push({ name: 'Stripe', ok: false, error: e.message });
   }
 
-  // 3a. Resend DNS Records — check every record is verified
-  try {
-    const domainRes = await fetch('https://api.resend.com/domains/3e78f4d1-e142-4156-9bb1-cc3ef5039cbe', {
-      headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}` },
-    });
-    const domain = await domainRes.json();
-    const failedRecords = (domain.records || []).filter(r => r.status === 'failed' || r.status === 'not_started' || r.status === 'temporary_failure');
-    if (failedRecords.length > 0) {
-      const names = failedRecords.map(r => `${r.record} (${r.type} ${r.name || '@'})`).join(', ');
-      checks.push({ name: 'Resend DNS Records', ok: false, error: `${failedRecords.length} record(s) not verified: ${names}` });
-    } else {
-      checks.push({ name: 'Resend DNS Records', ok: true, error: null });
-    }
-  } catch (e) {
-    checks.push({ name: 'Resend DNS Records', ok: false, error: e.message });
+  // 3a. Brevo SMTP — check credentials are set
+  if (process.env.BREVO_SMTP_KEY && process.env.BREVO_SMTP_USER) {
+    checks.push({ name: 'Brevo SMTP', ok: true, error: null });
+  } else {
+    checks.push({ name: 'Brevo SMTP', ok: false, error: 'BREVO_SMTP_KEY or BREVO_SMTP_USER not set' });
   }
-
-  // 3b. Resend Email Delivery — inferred from DNS records being verified (no test email sent every 15 min)
-  // If DNS records are all verified, Resend can deliver. Sending a real test email on every health check
-  // would flood the inbox (96 emails/day). Use /api/admin/test-email for on-demand delivery testing.
-  checks.push({ name: 'Resend Email Delivery', ok: true, error: null, info: 'Inferred from DNS verification' });
 
   // 3c. Required environment variables
   const requiredEnvVars = [
-    'RESEND_API_KEY', 'STRIPE_SECRET_KEY', 'DATABASE_URL', 'JWT_SECRET',
+    'BREVO_SMTP_KEY', 'BREVO_SMTP_USER', 'STRIPE_SECRET_KEY', 'DATABASE_URL', 'JWT_SECRET',
     'PRICE_PROFESSIONAL_MONTHLY', 'PRICE_BUSINESS_MONTHLY', 'PRICE_GOVERNMENT_MONTHLY',
     'PRICE_API_MONTHLY', 'PRICE_GOVERNMENT_PILOT', 'POLYGON_RPC_URL',
   ];
@@ -9960,19 +9914,11 @@ app.post(['/api/admin/send-articles', '/admin/send-articles'], authRateLimit, as
     }
   ];
 
-  const { Resend: ResendClass } = await import('resend');
-  const resendClient = new ResendClass(process.env.RESEND_API_KEY);
   const results = [];
   for (const email of emails) {
     try {
-      const result = await resendClient.emails.send({
-        from: 'Scott Kiersten <gov@proofdeed.com>',
-        reply_to: 'gov@proofdeed.com',
-        to: email.to,
-        subject: email.subject,
-        text: email.text
-      });
-      results.push({ to: email.to, status: 'sent', id: result.data?.id });
+      await sendEmail({ from: 'Scott Kiersten <gov@proofdeed.com>', to: email.to, subject: email.subject, text: email.text });
+      results.push({ to: email.to, status: 'sent' });
       await new Promise(r => setTimeout(r, 3000));
     } catch (err) {
       results.push({ to: email.to, status: 'failed', error: err.message });
@@ -10040,9 +9986,9 @@ app.get(["/health-check", "/api/health-check"], async (req, res) => {
   }
 
   // Send alert email if failures
-  if (failed.length > 0 && process.env.RESEND_API_KEY) {
+  if (failed.length > 0 && process.env.BREVO_SMTP_KEY) {
     try {
-      await resend.emails.send({
+      await sendEmail({
         from: "ProofDeed Health Check <info@proofdeed.com>",
         to: "info@proofdeed.com",
         subject: `🚨 ProofDeed Health Check FAILED — ${failed.length} issue(s)`,
