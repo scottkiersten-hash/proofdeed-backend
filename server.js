@@ -8999,9 +8999,10 @@ function queryNeedsGeo(query) {
 }
 
 async function searchLeadsViaGoogle(target, targetIndex = 0) {
-  const apiKey = process.env.SEARLO_API_KEY;
-  if (!apiKey) {
-    console.log('[LeadEngine] Missing SEARLO_API_KEY — skipping');
+  const apiKey = process.env.GOOGLE_CSE_API_KEY;
+  const cseId = process.env.GOOGLE_CSE_ID;
+  if (!apiKey || !cseId) {
+    console.log('[LeadEngine] Missing GOOGLE_CSE_API_KEY or GOOGLE_CSE_ID — skipping');
     return [];
   }
 
@@ -9014,13 +9015,14 @@ async function searchLeadsViaGoogle(target, targetIndex = 0) {
   if (geoSuffix) console.log(`[LeadEngine] Geo-rotated query: "${query}"`);
 
   try {
-    // 2 pages of Searlo results (10 per page = 20 URLs to mine)
+    // 2 pages of Google CSE results (10 per page = 20 URLs to mine)
     for (let page = 0; page <= 1; page++) {
-      const url = `https://api.searlo.tech/api/v1/search?q=${encodeURIComponent(query)}&num=10&page=${page + 1}`;
-      const res = await fetch(url, { headers: { 'x-api-key': apiKey } });
-      if (!res.ok) { console.log(`[LeadEngine] Searlo API error ${res.status}`); break; }
+      const start = page * 10 + 1;
+      const url = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${cseId}&q=${encodeURIComponent(query)}&num=10&start=${start}`;
+      const res = await fetch(url);
+      if (!res.ok) { console.log(`[LeadEngine] Google CSE error ${res.status}`); break; }
       const data = await res.json();
-      const items = data.organic || data.results || [];
+      const items = data.items || [];
       if (!items.length) break;
       const mappedItems = items.map(item => ({
         title: item.title || '',
@@ -9354,8 +9356,8 @@ async function recordEmailEvent(email, event) {
 }
 
 async function runLeadEngine(targetsPerRun = 3) {
-  if (!process.env.SEARLO_API_KEY || !process.env.BREVO_SMTP_KEY) {
-    console.log(`[LeadEngine] Missing API keys — SEARLO_API_KEY: ${!!process.env.SEARLO_API_KEY}, BREVO_SMTP_KEY: ${!!process.env.BREVO_SMTP_KEY}`);
+  if (!process.env.GOOGLE_CSE_API_KEY || !process.env.GOOGLE_CSE_ID || !process.env.BREVO_SMTP_KEY) {
+    console.log(`[LeadEngine] Missing API keys — GOOGLE_CSE_API_KEY: ${!!process.env.GOOGLE_CSE_API_KEY}, GOOGLE_CSE_ID: ${!!process.env.GOOGLE_CSE_ID}, BREVO_SMTP_KEY: ${!!process.env.BREVO_SMTP_KEY}`);
     return;
   }
 
@@ -9563,7 +9565,8 @@ app.get(['/api/admin/lead-engine', '/admin/lead-engine'], authRateLimit, async (
       nextTarget: LEAD_TARGETS[parseInt(state.rotation_index?.value || '0') % LEAD_TARGETS.length],
       schedule: 'Tue/Wed/Thu 8am PT',
       envCheck: {
-        SEARLO_API_KEY: !!process.env.SEARLO_API_KEY,
+        GOOGLE_CSE_API_KEY: !!process.env.GOOGLE_CSE_API_KEY,
+        GOOGLE_CSE_ID: !!process.env.GOOGLE_CSE_ID,
         BREVO_SMTP_KEY: !!process.env.BREVO_SMTP_KEY,
       },
     });
