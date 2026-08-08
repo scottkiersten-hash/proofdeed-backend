@@ -9437,6 +9437,12 @@ async function runLeadEngine(targetsPerRun = 3) {
         for (const lead of leads) {
           if (dailySentSoFar + totalSent >= DAILY_SEND_CAP) { skipped++; continue; } // daily cap guard
           if (!lead.email || !lead.name || !lead.company) { skipped++; continue; }
+          const emailDomain = lead.email.split('@')[1]?.toLowerCase() || '';
+          if (emailDomain.endsWith('.mil') || emailDomain.endsWith('.gov')) {
+            skipped++;
+            console.log(`[LeadEngine] Skipped (government domain — manual outreach only): ${lead.email}`);
+            continue;
+          }
           const deliverable = await isEmailDeliverable(lead.email);
           if (!deliverable) { skipped++; console.log(`[LeadEngine] Skipped (undeliverable): ${lead.email}`); continue; }
           const exists = await pool.query('SELECT id, pipeline_stage FROM outreach_contacts WHERE email=$1', [lead.email.toLowerCase()]);
