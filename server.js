@@ -87,7 +87,7 @@ async function sendAnchorConfirmationEmail({ to, proofId, txHash, fileName, veri
           </div>
           <div style="background:#fff;border:1px solid #e5e7eb;border-top:none;padding:28px;border-radius:0 0 8px 8px">
             <p style="font-size:16px;font-weight:600;margin:0 0 12px">Your document is blockchain-confirmed</p>
-            <p style="color:#374151;font-size:14px;margin:0 0 20px">${label} has been anchored on the Polygon blockchain and is now permanently verifiable.</p>
+            <p style="color:#374151;font-size:14px;margin:0 0 20px">${label} has been anchored on an independent verification network and is now permanently verifiable.</p>
             <table style="width:100%;font-size:13px;border-collapse:collapse;margin-bottom:20px">
               <tr><td style="color:#6b7280;padding:6px 0;width:110px">Proof ID</td><td style="color:#111827;font-family:monospace">${proofId}</td></tr>
               <tr><td style="color:#6b7280;padding:6px 0">Blockchain TX</td><td style="color:#111827;font-family:monospace;font-size:11px">${txHash}</td></tr>
@@ -1236,7 +1236,7 @@ app.get('/passport/:id', async (req, res) => {
       </div>
       <div>
         <div style="font-size:15px;font-weight:700;color:#15803d">Verified — Authentic Asset Passport™</div>
-        <div style="font-size:13px;color:#16a34a">This asset's history is permanently recorded and independently verifiable on the Polygon blockchain.</div>
+        <div style="font-size:13px;color:#16a34a">This asset's history is permanently recorded and independently verifiable on an independent verification network.</div>
       </div>
     </div>
 
@@ -1262,7 +1262,7 @@ app.get('/passport/:id', async (req, res) => {
     <div style="background:white;border:1px solid #e2e8f0;border-radius:10px;margin-bottom:20px;overflow:hidden">
       <div style="padding:20px 24px;border-bottom:1px solid #f1f5f9">
         <div style="font-size:14px;font-weight:700;color:#0f172a">Certified Fields</div>
-        <div style="font-size:12px;color:#64748b;margin-top:2px">Each field was individually hashed and anchored at time of creation</div>
+        <div style="font-size:12px;color:#64748b;margin-top:2px">Each field was individually recorded and anchored at time of creation</div>
       </div>
       <div style="overflow-x:auto">
         <table style="width:100%;border-collapse:collapse">
@@ -1289,7 +1289,7 @@ app.get('/passport/:id', async (req, res) => {
 
     <!-- Legal footer -->
     <div style="text-align:center;padding:24px 0">
-      <div style="font-size:12px;color:#94a3b8;margin-bottom:8px">Legally defensible under FRE Rule 901 · Anchored on Polygon blockchain · ProofDeed LLC</div>
+      <div style="font-size:12px;color:#94a3b8;margin-bottom:8px">Legally defensible under FRE Rule 901 · Independently verifiable · ProofDeed LLC</div>
       <a href="https://proofdeed.com" style="font-size:12px;color:#0176D3;text-decoration:none">Create your own Asset Passport™ at proofdeed.com</a>
     </div>
 
@@ -1535,7 +1535,7 @@ app.get('/trust/:id', async (req, res) => {
     <!-- Verified badge -->
     <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:14px 20px;display:flex;align-items:center;gap:12px;margin-bottom:20px">
       <svg width="20" height="20" viewBox="0 0 20 20" fill="#1d4ed8"><path fill-rule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
-      <div style="font-size:13px;color:#1d4ed8;font-weight:600">This Trust ID™ is independently verifiable. All records are anchored on the Polygon blockchain and cannot be altered.</div>
+      <div style="font-size:13px;color:#1d4ed8;font-weight:600">This Trust ID™ is independently verifiable. All records are anchored on an independent verification network and cannot be altered.</div>
     </div>
 
     <!-- Trust Records -->
@@ -1546,7 +1546,7 @@ app.get('/trust/:id', async (req, res) => {
     </div>
 
     <div style="text-align:center;padding:24px 0">
-      <div style="font-size:12px;color:#94a3b8;margin-bottom:8px">Legally defensible under FRE Rule 901 · Anchored on Polygon blockchain · ProofDeed LLC</div>
+      <div style="font-size:12px;color:#94a3b8;margin-bottom:8px">Legally defensible under FRE Rule 901 · Independently verifiable · ProofDeed LLC</div>
       <a href="https://proofdeed.com" style="font-size:12px;color:#0176D3;text-decoration:none">Create a Trust ID™ at proofdeed.com</a>
     </div>
 
@@ -2100,7 +2100,7 @@ app.post(["/create-proof", "/api/create-proof"], async (req, res) => {
       proofId,
       timestamp,
       polygon_tx: null,
-      verificationText: "Your document fingerprint has been permanently recorded on the Polygon blockchain."
+      verificationText: "Your document fingerprint has been permanently recorded on an independent verification network."
     });
 
     if (user.email) {
@@ -2108,7 +2108,7 @@ app.post(["/create-proof", "/api/create-proof"], async (req, res) => {
         to: user.email,
         subject: "ProofDeed Certificate — " + proofId,
         text: [
-          "Your document has been certified and permanently anchored to the Polygon blockchain.",
+          "Your document has been certified and permanently anchored to an independent verification network.",
           "",
           "Certificate ID: " + proofId,
           "SHA-256 Hash:   " + documentHash,
@@ -2635,7 +2635,7 @@ app.get('/verify-fields', (req, res) => {
     <div id="result"></div>
 
     <div style="text-align:center;padding:24px 0;font-size:12px;color:#94a3b8">
-      Legally defensible under FRE Rule 901 &middot; Powered by Polygon blockchain &middot; ProofDeed LLC
+      Legally defensible under FRE Rule 901 &middot; Independently verifiable &middot; ProofDeed LLC
     </div>
   </div>
 
@@ -2748,13 +2748,13 @@ function runTrustAnalysis({ certRows, passportRows, passportEvents, trustIdRows,
   const pending = certRows.filter(c => !c.polygon_tx);
   if (certRows.length > 0) {
     if (anchored.length === certRows.length) {
-      findings.push({ type: 'positive', title: 'Blockchain Anchoring Confirmed', detail: `All ${anchored.length} certification record(s) are anchored on the Polygon blockchain with confirmed transaction hashes.` });
+      findings.push({ type: 'positive', title: 'Blockchain Anchoring Confirmed', detail: `All ${anchored.length} certification record(s) are anchored on an independent verification network with confirmed transaction hashes.` });
     } else if (anchored.length > 0) {
       riskScore += 15;
       findings.push({ type: 'warning', title: 'Partial Blockchain Anchoring', detail: `${anchored.length} of ${certRows.length} record(s) are confirmed on-chain. ${pending.length} record(s) are still pending blockchain confirmation.` });
     } else {
       riskScore += 30;
-      findings.push({ type: 'warning', title: 'Blockchain Anchoring Pending', detail: `${certRows.length} record(s) exist in the ProofDeed system but have not yet been confirmed on the Polygon blockchain. Anchoring is typically completed within minutes of certification.` });
+      findings.push({ type: 'warning', title: 'Blockchain Anchoring Pending', detail: `${certRows.length} record(s) exist in the ProofDeed system but have not yet been confirmed on an independent verification network. Anchoring is typically completed within minutes of certification.` });
     }
   }
 
@@ -2762,7 +2762,7 @@ function runTrustAnalysis({ certRows, passportRows, passportEvents, trustIdRows,
   const certsWithFields = certRows.filter(c => c.fields && Object.keys(c.fields).length > 0);
   const certsWithHashes = certRows.filter(c => c.field_hashes && Object.keys(c.field_hashes).length > 0);
   if (certsWithFields.length > 0 && certsWithHashes.length > 0) {
-    findings.push({ type: 'positive', title: 'Field-Level Integrity Verified', detail: `${certsWithFields.length} record(s) include individually hashed field values, enabling granular tamper detection on a per-field basis.` });
+    findings.push({ type: 'positive', title: 'Field-Level Integrity Verified', detail: `${certsWithFields.length} record(s) include field-level integrity records, enabling granular tamper detection on a per-field basis.` });
   } else if (certRows.length > 0) {
     riskScore += 10;
     findings.push({ type: 'warning', title: 'No Field-Level Hashing Detected', detail: 'Records were certified at the document level only. Field-level integrity verification is not available for these records.' });
@@ -2828,7 +2828,7 @@ function runTrustAnalysis({ certRows, passportRows, passportEvents, trustIdRows,
   if (trustIdRows.length) parts.push(`a Trust ID for ${trustIdRows[0].entity_name}`);
   const recordDesc = parts.join(', ');
   const anchorStatus = anchored.length === certRows.length && certRows.length > 0
-    ? 'all records are confirmed on the Polygon blockchain'
+    ? 'all records are confirmed on an independent verification network'
     : certRows.length > 0 ? 'blockchain anchoring is pending for some records' : 'no direct certification records were analyzed';
 
   const summary = `This analysis covers ${recordDesc}. At the time of analysis, ${anchorStatus}. Overall integrity risk is assessed as ${risk_level.toUpperCase()} based on ${findings.length} evaluated signal(s).`;
@@ -2993,7 +2993,7 @@ app.get('/analysis/:id', async (req, res) => {
   ${linkedIds ? `<div class="card"><div class="card-title">Linked Records</div><div class="linked">${linkedIds}</div></div>` : ''}
 
   <div class="legal">
-    This AI Trust Analysis™ is generated by Claude (Anthropic) based solely on the verified records stored in the ProofDeed system at the time of analysis. It does not constitute legal advice. The findings are informational and should be reviewed by a qualified professional before reliance in legal, regulatory, or financial proceedings. ProofDeed Trust Records are independently verifiable on the Polygon blockchain.
+    This AI Trust Analysis™ is generated by Claude (Anthropic) based solely on the verified records stored in the ProofDeed system at the time of analysis. It does not constitute legal advice. The findings are informational and should be reviewed by a qualified professional before reliance in legal, regulatory, or financial proceedings. ProofDeed Trust Records are independently verifiable on an independent verification network.
   </div>
 
   <div class="footer" style="margin-top:24px">
@@ -3188,7 +3188,7 @@ app.get('/reseller/:slug', async (req, res) => {
     <div class="how-card">
       <div class="how-num">1</div>
       <div class="how-title">Document Certified</div>
-      <div class="how-desc">When a document is issued, every field is individually hashed and anchored on the Polygon blockchain.</div>
+      <div class="how-desc">When a document is issued, every field is individually hashed and anchored on an independent verification network.</div>
     </div>
     <div class="how-card">
       <div class="how-num">2</div>
@@ -3465,7 +3465,7 @@ app.post(["/contact", "/api/contact"], async (req, res) => {
       sendEmail({
         to: email,
         subject: subject || "Your ProofDeed Certificate",
-        html: "<div style='font-family:sans-serif;max-width:560px;margin:0 auto'><div style='background:#0f172a;padding:18px 24px;border-radius:8px 8px 0 0'><span style='color:#fff;font-size:17px;font-weight:700'>Proof<span style='color:#60a5fa'>Deed</span></span></div><div style='background:#fff;border:1px solid #e5e7eb;border-top:none;padding:24px;border-radius:0 0 8px 8px'><p style='font-weight:600;font-size:15px;margin:0 0 12px'>Document Certified</p><p style='color:#374151;font-size:13px;margin:0 0 20px'>Your document has been permanently recorded on the Polygon blockchain.</p><table style='width:100%;font-size:13px;border-collapse:collapse;margin-bottom:20px'><tr><td style='color:#6b7280;padding:5px 0;width:100px'>Proof ID</td><td style='font-family:monospace;color:#1e40af'>" + proofId + "</td></tr><tr><td style='color:#6b7280;padding:5px 0'>Hash</td><td style='font-family:monospace;font-size:11px;word-break:break-all;color:#374151'>" + documentHash + "</td></tr></table><a href='https://proofdeed.com/verify/" + proofId + "' style='display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:10px 20px;border-radius:6px;font-size:13px;font-weight:600'>Verify Certificate</a><p style='color:#9ca3af;font-size:11px;margin-top:20px'>Legally defensible under FRE Rule 901. ProofDeed Trust Infrastructure Platform.</p></div></div>"
+        html: "<div style='font-family:sans-serif;max-width:560px;margin:0 auto'><div style='background:#0f172a;padding:18px 24px;border-radius:8px 8px 0 0'><span style='color:#fff;font-size:17px;font-weight:700'>Proof<span style='color:#60a5fa'>Deed</span></span></div><div style='background:#fff;border:1px solid #e5e7eb;border-top:none;padding:24px;border-radius:0 0 8px 8px'><p style='font-weight:600;font-size:15px;margin:0 0 12px'>Document Certified</p><p style='color:#374151;font-size:13px;margin:0 0 20px'>Your document has been permanently recorded on an independent verification network.</p><table style='width:100%;font-size:13px;border-collapse:collapse;margin-bottom:20px'><tr><td style='color:#6b7280;padding:5px 0;width:100px'>Proof ID</td><td style='font-family:monospace;color:#1e40af'>" + proofId + "</td></tr><tr><td style='color:#6b7280;padding:5px 0'>Hash</td><td style='font-family:monospace;font-size:11px;word-break:break-all;color:#374151'>" + documentHash + "</td></tr></table><a href='https://proofdeed.com/verify/" + proofId + "' style='display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:10px 20px;border-radius:6px;font-size:13px;font-weight:600'>Verify Certificate</a><p style='color:#9ca3af;font-size:11px;margin-top:20px'>Legally defensible under FRE Rule 901. ProofDeed Trust Infrastructure Platform.</p></div></div>"
       });
     } else {
       const contactText = "New contact submission from ProofDeed.\n\nName: " + name + "\nEmail: " + email + "\nOrganization: " + (resolvedCompany || "N/A") + "\nPhone: " + (phone || "N/A") + "\nMessage: " + (resolvedNotes || "N/A") + "\n\nProofDeed\nhttps://proofdeed.com";
@@ -3761,7 +3761,7 @@ app.post(["/stripe-webhook", "/api/stripe-webhook"], express.raw({ type: "applic
           text: [
             "Your ProofDeed subscription has been cancelled and your access has ended.",
             "",
-            "Every certificate you created remains permanently on the Polygon blockchain — your proofs are yours forever, regardless of your subscription status.",
+            "Every certificate you created remains permanently on an independent verification network — your proofs are yours forever, regardless of your subscription status.",
             "",
             "If you cancelled by mistake or would like to resubscribe:",
             "  https://proofdeed.com/#pricing",
@@ -4654,7 +4654,7 @@ cron.schedule("0 4 * * *", async () => {
         from: 'ProofDeed Government <gov@proofdeed.com>',
         to: row.email,
         subject: "ProofDeed Government Pilot — Your 45-Day Pilot Has Ended",
-        text: "Your ProofDeed Government Pilot Program has now concluded.\n\nAll records certified during your pilot remain permanently on the Polygon blockchain — fully verifiable forever.\n\nTo continue using ProofDeed, please contact us to discuss volume pricing for your agency:\n\n  Email: gov@proofdeed.com\n  Enterprise pricing starts at $0.76/certification, dropping to $0.15 at scale.\n\nWe would love to continue supporting your agency's record integrity needs.\n\nProofDeed\nhttps://proofdeed.com"
+        text: "Your ProofDeed Government Pilot Program has now concluded.\n\nAll records certified during your pilot remain permanently on an independent verification network — fully verifiable forever.\n\nTo continue using ProofDeed, please contact us to discuss volume pricing for your agency:\n\n  Email: gov@proofdeed.com\n  Enterprise pricing starts at $0.76/certification, dropping to $0.15 at scale.\n\nWe would love to continue supporting your agency's record integrity needs.\n\nProofDeed\nhttps://proofdeed.com"
       }).catch(err => console.error("Pilot expiry email failed:", err.message));
       console.log("Government pilot expired and deactivated:", row.email);
     }
@@ -5917,7 +5917,7 @@ app.get(['/api/partner/:code', '/partner/:code'], async (req, res) => {
   <div class="features">
     <div class="feature">
       <h3>Tamper-Proof</h3>
-      <p>Every document is anchored to the Polygon blockchain the moment it's certified. Any alteration is immediately detectable — permanently.</p>
+      <p>Every document is anchored to an independent verification network the moment it's certified. Any alteration is immediately detectable — permanently.</p>
     </div>
     <div class="feature">
       <h3>Legally Defensible</h3>
@@ -5940,7 +5940,7 @@ app.get(['/api/partner/:code', '/partner/:code'], async (req, res) => {
       <div class="step">
         <div class="step-num">2</div>
         <h4>Certify</h4>
-        <p>A unique fingerprint is created and anchored to the Polygon blockchain instantly.</p>
+        <p>A unique fingerprint is created and anchored to an independent verification network instantly.</p>
       </div>
       <div class="step">
         <div class="step-num">3</div>
@@ -5952,7 +5952,7 @@ app.get(['/api/partner/:code', '/partner/:code'], async (req, res) => {
 
   <div class="bottom-cta">
     <h2>Ready to protect your documents?</h2>
-    <p>Join organizations using blockchain certification to eliminate document fraud and disputes.</p>
+    <p>Join organizations using ProofDeed to eliminate document fraud and disputes.</p>
     <a href="https://proofdeed.com/document?ref=${refCode}" class="cta-btn">Certify Your First Document</a>
   </div>
 
@@ -7327,7 +7327,7 @@ As the UAE accelerates toward its 2026 Paperless Government mandate, the risk si
 
 The Dubai Land Department is already issuing blockchain-backed title deeds. The gap is in the private developer workflow: the documents your team creates, transfers, and stores before they ever reach DLD.
 
-ProofDeed provides a single API call that anchors each document field to the Polygon blockchain at the moment of creation — sale price, unit number, buyer name, execution date — so any downstream alteration is immediately detectable. No system replacement. Compatible with your existing DMS and CRM.
+ProofDeed provides a single API call that anchors each document field to an independent verification network at the moment of creation — sale price, unit number, buyer name, execution date — so any downstream alteration is immediately detectable. No system replacement. Compatible with your existing DMS and CRM.
 
 Relevant to ${company}'s current digital transformation priorities:
 → Aligns with Dubai Paperless Strategy 2026 and VARA's data integrity standards
@@ -7349,7 +7349,7 @@ Property handover disputes and title transfer delays cost UAE developers signifi
 
 With the UAE's 2026 Paperless Mandate requiring all government-adjacent transactions to be fully digital, the operational risk is only increasing. A digital document with no cryptographic proof of integrity is a liability.
 
-ProofDeed provides field-level blockchain certification for every document in your handover and sales workflow — NOC, SPA, title deed, payment schedules — anchored at creation so ${company}'s team, your buyers, and the DLD all see the same verified original.
+ProofDeed provides field-level cryptographic certification for every document in your handover and sales workflow — NOC, SPA, title deed, payment schedules — anchored at creation so ${company}'s team, your buyers, and the DLD all see the same verified original.
 
 One API call. No workflow disruption. Works alongside your existing property management system.
 
@@ -7405,7 +7405,7 @@ UAE automotive conglomerates manage some of the most document-intensive operatio
 
 With the UAE's broader push toward digital compliance (Dubai Paperless 2026, VARA standards), the question for operations of ${company}'s scale is no longer "should we digitize?" — it's "how do we prove our digital records are unaltered?"
 
-ProofDeed provides field-level blockchain certification for every import and title document at the moment of origination. VIN, chassis number, country of origin, sale price — each individually hashed and anchored. Any post-facto alteration is immediately detectable by any party in the chain, including the Roads and Transport Authority (RTA).
+ProofDeed provides field-level cryptographic certification for every import and title document at the moment of origination. VIN, chassis number, country of origin, sale price — each individually hashed and anchored. Any post-facto alteration is immediately detectable by any party in the chain, including the Roads and Transport Authority (RTA).
 
 One API. No system replacement. Works alongside your existing DMS and ERP.
 
@@ -7529,7 +7529,7 @@ info@proofdeed.com | proofdeed.com`,
 
 Most OEMs are now building some version of a "Vehicle Digital Identity" — a cryptographic record that follows the VIN from factory to end-of-life. The hard problem isn't storage; it's proving that the records accumulated along the way are unaltered originals.
 
-We've built a field-level hashing layer that anchors individual data points (not just document hashes) to the Polygon blockchain at creation. We're looking for one Principal Blockchain Architect in automotive to act as a Design Partner as we finalize our API spec.
+We've built a field-level hashing layer that anchors individual data points (not just document hashes) to an independent verification network at creation. We're looking for one Principal Blockchain Architect in automotive to act as a Design Partner as we finalize our API spec.
 
 The goal: ensure our hashing schema is compatible with how your team models vehicle identity — and share what we've learned about field-level vs. document-level anchoring at OEM scale.
 
@@ -7638,7 +7638,7 @@ We're finalizing the ProofDeed API for cross-asset document provenance. We're lo
 The goal: understand how your team currently bridges traditional asset documentation and cryptographic attestation — and ensure our anchoring layer maps cleanly to your regulatory submission workflow.
 
 In exchange for 20 minutes:
-→ Sandbox access to our blockchain anchoring API
+→ Sandbox access to our trust infrastructure API
 → Input into how we model "regulatory-grade" document proof for digital asset compliance
 
 Worth exploring?
@@ -7718,7 +7718,7 @@ info@proofdeed.com | proofdeed.com`,
 
 Every LIMS generates audit trails — but those audit trails live inside the system and can't be independently verified by a regulator, customer, or auditor without trusting the system itself. When a 483 cites "audit trail questions," you're defending a log, not a proof.
 
-We're building the ProofDeed API to add a blockchain-anchored audit layer on top of existing LIMS workflows. We're looking for one LIMS Administrator to act as a Design Partner for our developer sandbox.
+We're building the ProofDeed API to add a trust infrastructure audit layer on top of existing LIMS workflows. We're looking for one LIMS Administrator to act as a Design Partner for our developer sandbox.
 
 The goal: understand how your LIMS currently generates and exports audit records — and where our anchoring API can slot in without replacing your existing system.
 
@@ -7888,7 +7888,7 @@ const INITIAL_EMAIL = (name, company, industry, role) => {
 
 When a recorded document gets challenged — contested deed, disputed filing, chain-of-title dispute — your office has to prove it. The question isn't whether it's in your system. It's whether you can prove it hasn't been altered.
 
-ProofDeed creates a Trust Record for every document at the moment of recording — a permanent, tamper-proof fingerprint anchored to the Polygon blockchain. If the document is ever questioned, authenticity is provable in seconds. No system replacement. No document storage. No IT required. Works alongside your existing workflow — live in days.
+ProofDeed creates a Trust Record for every document at the moment of recording — a permanent, tamper-proof fingerprint anchored to an independent verification network. If the document is ever questioned, authenticity is provable in seconds. No system replacement. No document storage. No IT required. Works alongside your existing workflow — live in days.
 
 Several county offices are using this to get ahead of fraud liability before it becomes a headline.
 
@@ -7906,7 +7906,7 @@ gov@proofdeed.com | proofdeed.com`;
 
 When document authenticity gets disputed in litigation, the question your office faces is: can you prove the document hasn't been altered since it was created? Timestamps in internal systems don't answer that. A court wants independent, tamper-proof proof.
 
-ProofDeed creates a Trust Record at the moment a document is processed — permanently anchored to the Polygon blockchain, independently verifiable by any court, auditor, or opposing counsel without access to your internal systems. Legally defensible under FRE Rule 901. No system changes required.
+ProofDeed creates a Trust Record at the moment a document is processed — permanently anchored to an independent verification network, independently verifiable by any court, auditor, or opposing counsel without access to your internal systems. Legally defensible under FRE Rule 901. No system changes required.
 
 The cost of a single disputed record averages $50,000 in legal fees. The cost to protect against it is a fraction of that.
 
@@ -7926,7 +7926,7 @@ I'll keep this short because I know your plate is full.
 
 ProofDeed adds tamper-proof Trust Records to your existing document workflow — no system replacement, no document storage on our end, single API call. Most county offices are live in under a week with no impact on existing infrastructure.
 
-It creates a blockchain-anchored Trust Record for each document at the moment it's processed — permanently verifiable proof of integrity and timestamp that holds up in court under FRE Rule 901.
+It creates a Trust Record for each document at the moment it's processed — permanently verifiable proof of authenticity and chain of custody that holds up in court under FRE Rule 901.
 
 No new user training. No data migration. No long-term lock-in.
 
@@ -7946,7 +7946,7 @@ If your office is evaluating document integrity solutions, I want to make this e
 
 ProofDeed offers a fixed-cost 45-day Government Pilot — full API access, no variable costs, no long-term commitment. If it works, you continue on a monthly subscription. If not, your Trust Records remain on-chain permanently regardless.
 
-It anchors documents to the Polygon blockchain at the moment of processing — tamper-proof, legally defensible proof under FRE Rule 901. Single API integration. No system replacement.
+It anchors documents to an independent verification network at the moment of processing — tamper-proof, legally defensible proof under FRE Rule 901. Single API integration. No system replacement.
 
 ACH and purchase order accepted.
 
@@ -7964,7 +7964,7 @@ gov@proofdeed.com | proofdeed.com`;
 
 Every title transfer, lien release, and odometer disclosure your operation processes is a liability the moment it's disputed. A forged title or altered sale price — if you can't prove the document at the exact moment it was created, you're defending yourself without evidence.
 
-ProofDeed creates a Trust Record for every deal document — VIN, odometer, sale price, buyer name — anchored individually on the Polygon blockchain when the deal is finalized. If a single field is ever moved, it's immediately detectable. Buyers get a permanent Asset Passport™ to verify their vehicle's history. You get legally defensible proof under FRE Rule 901.
+ProofDeed creates a Trust Record for every deal document — VIN, odometer, sale price, buyer name — anchored individually on an independent verification network when the deal is finalized. If a single field is ever moved, it's immediately detectable. Buyers get a permanent Asset Passport™ to verify their vehicle's history. You get legally defensible proof under FRE Rule 901.
 
 No system replacement — one webhook into your existing DMS, live in a day.
 
@@ -7982,7 +7982,7 @@ info@proofdeed.com | proofdeed.com`;
 
 Lien accuracy and title chain integrity are the foundation of your collateral position. When a borrower defaults and the title history is challenged — altered lien amounts, forged releases, disputed ownership — your recovery depends on whether you can prove each field in the document is authentic.
 
-ProofDeed creates a Trust Record for every loan document and lien at the field level — VIN, lien amount, lienholder, release date — each individually anchored on the Polygon blockchain. If a single figure is altered after the fact, it's immediately provable. Legally defensible under FRE Rule 901. One API call, no system changes.
+ProofDeed creates a Trust Record for every loan document and lien at the field level — VIN, lien amount, lienholder, release date — each individually anchored on an independent verification network. If a single figure is altered after the fact, it's immediately provable. Legally defensible under FRE Rule 901. One API call, no system changes.
 
 See it in 2 minutes: proofdeed.com/demo
 
@@ -7998,7 +7998,7 @@ info@proofdeed.com | proofdeed.com`;
 
 At auction volume, every vehicle transfer is a potential chain-of-custody dispute. Odometer fraud, salvage title laundering, forged condition reports — the liability lands on whoever processed the last transaction without proof.
 
-ProofDeed creates a Trust Record for every vehicle sale — VIN, odometer, condition grade, seller/buyer fields — anchored on the Polygon blockchain at the moment of transaction. Each buyer gets an Asset Passport™ showing the vehicle's verified history. Title washing becomes immediately detectable.
+ProofDeed creates a Trust Record for every vehicle sale — VIN, odometer, condition grade, seller/buyer fields — anchored on an independent verification network at the moment of transaction. Each buyer gets an Asset Passport™ showing the vehicle's verified history. Title washing becomes immediately detectable.
 
 Legally defensible under FRE Rule 901. One webhook into your existing workflow, live in a day.
 
@@ -8016,7 +8016,7 @@ info@proofdeed.com | proofdeed.com`;
 
 When an audit, dispute, or regulatory review puts a document's authenticity in question, your organization has to prove it — not just that it exists in your system, but that it hasn't been altered since it was created. Most document management systems can't answer that. Courts and regulators increasingly expect independent proof.
 
-ProofDeed creates a Trust Record for every critical document at the moment it's processed — permanently anchored to the Polygon blockchain, independently verifiable by any court or regulator without access to your internal systems. Legally defensible under FRE Rule 901. No system replacement. No document storage. Single API call.
+ProofDeed creates a Trust Record for every critical document at the moment it's processed — permanently anchored to an independent verification network, independently verifiable by any court or regulator without access to your internal systems. Legally defensible under FRE Rule 901. No system replacement. No document storage. Single API call.
 
 See it in 2 minutes: proofdeed.com/demo
 
@@ -8052,7 +8052,7 @@ When a patient record, prescription, or clinical document gets disputed — in l
 
 With AI tools now capable of altering scanned documents without a trace, that gap is a liability. Under HIPAA, CMS, and Joint Commission standards, document integrity isn't optional — but most compliance programs have no independent proof layer.
 
-ProofDeed creates a Trust Record for each clinical document at the moment it's processed — patient name, dates, clinical data, all individually anchored to the Polygon blockchain. If a single field is changed after the fact, it's immediately detectable. Legally defensible under FRE Rule 901. No system replacement.
+ProofDeed creates a Trust Record for each clinical document at the moment it's processed — patient name, dates, clinical data, all individually anchored to an independent verification network. If a single field is changed after the fact, it's immediately detectable. Legally defensible under FRE Rule 901. No system replacement.
 
 See it in 2 minutes: proofdeed.com/demo
 
@@ -8068,7 +8068,7 @@ info@proofdeed.com | proofdeed.com`;
 
 Every real estate closing generates documents that can be disputed years later — deeds, settlement statements, wire instructions. The problem most agencies don't realize: standard PDFs can be altered after signing without triggering any alert, making it impossible to prove what was in the document at the moment of closing.
 
-ProofDeed creates a Trust Record for every closing document the instant it's processed — buyer name, sale price, legal description, recording date, all individually locked on the Polygon blockchain. If a single field is ever changed, it's immediately detectable. Buyers get a permanent verification link. You get legally defensible proof under FRE Rule 901.
+ProofDeed creates a Trust Record for every closing document the instant it's processed — buyer name, sale price, legal description, recording date, all individually locked on an independent verification network. If a single field is ever changed, it's immediately detectable. Buyers get a permanent verification link. You get legally defensible proof under FRE Rule 901.
 
 No software to install. No IT required. Works alongside your existing closing platform. Live in a day.
 
@@ -8088,7 +8088,7 @@ With AI editing tools and deepfake technology now capable of altering signed doc
 
 The most damaging thing opposing counsel can do is allege a document was altered after creation — and if you can't prove otherwise independently, you're defending the document instead of the case.
 
-ProofDeed creates a Trust Record for every firm document — party names, dates, amounts, terms — each individually anchored on the Polygon blockchain at the moment of creation. Documents become legally defensible under FRE Rule 901. If opposing counsel claims anything was changed after signing, you prove it in seconds.
+ProofDeed creates a Trust Record for every firm document — party names, dates, amounts, terms — each individually anchored on an independent verification network at the moment of creation. Documents become legally defensible under FRE Rule 901. If opposing counsel claims anything was changed after signing, you prove it in seconds.
 
 No system changes. No IT required.
 
@@ -8106,7 +8106,7 @@ info@proofdeed.com | proofdeed.com`;
 
 Insurance fraud schemes succeed because claim photos, damage estimates, and loss documentation are easy to alter before submission — and by the time your SIU team investigates, there's no way to prove what the original showed. Photoshopped damage, inflated repair estimates, backdated reports: the manipulation happens before it ever reaches your desk.
 
-ProofDeed lets your field adjusters create a Trust Record for claim photos and repair estimates the second they're captured — making it impossible for claimants to alter values after the fact. Each Trust Record is permanently anchored to the Polygon blockchain, legally defensible under FRE Rule 901. No app for claimants. Single API call for your adjusters.
+ProofDeed lets your field adjusters create a Trust Record for claim photos and repair estimates the second they're captured — making it impossible for claimants to alter values after the fact. Each Trust Record is permanently anchored to an independent verification network, legally defensible under FRE Rule 901. No app for claimants. Single API call for your adjusters.
 
 Live in days.
 
@@ -8156,7 +8156,7 @@ info@proofdeed.com | proofdeed.com`;
 
 Diploma mills and credential fraud cost employers millions annually — and the institutions that issued the credentials bear reputational liability they didn't create. The problem: most verification systems require checking back with your office. If your records system is unavailable, or a credential is forged entirely, there's no independent proof.
 
-ProofDeed turns diplomas and certificates into permanent Trust Records — anchored to the Polygon blockchain at issuance. Employers self-verify for free without contacting your office. No forged document can replicate the cryptographic proof. Legally defensible under FRE Rule 901.
+ProofDeed turns diplomas and certificates into permanent Trust Records — anchored to an independent verification network at issuance. Employers self-verify for free without contacting your office. No forged document can replicate the cryptographic proof. Legally defensible under FRE Rule 901.
 
 No records system replacement. Live in days.
 
@@ -8210,7 +8210,7 @@ info@proofdeed.com | proofdeed.com`;
 
 Insurance fraud schemes succeed because claim photos, damage estimates, and loss documentation are easy to alter before submission. By the time your investigation team reviews a claim, the original record may be unrecoverable. Inflated repair estimates, backdated reports, and photoshopped damage photos — the manipulation happens before the document reaches your desk.
 
-ProofDeed lets field adjusters create a Trust Record for claim photos and repair estimates at the moment they are captured — making it impossible to alter values after the fact. Each Trust Record is permanently anchored to the Polygon blockchain, independently verifiable by any court or regulator worldwide. No app for claimants. Single API call for your adjusters.
+ProofDeed lets field adjusters create a Trust Record for claim photos and repair estimates at the moment they are captured — making it impossible to alter values after the fact. Each Trust Record is permanently anchored to an independent verification network, independently verifiable by any court or regulator worldwide. No app for claimants. Single API call for your adjusters.
 
 Live in days.
 
@@ -8246,7 +8246,7 @@ info@proofdeed.com | proofdeed.com`;
 
 When a recall investigation, parts fraud claim, or autonomous vehicle incident goes to litigation, your supply chain documentation has to prove authenticity — not just that it's in your systems, but that it hasn't been altered since it was created. Falsified Certificates of Conformity, altered build sheets, and tampered OTA firmware version records all start with a document that couldn't be independently verified.
 
-ProofDeed creates a Trust Record for every supply chain document and parts certification at the moment it's generated — part number, supplier ID, conformity date, firmware hash, all individually locked on the Polygon blockchain. If any field is changed downstream, it's immediately detectable. Each record gets a permanent Asset Passport™ with public verification. Legally defensible under FRE Rule 901.
+ProofDeed creates a Trust Record for every supply chain document and parts certification at the moment it's generated — part number, supplier ID, conformity date, firmware hash, all individually locked on an independent verification network. If any field is changed downstream, it's immediately detectable. Each record gets a permanent Asset Passport™ with public verification. Legally defensible under FRE Rule 901.
 
 No system replacement. Single webhook into your existing document workflow.
 
@@ -8330,7 +8330,7 @@ info@proofdeed.com | proofdeed.com`;
 
 In private equity and asset management, the back office handles documents where a single altered digit can cost millions — subscription agreements, side letters, PPMs, capital call notices. Most document systems can tell you when a file was last modified. None can prove it wasn't.
 
-ProofDeed creates a Trust Record for every critical document at the field level — investor name, commitment amount, terms, execution date — each individually anchored on the Polygon blockchain at the moment of execution. If a single decimal point is moved after the fact, it's immediately detectable. Independent proof that doesn't rely on your internal IT.
+ProofDeed creates a Trust Record for every critical document at the field level — investor name, commitment amount, terms, execution date — each individually anchored on an independent verification network at the moment of execution. If a single decimal point is moved after the fact, it's immediately detectable. Independent proof that doesn't rely on your internal IT.
 
 Integrates via API into your existing document workflow. No system replacement. Live in a day.
 
@@ -8398,7 +8398,7 @@ info@proofdeed.com | proofdeed.com`;
 
 FDA and EMA are tightening enforcement of ALCOA+ data integrity standards — and the most common failure point isn't missing records, it's records that can't be proven unaltered. A Certificate of Analysis, a batch manufacturing record, a deviation report — if you can't prove the document hasn't been modified since creation, the entire batch is at risk.
 
-ProofDeed creates a Trust Record for every quality document at the field level — batch number, test results, analyst signature, approval date — each individually anchored on the Polygon blockchain at the moment of creation. If a single value is changed after the fact, it's immediately detectable. Third-party proof that satisfies 21 CFR Part 11 and ALCOA+ without replacing your QMS.
+ProofDeed creates a Trust Record for every quality document at the field level — batch number, test results, analyst signature, approval date — each individually anchored on an independent verification network at the moment of creation. If a single value is changed after the fact, it's immediately detectable. Third-party proof that satisfies 21 CFR Part 11 and ALCOA+ without replacing your QMS.
 
 One API call. No system replacement. Live in a day.
 
@@ -8466,7 +8466,7 @@ info@proofdeed.com | proofdeed.com`;
 
 In aviation, a plane is only as airworthy as its paperwork. When an incident investigation or airworthiness authority challenges a maintenance log — whether an inspection was actually signed off on that date, whether a part was genuinely certified — the documentation is the evidence. If it can't be proven unaltered, the liability is open.
 
-ProofDeed creates a Trust Record for every maintenance log entry at the field level — tail number, inspection type, technician ID, sign-off date, part number — each individually anchored on the Polygon blockchain at the moment it's recorded. If a single field is ever modified, it's immediately detectable. Legally defensible under FRE Rule 901.
+ProofDeed creates a Trust Record for every maintenance log entry at the field level — tail number, inspection type, technician ID, sign-off date, part number — each individually anchored on an independent verification network at the moment it's recorded. If a single field is ever modified, it's immediately detectable. Legally defensible under FRE Rule 901.
 
 One webhook into your MRO management system. No system replacement.
 
@@ -8484,7 +8484,7 @@ info@proofdeed.com | proofdeed.com`;
 
 As MRO operations move from paper to digital, the core question regulators and airlines ask is: how do you prove a digitized record is identical to the original, and that it hasn't been altered since? Paper had a physical chain of custody. Digital records need cryptographic proof.
 
-ProofDeed provides that proof layer. Every maintenance record, parts certificate, and airworthiness document gets a Trust Record anchored to the Polygon blockchain at the moment it's created or digitized — independently verifiable by any airline, regulator, or auditor without access to your systems.
+ProofDeed provides that proof layer. Every maintenance record, parts certificate, and airworthiness document gets a Trust Record anchored to an independent verification network at the moment it's created or digitized — independently verifiable by any airline, regulator, or auditor without access to your systems.
 
 One API call into your existing document workflow.
 
@@ -8520,7 +8520,7 @@ info@proofdeed.com | proofdeed.com`;
 
 From supplier Certificates of Conformity to VIN-linked build sheets, your supply chain documentation is the proof that a vehicle's history is clean. Title washing, falsified maintenance records, and altered part certifications all start with a document someone couldn't prove original.
 
-ProofDeed creates a Trust Record for each field in your supply chain documents — part number, supplier ID, conformity date, test results — individually anchored on the Polygon blockchain at the moment they're created. If any field is altered downstream, it's immediately detectable. Each document gets an Asset Passport™ with a public verification link tied to the VIN.
+ProofDeed creates a Trust Record for each field in your supply chain documents — part number, supplier ID, conformity date, test results — individually anchored on an independent verification network at the moment they're created. If any field is altered downstream, it's immediately detectable. Each document gets an Asset Passport™ with a public verification link tied to the VIN.
 
 One webhook into your existing document workflow. No system replacement. Live in a day.
 
@@ -8586,7 +8586,7 @@ info@proofdeed.com | proofdeed.com`;
 
 Deed fraud and clouded titles are becoming a significant operational burden for county recorders. Once a fraudulent deed is recorded, the damage to the chain of title — and the staff time to unwind it — is substantial.
 
-ProofDeed creates a Trust Record for every deed at the moment of recording — a permanent digital fingerprint anchored to the Polygon blockchain. If that document is ever altered, the fingerprint doesn't match — immediate, irrefutable evidence of tampering. Legally defensible under FRE Rule 901.
+ProofDeed creates a Trust Record for every deed at the moment of recording — a permanent digital fingerprint anchored to an independent verification network. If that document is ever altered, the fingerprint doesn't match — immediate, irrefutable evidence of tampering. Legally defensible under FRE Rule 901.
 
 No system replacement. Works alongside your existing recording software via a single API call.
 
@@ -8638,7 +8638,7 @@ info@proofdeed.com | proofdeed.com`;
 
 Home title theft and deed fraud cases are increasingly difficult to prosecute because the fraudulent document, by the time it's discovered, has passed through multiple hands. Proving which version was recorded and when — without an immutable record — often comes down to competing paper trails.
 
-ProofDeed creates a Trust Record for every document at recording — a cryptographic fingerprint anchored to the Polygon blockchain. Legally defensible proof of integrity and timestamp under FRE Rule 901. It turns deed fraud into a provable, prosecutable offense.
+ProofDeed creates a Trust Record for every document at recording — a cryptographic fingerprint anchored to an independent verification network. Legally defensible proof of integrity and timestamp under FRE Rule 901. It turns deed fraud into a provable, prosecutable offense.
 
 Would a brief conversation make sense?
 
