@@ -3605,6 +3605,7 @@ app.post(["/stripe-webhook", "/api/stripe-webhook"], express.raw({ type: "applic
         'starter-monthly': 250,      'starter-annual': 250,
         'pro-monthly': 2500,         'pro-annual': 2500,
         'enterprise': 25000,
+        'government-trial-monthly': 50000,
       };
 
       if (isOneTime && session.metadata?.type === "topup_1000") {
@@ -3690,35 +3691,78 @@ app.post(["/stripe-webhook", "/api/stripe-webhook"], express.raw({ type: "applic
           'professional-monthly': 'Professional', 'business-monthly': 'Business',
           'enterprise-monthly': 'Enterprise', 'api-monthly': 'API Developer',
           'government-monthly': 'Government', 'starter-monthly': 'Starter',
-          'pro-monthly': 'Pro',
+          'pro-monthly': 'Pro', 'government-trial-monthly': 'Government (30-Day Trial)',
         };
         const planLabel = planLabels[planName] || 'Professional';
 
-        await sendEmail({
-          to: email,
-          subject: `Welcome to ProofDeed — your ${planLabel} account is active`,
-          html: `
-            <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:580px;margin:0 auto;color:#111827">
-              <div style="background:#0f172a;padding:20px 28px;border-radius:8px 8px 0 0">
-                <span style="color:#fff;font-size:18px;font-weight:700">Proof<span style="color:#60a5fa">Deed</span></span>
-              </div>
-              <div style="background:#fff;border:1px solid #e5e7eb;border-top:none;padding:28px;border-radius:0 0 8px 8px">
-                <p style="font-size:16px;font-weight:600;margin:0 0 6px">Your ${planLabel} account is active</p>
-                <p style="color:#374151;font-size:14px;margin:0 0 24px">Welcome to ProofDeed. Your API key is ready — keep it secure.</p>
-                <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:20px;margin-bottom:24px">
-                  <div style="font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Your API Key</div>
-                  <div style="font-family:monospace;font-size:13px;color:#1e40af;word-break:break-all;margin-bottom:16px">${activeKey}</div>
-                  <div style="font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Monthly Limit</div>
-                  <div style="font-size:14px;color:#111827">${activeLimit.toLocaleString()} Trust Records/month</div>
+        if (planName === 'government-trial-monthly') {
+          let trialEndLabel = 'in 30 days';
+          try {
+            const sub = await stripe.subscriptions.retrieve(subscriptionId);
+            if (sub.trial_end) {
+              trialEndLabel = new Date(sub.trial_end * 1000).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+            }
+          } catch (err) {
+            console.error("Could not retrieve trial_end:", err.message);
+          }
+
+          await sendEmail({
+            from: 'ProofDeed Government <gov@proofdeed.com>',
+            to: email,
+            subject: "ProofDeed Government Trial — your API key is ready",
+            html: `
+              <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:580px;margin:0 auto;color:#111827">
+                <div style="background:#032D60;padding:20px 28px;border-radius:8px 8px 0 0">
+                  <span style="color:#fff;font-size:18px;font-weight:700">Proof<span style="color:#60a5fa">Deed</span> — Government Trial</span>
                 </div>
-                <p style="font-size:14px;color:#374151;margin:0 0 8px">Getting started:</p>
-                <p style="font-size:14px;color:#374151;margin:0 0 4px">• Certify a document: <a href="https://proofdeed.com/upload" style="color:#2563eb">proofdeed.com/upload</a></p>
-                <p style="font-size:14px;color:#374151;margin:0 0 4px">• API dashboard: <a href="https://proofdeed.com/api-dashboard" style="color:#2563eb">proofdeed.com/api-dashboard</a></p>
-                <p style="font-size:14px;color:#374151;margin:0 0 24px">• API docs: <a href="https://proofdeed.com/api-docs" style="color:#2563eb">proofdeed.com/api-docs</a></p>
-                <p style="color:#9ca3af;font-size:12px;margin:0">Questions? Reply to this email or contact <a href="mailto:info@proofdeed.com" style="color:#9ca3af">info@proofdeed.com</a>. Legally defensible under FRE Rule 901.</p>
-              </div>
-            </div>`
-        });
+                <div style="background:#fff;border:1px solid #e5e7eb;border-top:none;padding:28px;border-radius:0 0 8px 8px">
+                  <p style="font-size:16px;font-weight:600;margin:0 0 6px">Your 30-day Government trial is active</p>
+                  <p style="color:#374151;font-size:14px;margin:0 0 24px">Full API and batch access — ${activeLimit.toLocaleString()} Trust Records included.</p>
+                  <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:20px;margin-bottom:24px">
+                    <div style="font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Your API Key</div>
+                    <div style="font-family:monospace;font-size:13px;color:#1e40af;word-break:break-all;margin-bottom:16px">${activeKey}</div>
+                    <div style="font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Monthly Limit</div>
+                    <div style="font-size:14px;color:#111827">${activeLimit.toLocaleString()} Trust Records/month</div>
+                  </div>
+                  <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:16px 20px;margin-bottom:24px">
+                    <p style="font-size:13px;color:#92400e;margin:0;font-weight:600">Billing starts ${trialEndLabel}</p>
+                    <p style="font-size:13px;color:#92400e;margin:6px 0 0">Your card on file will be charged $999/month starting ${trialEndLabel} unless you cancel before then. To cancel, email gov@proofdeed.com anytime before the trial ends — no penalty, no questions asked.</p>
+                  </div>
+                  <p style="font-size:14px;color:#374151;margin:0 0 8px">Getting started:</p>
+                  <p style="font-size:14px;color:#374151;margin:0 0 4px">• Certify a document: <a href="https://proofdeed.com/upload" style="color:#2563eb">proofdeed.com/upload</a></p>
+                  <p style="font-size:14px;color:#374151;margin:0 0 4px">• API dashboard: <a href="https://proofdeed.com/api-dashboard" style="color:#2563eb">proofdeed.com/api-dashboard</a></p>
+                  <p style="font-size:14px;color:#374151;margin:0 0 24px">• API docs: <a href="https://proofdeed.com/api-docs" style="color:#2563eb">proofdeed.com/api-docs</a></p>
+                  <p style="color:#9ca3af;font-size:12px;margin:0">Questions? Contact <a href="mailto:gov@proofdeed.com" style="color:#9ca3af">gov@proofdeed.com</a>. Legally defensible under FRE Rule 901.</p>
+                </div>
+              </div>`
+          });
+        } else {
+          await sendEmail({
+            to: email,
+            subject: `Welcome to ProofDeed — your ${planLabel} account is active`,
+            html: `
+              <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:580px;margin:0 auto;color:#111827">
+                <div style="background:#0f172a;padding:20px 28px;border-radius:8px 8px 0 0">
+                  <span style="color:#fff;font-size:18px;font-weight:700">Proof<span style="color:#60a5fa">Deed</span></span>
+                </div>
+                <div style="background:#fff;border:1px solid #e5e7eb;border-top:none;padding:28px;border-radius:0 0 8px 8px">
+                  <p style="font-size:16px;font-weight:600;margin:0 0 6px">Your ${planLabel} account is active</p>
+                  <p style="color:#374151;font-size:14px;margin:0 0 24px">Welcome to ProofDeed. Your API key is ready — keep it secure.</p>
+                  <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:20px;margin-bottom:24px">
+                    <div style="font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Your API Key</div>
+                    <div style="font-family:monospace;font-size:13px;color:#1e40af;word-break:break-all;margin-bottom:16px">${activeKey}</div>
+                    <div style="font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Monthly Limit</div>
+                    <div style="font-size:14px;color:#111827">${activeLimit.toLocaleString()} Trust Records/month</div>
+                  </div>
+                  <p style="font-size:14px;color:#374151;margin:0 0 8px">Getting started:</p>
+                  <p style="font-size:14px;color:#374151;margin:0 0 4px">• Certify a document: <a href="https://proofdeed.com/upload" style="color:#2563eb">proofdeed.com/upload</a></p>
+                  <p style="font-size:14px;color:#374151;margin:0 0 4px">• API dashboard: <a href="https://proofdeed.com/api-dashboard" style="color:#2563eb">proofdeed.com/api-dashboard</a></p>
+                  <p style="font-size:14px;color:#374151;margin:0 0 24px">• API docs: <a href="https://proofdeed.com/api-docs" style="color:#2563eb">proofdeed.com/api-docs</a></p>
+                  <p style="color:#9ca3af;font-size:12px;margin:0">Questions? Reply to this email or contact <a href="mailto:info@proofdeed.com" style="color:#9ca3af">info@proofdeed.com</a>. Legally defensible under FRE Rule 901.</p>
+                </div>
+              </div>`
+          });
+        }
       }
 
       if (referral) {
@@ -3937,6 +3981,38 @@ app.post(["/admin/test-email", "/api/admin/test-email"], async (req, res) => {
   } catch (err) {
     console.error("Test email failed:", err.message);
     res.status(500).json({ error: err.message });
+  }
+});
+
+/* ---------------- ADMIN: GOVERNMENT TRIAL CHECKOUT LINK ---------------- */
+// Admin-only. Generates a Stripe subscription checkout link for the real Government
+// plan with a 30-day trial attached (card required, auto-bills at $999/mo on day 30
+// unless the agency cancels first). Not exposed publicly — send manually per agency
+// after confirming eligibility.
+app.post(["/admin/create-trial-checkout", "/api/admin/create-trial-checkout"], async (req, res) => {
+  try {
+    if (!verifyAdminAuth(req)) return res.status(401).json({ error: "Unauthorized." });
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: "Email required." });
+
+    const priceId = process.env.PRICE_GOVERNMENT_MONTHLY;
+    if (!priceId) return res.status(500).json({ error: "PRICE_GOVERNMENT_MONTHLY is not configured." });
+
+    const session = await stripe.checkout.sessions.create({
+      mode: "subscription",
+      payment_method_types: ["card"],
+      customer_email: email,
+      line_items: [{ price: priceId, quantity: 1 }],
+      subscription_data: { trial_period_days: 30 },
+      metadata: { plan: "government-trial-monthly" },
+      success_url: "https://proofdeed.com/success?plan=government-trial-monthly",
+      cancel_url: "https://proofdeed.com/government",
+    });
+
+    res.json({ url: session.url });
+  } catch (err) {
+    console.error("/api/admin/create-trial-checkout error:", err);
+    res.status(500).json({ error: "Internal server error." });
   }
 });
 
