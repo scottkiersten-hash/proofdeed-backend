@@ -2893,7 +2893,7 @@ app.post(['/api/v1/trust-analysis', '/v1/trust-analysis'], authenticateApiKey, a
     let certRows = [], passportRows = [], passportEvents = [], trustIdRows = [], trustRecords = [];
 
     if (proof_id) {
-      const cr = await pool.query('SELECT hash, file_name, created_at, polygon_tx, fields, field_hashes FROM certifications WHERE hash=$1 OR id::text=$1 LIMIT 5', [proof_id]);
+      const cr = await pool.query('SELECT hash, created_at, polygon_tx FROM certifications WHERE hash=$1 OR id::text=$1 LIMIT 5', [proof_id]);
       certRows = cr.rows;
     }
 
@@ -2901,9 +2901,9 @@ app.post(['/api/v1/trust-analysis', '/v1/trust-analysis'], authenticateApiKey, a
       const pr = await pool.query('SELECT * FROM asset_passports WHERE passport_id=$1', [passport_id]);
       passportRows = pr.rows;
       if (pr.rows.length) {
-        const pe = await pool.query('SELECT event_type, description, actor, occurred_at, fields FROM asset_passport_events WHERE passport_id=$1 ORDER BY occurred_at', [passport_id]);
+        const pe = await pool.query('SELECT event_type, event_label, occurred_at, fields FROM asset_passport_events WHERE passport_id=$1 ORDER BY occurred_at', [passport_id]);
         passportEvents = pe.rows;
-        const linked = await pool.query('SELECT hash, file_name, created_at, polygon_tx, fields, field_hashes FROM certifications WHERE id IN (SELECT unnest(proof_ids) FROM asset_passports WHERE passport_id=$1)', [passport_id]).catch(() => ({ rows: [] }));
+        const linked = await pool.query('SELECT hash, created_at, polygon_tx FROM certifications WHERE certification_id = (SELECT proof_id FROM asset_passports WHERE passport_id=$1)', [passport_id]).catch(() => ({ rows: [] }));
         certRows = [...certRows, ...linked.rows];
       }
     }
@@ -9851,7 +9851,6 @@ async function runHealthChecks() {
     { name: 'Checkout business-monthly',     mode: 'subscription', price: process.env.PRICE_BUSINESS_MONTHLY },
     { name: 'Checkout government-monthly',   mode: 'subscription', price: process.env.PRICE_GOVERNMENT_MONTHLY },
     { name: 'Checkout api-monthly',          mode: 'subscription', price: process.env.PRICE_API_MONTHLY },
-    { name: 'Checkout government-pilot',     mode: 'payment',      price: process.env.PRICE_GOVERNMENT_PILOT },
   ];
   for (const plan of checkoutPlans) {
     try {
@@ -10123,7 +10122,6 @@ app.get(["/health-check", "/api/health-check"], async (req, res) => {
     { key: "business-monthly",     mode: "subscription", price: process.env.PRICE_BUSINESS_MONTHLY },
     { key: "government-monthly",   mode: "subscription", price: process.env.PRICE_GOVERNMENT_MONTHLY },
     { key: "api-monthly",          mode: "subscription", price: process.env.PRICE_API_MONTHLY },
-    { key: "government-pilot",     mode: "payment",      price: process.env.PRICE_GOVERNMENT_PILOT },
   ];
   for (const plan of plans) {
     try {
