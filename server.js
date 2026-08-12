@@ -1042,7 +1042,7 @@ function hashFields(fields) {
 }
 
 /* POST /api/v1/asset-passport — Create a new Asset Passport */
-app.post('/api/v1/asset-passport', authenticateApiKey, async (req, res) => {
+app.post(['/api/v1/asset-passport', '/v1/asset-passport'], authenticateApiKey, async (req, res) => {
   try {
     const { asset_type, asset_identifier, label, owner_name, owner_email, fields } = req.body;
 
@@ -1101,7 +1101,7 @@ app.post('/api/v1/asset-passport', authenticateApiKey, async (req, res) => {
 });
 
 /* POST /api/v1/asset-passport/:id/event — Add a lifecycle event to an existing passport */
-app.post('/api/v1/asset-passport/:id/event', authenticateApiKey, async (req, res) => {
+app.post(['/api/v1/asset-passport/:id/event', '/v1/asset-passport/:id/event'], authenticateApiKey, async (req, res) => {
   try {
     const { id } = req.params;
     const { event_type, event_label, fields } = req.body;
@@ -1150,7 +1150,7 @@ app.post('/api/v1/asset-passport/:id/event', authenticateApiKey, async (req, res
 });
 
 /* GET /api/v1/asset-passport/:id — Get passport data (API) */
-app.get('/api/v1/asset-passport/:id', authenticateApiKey, async (req, res) => {
+app.get(['/api/v1/asset-passport/:id', '/v1/asset-passport/:id'], authenticateApiKey, async (req, res) => {
   try {
     const passport = await pool.query('SELECT * FROM asset_passports WHERE passport_id=$1', [req.params.id]);
     if (!passport.rows[0]) return res.status(404).json({ error: 'Asset Passport not found.' });
@@ -1323,7 +1323,7 @@ function calcTrustScore(recordCount, onChainCount) {
 }
 
 /* POST /api/v1/trust-id — Create a new Trust ID™ for an entity */
-app.post('/api/v1/trust-id', authenticateApiKey, async (req, res) => {
+app.post(['/api/v1/trust-id', '/v1/trust-id'], authenticateApiKey, async (req, res) => {
   try {
     const { entity_type, entity_name, entity_email, entity_org, metadata } = req.body;
     if (!entity_type || !entity_name) {
@@ -1364,7 +1364,7 @@ app.post('/api/v1/trust-id', authenticateApiKey, async (req, res) => {
 });
 
 /* POST /api/v1/trust-id/:id/record — Attach a Trust Record to a Trust ID™ */
-app.post('/api/v1/trust-id/:id/record', authenticateApiKey, async (req, res) => {
+app.post(['/api/v1/trust-id/:id/record', '/v1/trust-id/:id/record'], authenticateApiKey, async (req, res) => {
   try {
     const { id } = req.params;
     const { record_type, record_label, fields, passport_id } = req.body;
@@ -1431,7 +1431,7 @@ app.post('/api/v1/trust-id/:id/record', authenticateApiKey, async (req, res) => 
 });
 
 /* GET /api/v1/trust-id/:id — Retrieve Trust ID™ + all records (API) */
-app.get('/api/v1/trust-id/:id', authenticateApiKey, async (req, res) => {
+app.get(['/api/v1/trust-id/:id', '/v1/trust-id/:id'], authenticateApiKey, async (req, res) => {
   try {
     const tid = await pool.query('SELECT * FROM trust_ids WHERE trust_id=$1', [req.params.id]);
     if (!tid.rows[0]) return res.status(404).json({ error: 'Trust ID not found.' });
@@ -1445,7 +1445,7 @@ app.get('/api/v1/trust-id/:id', authenticateApiKey, async (req, res) => {
 });
 
 /* GET /api/v1/trust-id/lookup/:email — Look up a Trust ID by entity email */
-app.get('/api/v1/trust-id/lookup/:email', authenticateApiKey, async (req, res) => {
+app.get(['/api/v1/trust-id/lookup/:email', '/v1/trust-id/lookup/:email'], authenticateApiKey, async (req, res) => {
   try {
     const tid = await pool.query('SELECT * FROM trust_ids WHERE entity_email=$1', [req.params.email.toLowerCase()]);
     if (!tid.rows[0]) return res.status(404).json({ error: 'No Trust ID found for this email.' });
@@ -2883,7 +2883,7 @@ function runTrustAnalysis({ certRows, passportRows, passportEvents, trustIdRows,
 }
 
 /* POST /api/v1/trust-analysis — Authenticated endpoint, runs rule-based trust analysis */
-app.post('/api/v1/trust-analysis', authenticateApiKey, async (req, res) => {
+app.post(['/api/v1/trust-analysis', '/v1/trust-analysis'], authenticateApiKey, async (req, res) => {
   try {
     const { proof_id, passport_id, trust_id } = req.body;
     if (!proof_id && !passport_id && !trust_id) {
@@ -3063,7 +3063,7 @@ function generateResellerApiKey() {
 }
 
 /* POST /api/v1/reseller/register — Admin only, creates a new reseller account */
-app.post('/api/v1/reseller/register', async (req, res) => {
+app.post(['/api/v1/reseller/register', '/v1/reseller/register'], async (req, res) => {
   if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
   try {
     const { company_name, contact_email, slug, commission_rate, brand_color, brand_logo_url } = req.body;
@@ -3098,7 +3098,7 @@ app.post('/api/v1/reseller/register', async (req, res) => {
 });
 
 /* GET /api/v1/reseller/:slug/stats — Reseller API key auth, returns usage stats */
-app.get('/api/v1/reseller/:slug/stats', async (req, res) => {
+app.get(['/api/v1/reseller/:slug/stats', '/v1/reseller/:slug/stats'], async (req, res) => {
   const apiKey = req.headers['x-reseller-key'] || req.headers['authorization']?.replace('Bearer ', '');
   if (!apiKey) return res.status(401).json({ error: 'Missing x-reseller-key header.' });
 
