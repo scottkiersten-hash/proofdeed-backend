@@ -186,7 +186,8 @@ const PORT = process.env.PORT || 8080;
 /* ---------------- Database ---------------- */
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
+  ssl: { rejectUnauthorized: false },
+  max: 20 // was unset (pg default: 10) -- tune to the managed Postgres plan's actual connection ceiling
 });
 
 /* ---------------- Middleware ---------------- */
@@ -1580,22 +1581,42 @@ async function processBatchBackground(batchId, certRecords, apiKey) {
     // Single blockchain transaction for the entire batch
     const txHash = await anchorToPolygon(merkleRoot);
 
-    // Update every cert with shared tx + individual Merkle proof
-    for (const cert of certRecords) {
+    // Update every cert with shared tx + individual Merkle proof — chunked bulk update, not one row per round trip
+    const UPDATE_CHUNK = 1000;
+    for (let i = 0; i < certRecords.length; i += UPDATE_CHUNK) {
+      const chunk = certRecords.slice(i, i + UPDATE_CHUNK);
+      const rows = [];
+      for (const cert of chunk) {
+        try {
+          const leaf = keccak256(cert.documentHash);
+          const proof = tree.getProof(leaf).map(p => ({
+            data: p.data.toString("hex"),
+            position: p.position
+          }));
+          rows.push({ proofId: cert.proofId, proofJson: JSON.stringify(proof) });
+        } catch (err) {
+          console.error("Merkle proof build failed for", cert.proofId, err.message);
+          failed++;
+        }
+      }
+      if (rows.length === 0) continue;
+      const values = [];
+      const placeholders = rows.map((r, idx) => {
+        const b = idx * 2;
+        values.push(r.proofId, r.proofJson);
+        return `($${b + 1}, $${b + 2}::jsonb)`;
+      }).join(",");
       try {
-        const leaf = keccak256(cert.documentHash);
-        const proof = tree.getProof(leaf).map(p => ({
-          data: p.data.toString("hex"),
-          position: p.position
-        }));
         await pool.query(
-          `UPDATE certifications SET polygon_tx = $1, merkle_root = $2, merkle_proof = $3 WHERE certification_id = $4`,
-          [txHash, merkleRoot, JSON.stringify(proof), cert.proofId]
+          `UPDATE certifications AS c SET polygon_tx = $${rows.length * 2 + 1}, merkle_root = $${rows.length * 2 + 2}, merkle_proof = v.proof
+           FROM (VALUES ${placeholders}) AS v(id, proof)
+           WHERE c.certification_id = v.id`,
+          [...values, txHash, merkleRoot]
         );
-        processed++;
+        processed += rows.length;
       } catch (err) {
-        console.error("Merkle proof update failed for", cert.proofId, err.message);
-        failed++;
+        console.error("Batch Merkle proof update failed for chunk starting at", i, err.message);
+        failed += rows.length;
       }
     }
 
@@ -1710,13 +1731,32 @@ app.post(["/api/v1/batch", "/v1/batch"], authenticateApiKey, async (req, res) =>
       [batchId, req.apiKey.email, certRecords.length]
     );
 
-    // Insert all certs immediately as pending (polygon_tx = null)
-    for (const cert of certRecords) {
-      await pool.query(
-        `INSERT INTO certifications (certification_id, hash, polygon_tx, batch_id, label, api_key_email, ip_address, created_at)
-         VALUES ($1, $2, NULL, $3, $4, $5, $6, NOW()) ON CONFLICT (certification_id) DO NOTHING`,
-        [cert.proofId, cert.documentHash, batchId, cert.label, req.apiKey.email, req.ip || req.headers["x-forwarded-for"] || null]
-      );
+    // Insert all certs immediately as pending (polygon_tx = null) — chunked bulk insert, not one row per round trip
+    const insertIp = req.ip || req.headers["x-forwarded-for"] || null;
+    const INSERT_CHUNK = 1000;
+    const insertClient = await pool.connect();
+    try {
+      await insertClient.query("BEGIN");
+      for (let i = 0; i < certRecords.length; i += INSERT_CHUNK) {
+        const chunk = certRecords.slice(i, i + INSERT_CHUNK);
+        const values = [];
+        const placeholders = chunk.map((cert, idx) => {
+          const b = idx * 6;
+          values.push(cert.proofId, cert.documentHash, batchId, cert.label, req.apiKey.email, insertIp);
+          return `($${b + 1}, $${b + 2}, NULL, $${b + 3}, $${b + 4}, $${b + 5}, $${b + 6}, NOW())`;
+        }).join(",");
+        await insertClient.query(
+          `INSERT INTO certifications (certification_id, hash, polygon_tx, batch_id, label, api_key_email, ip_address, created_at)
+           VALUES ${placeholders} ON CONFLICT (certification_id) DO NOTHING`,
+          values
+        );
+      }
+      await insertClient.query("COMMIT");
+    } catch (err) {
+      await insertClient.query("ROLLBACK");
+      throw err;
+    } finally {
+      insertClient.release();
     }
 
     // Deduct usage immediately
