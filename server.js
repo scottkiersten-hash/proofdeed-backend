@@ -626,7 +626,7 @@ app.post("/api/enterprise/generate-key", async (req, res) => {
 });
 
 /* ---------------- ENTERPRISE - SINGLE CERTIFY ---------------- */
-app.post("/api/v1/certify", authenticateApiKey, async (req, res) => {
+app.post(["/api/v1/certify", "/v1/certify"], authenticateApiKey, async (req, res) => {
   try {
     const { documentHash } = req.body;
 
@@ -690,7 +690,7 @@ app.post("/api/v1/certify", authenticateApiKey, async (req, res) => {
 /* ---------------- FILE CERTIFY (Enterprise API — with forensics) ---------------- */
 // Accepts the actual file, runs forensic analysis, hashes it, and certifies.
 // Returns Trust ID + forensic assessment in one call.
-app.post("/api/v1/certify/file", authenticateApiKey, upload.single('file'), async (req, res) => {
+app.post(["/api/v1/certify/file", "/v1/certify/file"], authenticateApiKey, upload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded. Send the file as multipart/form-data with field name "file".' });
 
@@ -851,7 +851,7 @@ app.post(["/api/certify-file", "/certify-file"], upload.single('file'), async (r
 /* ---------------- FIELD-LEVEL CERTIFY ---------------- */
 // Hashes each field individually so you can prove WHICH field changed, not just that something did.
 // Use case: financial sheets, automotive deal jackets, medical records, subscription agreements.
-app.post("/api/v1/certify/fields", authenticateApiKey, async (req, res) => {
+app.post(["/api/v1/certify/fields", "/v1/certify/fields"], authenticateApiKey, async (req, res) => {
   try {
     const { fields, label, metadata } = req.body;
     // fields = { vin: "1HGBH41JXMN109186", odometer: "45231", price: "24500.00", ... }
@@ -914,7 +914,7 @@ app.post("/api/v1/certify/fields", authenticateApiKey, async (req, res) => {
 });
 
 /* ---------------- FIELD VERIFY — check if a specific field has changed ---------------- */
-app.post("/api/v1/verify/fields", async (req, res) => {
+app.post(["/api/v1/verify/fields", "/v1/verify/fields"], async (req, res) => {
   try {
     const { proofId, fields } = req.body;
     if (!proofId || !fields) return res.status(400).json({ error: 'proofId and fields required.' });
@@ -947,7 +947,7 @@ app.post("/api/v1/verify/fields", async (req, res) => {
 /* ---------------- DMS WEBHOOK (Dealer Management System sync) ---------------- */
 // Drop this URL into any DMS (CDK, Reynolds & Reynolds, DealerSocket, Tekion) as a webhook.
 // When a deal is finalized, the DMS posts the deal data here and we auto-certify it.
-app.post("/api/v1/webhooks/dms", authenticateApiKey, async (req, res) => {
+app.post(["/api/v1/webhooks/dms", "/v1/webhooks/dms"], authenticateApiKey, async (req, res) => {
   try {
     const { vin, deal_number, buyer_name, sale_price, odometer, stock_number, sale_date, fields } = req.body;
 
@@ -1670,7 +1670,7 @@ async function processBatchBackground(batchId, certRecords, apiKey) {
   }
 }
 
-app.post("/api/v1/batch", authenticateApiKey, async (req, res) => {
+app.post(["/api/v1/batch", "/v1/batch"], authenticateApiKey, async (req, res) => {
   try {
     const { documents } = req.body;
 
@@ -1759,7 +1759,7 @@ app.post("/api/v1/batch", authenticateApiKey, async (req, res) => {
 });
 
 /* ---------------- BATCH STATUS ---------------- */
-app.get("/api/v1/batch/:batchId", authenticateApiKey, async (req, res) => {
+app.get(["/api/v1/batch/:batchId", "/v1/batch/:batchId"], authenticateApiKey, async (req, res) => {
   try {
     const { batchId } = req.params;
     const batch = await pool.query(
@@ -1803,7 +1803,7 @@ app.get("/api/v1/batch/:batchId", authenticateApiKey, async (req, res) => {
 });
 
 /* ---------------- API USAGE ---------------- */
-app.get("/api/v1/usage", authenticateApiKeyNoLimit, async (req, res) => {
+app.get(["/api/v1/usage", "/v1/usage"], authenticateApiKeyNoLimit, async (req, res) => {
   try {
     const recentBatches = await pool.query(
       `SELECT batch_id, status, total, processed, failed, created_at FROM batches WHERE email = $1 ORDER BY created_at DESC LIMIT 10`,
@@ -1824,7 +1824,7 @@ app.get("/api/v1/usage", authenticateApiKeyNoLimit, async (req, res) => {
 });
 
 /* ---------------- SET WEBHOOK URL ---------------- */
-app.put("/api/v1/webhook", authenticateApiKeyNoLimit, async (req, res) => {
+app.put(["/api/v1/webhook", "/v1/webhook"], authenticateApiKeyNoLimit, async (req, res) => {
   try {
     const { webhookUrl } = req.body;
     if (webhookUrl && !webhookUrl.startsWith("https://")) {
@@ -1841,7 +1841,7 @@ app.put("/api/v1/webhook", authenticateApiKeyNoLimit, async (req, res) => {
 });
 
 /* ---------------- API KEY ROTATION ---------------- */
-app.post("/api/v1/keys/rotate", authenticateApiKeyNoLimit, async (req, res) => {
+app.post(["/api/v1/keys/rotate", "/v1/keys/rotate"], authenticateApiKeyNoLimit, async (req, res) => {
   try {
     const newKey = "pd_live_" + crypto.randomBytes(32).toString("hex");
     await pool.query(
@@ -1859,7 +1859,7 @@ app.post("/api/v1/keys/rotate", authenticateApiKeyNoLimit, async (req, res) => {
 });
 
 /* ---------------- API KEY REVOCATION ---------------- */
-app.delete("/api/v1/keys", authenticateApiKeyNoLimit, async (req, res) => {
+app.delete(["/api/v1/keys", "/v1/keys"], authenticateApiKeyNoLimit, async (req, res) => {
   try {
     await pool.query(
       `UPDATE api_keys SET active = FALSE WHERE api_key = $1`,
@@ -1872,7 +1872,7 @@ app.delete("/api/v1/keys", authenticateApiKeyNoLimit, async (req, res) => {
 });
 
 /* ---------------- BATCH VERIFY ---------------- */
-app.post("/api/v1/batch/verify", authenticateApiKeyNoLimit, async (req, res) => {
+app.post(["/api/v1/batch/verify", "/v1/batch/verify"], authenticateApiKeyNoLimit, async (req, res) => {
   try {
     const { trust_ids } = req.body;
     if (!Array.isArray(trust_ids) || trust_ids.length === 0) {
@@ -1918,7 +1918,7 @@ app.post("/api/v1/batch/verify", authenticateApiKeyNoLimit, async (req, res) => 
 });
 
 /* ---------------- LIST CERTIFICATIONS ---------------- */
-app.get("/api/v1/certificates", authenticateApiKeyNoLimit, async (req, res) => {
+app.get(["/api/v1/certificates", "/v1/certificates"], authenticateApiKeyNoLimit, async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit) || 50, 500);
     const offset = parseInt(req.query.offset) || 0;
@@ -1951,7 +1951,7 @@ app.get("/api/v1/certificates", authenticateApiKeyNoLimit, async (req, res) => {
 });
 
 /* ---------------- CERTIFICATE PDF DOWNLOAD ---------------- */
-app.get("/api/v1/certificate/:proofId/pdf", authenticateApiKeyNoLimit, async (req, res) => {
+app.get(["/api/v1/certificate/:proofId/pdf", "/v1/certificate/:proofId/pdf"], authenticateApiKeyNoLimit, async (req, res) => {
   try {
     const { proofId } = req.params;
     const result = await pool.query(
