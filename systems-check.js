@@ -195,9 +195,9 @@ async function checkFunctional() {
   const assetId = "SYSCHECK-" + Date.now();
   const passport = await req("POST", "/api/v1/asset-passport", {
     apiKey: API_KEY,
-    body: { assetType: "test", assetIdentifier: assetId, label: "systems-check test asset" },
+    body: { asset_type: "test", asset_identifier: assetId, label: "systems-check test asset", fields: { note: "created by systems-check.js" } },
   });
-  const passportId = passport.json?.passportId || passport.json?.passport_id;
+  const passportId = passport.json?.passportId;
   record("Asset Passports", "Create a passport", passport.status === 200 && !!passportId, JSON.stringify(passport.json));
 
   if (passportId) {
@@ -208,10 +208,10 @@ async function checkFunctional() {
   // --- Trust IDs ---
   const trustIdReq = await req("POST", "/api/v1/trust-id", {
     apiKey: API_KEY,
-    body: { entityType: "organization", entityName: "Systems Check Test Entity", entityEmail: `systems-check-${Date.now()}@example.com` },
+    body: { entity_type: "organization", entity_name: "Systems Check Test Entity", entity_email: `systems-check-${Date.now()}@example.com` },
   });
-  const trustId = trustIdReq.json?.trustId || trustIdReq.json?.trust_id;
-  record("Trust IDs", "Create a Trust ID", trustIdReq.status === 200 && !!trustId, JSON.stringify(trustIdReq.json));
+  const trustId = trustIdReq.json?.trust_id;
+  record("Trust IDs", "Create a Trust ID", trustIdReq.status === 201 && !!trustId, JSON.stringify(trustIdReq.json));
 
   if (trustId) {
     const getTrustId = await req("GET", `/api/v1/trust-id/${trustId}`, { apiKey: API_KEY });
@@ -219,26 +219,31 @@ async function checkFunctional() {
   }
 
   // --- Trust Intelligence ---
-  if (proofId) {
+  // trust-analysis matches proof_id against the document's hash or internal
+  // numeric id, NOT the PD-... certification_id customers normally see --
+  // use the hash from the certify step above, not proofId.
+  if (docHash) {
     const analysis = await req("POST", "/api/v1/trust-analysis", {
       apiKey: API_KEY,
-      body: { proofId },
+      body: { proof_id: docHash },
     });
-    record("Trust Intelligence", "Run an analysis against a certified record", analysis.status === 200, `status=${analysis.status}`);
+    record("Trust Intelligence", "Run an analysis against a certified record", analysis.status === 200, JSON.stringify(analysis.json));
   }
 
   // --- Trust Graph (entities + relationships) ---
   const entity = await req("POST", "/api/entities", {
-    body: { name: "Systems Check Test Org", type: "organization" },
+    apiKey: API_KEY,
+    body: { entity_type: "organization", name: "Systems Check Test Org" },
   });
-  const entityId = entity.json?.entityId || entity.json?.entity_id;
+  const entityId = entity.json?.entity_id;
   record("Trust Graph", "Create an entity", entity.status === 200 && !!entityId, JSON.stringify(entity.json));
 
   if (entityId && proofId) {
     const relationship = await req("POST", `/api/certifications/${proofId}/relationships`, {
-      body: { entityId, relationshipType: "related_to" },
+      apiKey: API_KEY,
+      body: { entity_id: entityId, relationship_type: "related_to" },
     });
-    record("Trust Graph", "Link a certification to an entity", relationship.status === 200, `status=${relationship.status}`);
+    record("Trust Graph", "Link a certification to an entity", relationship.status === 200, JSON.stringify(relationship.json));
   }
 
   // --- Webhook config (set + read back, non-destructive) ---
