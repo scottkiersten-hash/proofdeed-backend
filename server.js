@@ -4069,7 +4069,7 @@ app.post(["/admin/create-user", "/api/admin/create-user"], async (req, res) => {
       const limits = { 'professional-monthly': 250, 'business-monthly': 500, 'government-monthly': 1000, 'api-monthly': 10000 };
       const limit = limits[plan] || 25;
       await pool.query(
-        "INSERT INTO api_keys (email, api_key, plan, monthly_limit, is_active, created_at) VALUES ($1, $2, $3, $4, true, NOW()) ON CONFLICT (email) DO UPDATE SET plan=$3, monthly_limit=$4",
+        "INSERT INTO api_keys (email, api_key, plan, monthly_limit, active, created_at) VALUES ($1, $2, $3, $4, true, NOW()) ON CONFLICT (email) DO UPDATE SET plan=$3, monthly_limit=$4",
         [email, 'ak_' + Math.random().toString(36).slice(2,18), plan, limit]
       );
     }
