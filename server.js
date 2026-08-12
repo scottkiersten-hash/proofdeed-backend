@@ -4068,15 +4068,24 @@ app.post(["/admin/create-user", "/api/admin/create-user"], async (req, res) => {
     if (plan) {
       const limits = { 'professional-monthly': 250, 'business-monthly': 500, 'government-monthly': 1000, 'api-monthly': 10000 };
       const limit = limits[plan] || 25;
-      await pool.query(
-        "INSERT INTO api_keys (email, api_key, plan, monthly_limit, active, created_at) VALUES ($1, $2, $3, $4, true, NOW()) ON CONFLICT (email) DO UPDATE SET plan=$3, monthly_limit=$4",
-        [email, 'ak_' + Math.random().toString(36).slice(2,18), plan, limit]
-      );
+      // Not using ON CONFLICT here -- the live api_keys table has no unique
+      // constraint on email to conflict against, despite schema.sql declaring
+      // one. Explicit check-then-write works regardless of whether that
+      // constraint actually exists.
+      const existingKey = await pool.query("SELECT id FROM api_keys WHERE email = $1", [email]);
+      if (existingKey.rows.length > 0) {
+        await pool.query("UPDATE api_keys SET plan = $1, monthly_limit = $2 WHERE email = $3", [plan, limit, email]);
+      } else {
+        await pool.query(
+          "INSERT INTO api_keys (email, api_key, plan, monthly_limit, active, created_at) VALUES ($1, $2, $3, $4, true, NOW())",
+          [email, 'ak_' + Math.random().toString(36).slice(2,18), plan, limit]
+        );
+      }
     }
     res.json({ success: true, message: `User ${email} created.` });
   } catch (err) {
     console.error("/api/admin/create-user error:", err);
-    res.status(500).json({ error: "Server error.", detail: err.message }); // TEMP diagnostic -- revert after debugging
+    res.status(500).json({ error: "Server error." });
   }
 });
 
@@ -4713,6 +4722,21 @@ async function ensureIndexes() {
   }
 }
 ensureIndexes();
+
+// api_keys.email should be unique (code throughout assumes one row per email,
+// e.g. WHERE email = $1 lookups) but the live table was created without that
+// constraint. Isolated from ensureIndexes() -- if this fails (e.g. duplicate
+// emails already exist), it must not block the other migrations in that batch.
+(async () => {
+  try {
+    await pool.query(`ALTER TABLE api_keys ADD CONSTRAINT api_keys_email_unique UNIQUE (email)`);
+    console.log("[Migration] Added missing unique constraint on api_keys.email");
+  } catch (err) {
+    if (err.code !== "42710" /* constraint already exists */) {
+      console.warn("[Migration] Could not add api_keys.email unique constraint (non-fatal):", err.message);
+    }
+  }
+})();
 
 /* ---------------- ONE-TIME: reset contacts sent from wrong domain ---------------- */
 async function resetWrongDomainContacts() {
