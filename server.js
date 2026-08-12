@@ -4076,7 +4076,7 @@ app.post(["/admin/create-user", "/api/admin/create-user"], async (req, res) => {
     res.json({ success: true, message: `User ${email} created.` });
   } catch (err) {
     console.error("/api/admin/create-user error:", err);
-    res.status(500).json({ error: "Server error." });
+    res.status(500).json({ error: "Server error.", detail: err.message }); // TEMP diagnostic -- revert after debugging
   }
 });
 
