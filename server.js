@@ -9772,9 +9772,24 @@ async function runHealthChecks() {
     checks.push({ name: 'Stripe', ok: false, error: e.message });
   }
 
-  // 3a. Brevo SMTP — check credentials are set
+  // 3a. Brevo SMTP — actually verify the connection + auth, not just that env vars exist.
+  // A missing dependency, revoked key, or provider-side issue must show up here, not just
+  // "the env var is present" -- that gap is exactly what let email delivery silently fail
+  // in production for a month with this check reporting healthy the whole time.
   if (process.env.BREVO_SMTP_KEY && process.env.BREVO_SMTP_USER) {
-    checks.push({ name: 'Brevo SMTP', ok: true, error: null });
+    try {
+      const nodemailer = await import('nodemailer');
+      const transporter = nodemailer.default.createTransport({
+        host: 'smtp-relay.brevo.com',
+        port: 587,
+        secure: false,
+        auth: { user: process.env.BREVO_SMTP_USER, pass: process.env.BREVO_SMTP_KEY },
+      });
+      await transporter.verify();
+      checks.push({ name: 'Brevo SMTP', ok: true, error: null });
+    } catch (e) {
+      checks.push({ name: 'Brevo SMTP', ok: false, error: e.message });
+    }
   } else {
     checks.push({ name: 'Brevo SMTP', ok: false, error: 'BREVO_SMTP_KEY or BREVO_SMTP_USER not set' });
   }
