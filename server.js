@@ -9138,6 +9138,25 @@ function queryNeedsGeo(query) {
   return true;
 }
 
+// Google's Custom Search JSON API free tier caps at 100 queries/day --
+// anything past that starts billing. This is a hard runtime guard so the
+// lead engine can never exceed the free tier regardless of how many cron
+// triggers or targetsPerRun get configured later. Keyed by date so it
+// resets naturally at midnight with no separate reset logic needed.
+const GOOGLE_CSE_DAILY_LIMIT = 90; // buffer under the real 100/day cap
+async function getGoogleCseCallsToday() {
+  const key = 'cse_calls_' + new Date().toISOString().slice(0, 10);
+  const row = await pool.query(`SELECT value FROM lead_engine_state WHERE key=$1`, [key]).catch(() => ({ rows: [] }));
+  return { key, count: row.rows[0] ? parseInt(row.rows[0].value) : 0 };
+}
+async function incrementGoogleCseCalls(key, current) {
+  await pool.query(
+    `INSERT INTO lead_engine_state (key, value, updated_at) VALUES ($1, $2, NOW())
+     ON CONFLICT (key) DO UPDATE SET value=$2, updated_at=NOW()`,
+    [key, String(current + 1)]
+  ).catch(() => {});
+}
+
 async function searchLeadsViaGoogle(target, targetIndex = 0) {
   const apiKey = process.env.GOOGLE_CSE_API_KEY;
   const cseId = process.env.GOOGLE_CSE_ID;
@@ -9157,9 +9176,15 @@ async function searchLeadsViaGoogle(target, targetIndex = 0) {
   try {
     // 2 pages of Google CSE results (10 per page = 20 URLs to mine)
     for (let page = 0; page <= 1; page++) {
+      const { key: cseKey, count: cseCount } = await getGoogleCseCallsToday();
+      if (cseCount >= GOOGLE_CSE_DAILY_LIMIT) {
+        console.log(`[LeadEngine] Google CSE daily free-tier guard hit (${cseCount}/${GOOGLE_CSE_DAILY_LIMIT}) — stopping for today, zero cost preserved.`);
+        break;
+      }
       const start = page * 10 + 1;
       const url = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${cseId}&q=${encodeURIComponent(query)}&num=10&start=${start}`;
       const res = await fetch(url);
+      await incrementGoogleCseCalls(cseKey, cseCount);
       if (!res.ok) { console.log(`[LeadEngine] Google CSE error ${res.status}`); break; }
       const data = await res.json();
       const items = data.items || [];
@@ -9501,6 +9526,15 @@ async function runLeadEngine(targetsPerRun = 3) {
     return;
   }
 
+  // Bail out immediately if today's free-tier Google CSE budget is already
+  // spent -- avoids looping through hundreds of targets that would each
+  // just no-op, and keeps this guaranteed zero-cost regardless of schedule.
+  const { count: cseCallsSoFar } = await getGoogleCseCallsToday();
+  if (cseCallsSoFar >= GOOGLE_CSE_DAILY_LIMIT) {
+    console.log(`[LeadEngine] Google CSE daily free-tier budget already spent (${cseCallsSoFar}/${GOOGLE_CSE_DAILY_LIMIT}) — skipping this run entirely.`);
+    return;
+  }
+
   // Prevent overlapping runs — but auto-reset if stuck for more than 3 hours
   const runningRow = await pool.query(`SELECT value, updated_at FROM lead_engine_state WHERE key='is_running'`).catch(() => ({ rows: [] }));
   if (runningRow.rows[0]?.value === 'true') {
@@ -9680,13 +9714,12 @@ async function runLeadEngine(targetsPerRun = 3) {
   ).catch(() => {});
 }
 
-// Lead engine — 7 days/week, twice daily at 8am and 2pm Chicago, 200 targets per run
-// Lead engine — Mon-Fri, every 2 hours 8am-4pm CT (5 runs × 400 targets = 2,000/day max)
-cron.schedule('0 8 * * 1-5',  () => runLeadEngine(400), { timezone: 'America/Chicago' });
-cron.schedule('0 10 * * 1-5', () => runLeadEngine(400), { timezone: 'America/Chicago' });
-cron.schedule('0 12 * * 1-5', () => runLeadEngine(400), { timezone: 'America/Chicago' });
-cron.schedule('0 14 * * 1-5', () => runLeadEngine(400), { timezone: 'America/Chicago' });
-cron.schedule('0 16 * * 1-5', () => runLeadEngine(400), { timezone: 'America/Chicago' });
+// Lead engine — Mon-Fri, morning + afternoon. The GOOGLE_CSE_DAILY_LIMIT
+// guard above is what actually keeps this at zero cost; these two runs are
+// just sized to roughly match the free-tier budget so most of it isn't
+// spent looping through no-op targets after the cap hits early in the day.
+cron.schedule('0 8 * * 1-5',  () => runLeadEngine(25), { timezone: 'America/Chicago' });
+cron.schedule('0 13 * * 1-5', () => runLeadEngine(25), { timezone: 'America/Chicago' });
 
 /* ---------------- Lead Engine API ----------------  */
 app.get(['/api/admin/lead-engine', '/admin/lead-engine'], authRateLimit, async (req, res) => {
