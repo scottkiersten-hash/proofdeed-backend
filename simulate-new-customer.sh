@@ -20,9 +20,18 @@
 set -euo pipefail
 
 BASE="${PROOFDEED_BASE_URL:-https://proofdeed.com}"
-ADMIN_KEY="${ADMIN_SECRET:-${ADMIN_PASSWORD:-}}"
+# Match verifyAdminAuth()'s exact precedence: ADMIN_PASSWORD checked first.
+# ADMIN_SECRET is a DO "encrypted" var -- the Console shell shows its raw
+# EV[...] ciphertext placeholder instead of the decrypted value, so it must
+# never be preferred over a plain var that's actually readable here.
+ADMIN_KEY="${ADMIN_PASSWORD:-${ADMIN_SECRET:-}}"
 if [ -z "$ADMIN_KEY" ]; then
   echo "ERROR: neither ADMIN_SECRET nor ADMIN_PASSWORD is set in this environment."
+  exit 1
+fi
+if [[ "$ADMIN_KEY" == EV\[* ]]; then
+  echo "ERROR: resolved admin key is a DO encrypted-var placeholder (starts with EV[), not the real value."
+  echo "Set ADMIN_PASSWORD as a plain (non-encrypted) variable, or run this outside the Console."
   exit 1
 fi
 
