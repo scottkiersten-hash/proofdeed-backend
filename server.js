@@ -9145,7 +9145,13 @@ function queryNeedsGeo(query) {
 // resets naturally at midnight with no separate reset logic needed.
 const GOOGLE_CSE_DAILY_LIMIT = 90; // buffer under the real 100/day cap
 async function getGoogleCseCallsToday() {
-  const key = 'cse_calls_' + new Date().toISOString().slice(0, 10);
+  // Must key off Pacific time, not UTC -- Google resets this quota at
+  // midnight Pacific. A UTC-keyed counter thinks it's a fresh day for
+  // several hours while Google still considers the previous (possibly
+  // exhausted) quota day active, letting requests through that Google
+  // then rejects with 429 anyway.
+  const pacificDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  const key = 'cse_calls_' + pacificDate;
   const row = await pool.query(`SELECT value FROM lead_engine_state WHERE key=$1`, [key]).catch(() => ({ rows: [] }));
   return { key, count: row.rows[0] ? parseInt(row.rows[0].value) : 0 };
 }
@@ -9762,23 +9768,6 @@ app.post(['/api/admin/lead-engine/run', '/admin/lead-engine/run'], authRateLimit
     // Always clear the running flag even if it crashes
     pool.query(`INSERT INTO lead_engine_state (key,value,updated_at) VALUES ('is_running','false',NOW()) ON CONFLICT (key) DO UPDATE SET value='false',updated_at=NOW()`).catch(() => {});
   });
-});
-
-// TEMP diagnostic -- raw Google CSE response for one query, bypassing all
-// lead-engine parsing/filtering logic. Revert after debugging.
-app.get(['/api/admin/lead-engine/diag', '/admin/lead-engine/diag'], authRateLimit, async (req, res) => {
-  if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
-  try {
-    const { count: cseCount } = await getGoogleCseCallsToday();
-    const apiKey = process.env.GOOGLE_CSE_API_KEY;
-    const cseId = process.env.GOOGLE_CSE_ID;
-    const url = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${cseId}&q=${encodeURIComponent('"County Recorder" contact email county USA site:*.gov')}&num=10`;
-    const r = await fetch(url);
-    const body = await r.text();
-    res.json({ trackedCallsToday: cseCount, googleStatus: r.status, googleOk: r.ok, bodyPreview: body.slice(0, 800) });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
 });
 
 // Force-reset stuck is_running flag
