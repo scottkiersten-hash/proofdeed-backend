@@ -9764,6 +9764,23 @@ app.post(['/api/admin/lead-engine/run', '/admin/lead-engine/run'], authRateLimit
   });
 });
 
+// TEMP diagnostic -- raw Google CSE response for one query, bypassing all
+// lead-engine parsing/filtering logic. Revert after debugging.
+app.get(['/api/admin/lead-engine/diag', '/admin/lead-engine/diag'], authRateLimit, async (req, res) => {
+  if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
+  try {
+    const { count: cseCount } = await getGoogleCseCallsToday();
+    const apiKey = process.env.GOOGLE_CSE_API_KEY;
+    const cseId = process.env.GOOGLE_CSE_ID;
+    const url = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${cseId}&q=${encodeURIComponent('"County Recorder" contact email county USA site:*.gov')}&num=10`;
+    const r = await fetch(url);
+    const body = await r.text();
+    res.json({ trackedCallsToday: cseCount, googleStatus: r.status, googleOk: r.ok, bodyPreview: body.slice(0, 800) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Force-reset stuck is_running flag
 app.post(['/api/admin/lead-engine/reset', '/admin/lead-engine/reset'], authRateLimit, async (req, res) => {
   if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
