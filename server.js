@@ -9795,6 +9795,9 @@ app.post(['/api/admin/lead-engine/reset', '/admin/lead-engine/reset'], authRateL
 const ADMIN_ALERT_EMAIL = process.env.MAIL_TO || 'sjjk@pm.me';
 let lastAlertSent = {};
 const ALERT_AFTER_FAILURES = 3; // must fail 3 checks in a row (~45 min) before alerting
+// Checks that still run and show in the dashboard, but never trigger an alert email —
+// use for known/expected issues you're not actively working (e.g. blocked on a manual step elsewhere).
+const ALERT_SILENCED = new Set(['Lead Engine']);
 
 // failureStreak persisted in DB so deploys don't reset the counter
 let failureStreak = {};
@@ -10025,6 +10028,7 @@ async function runHealthChecks() {
 
   // Only alert after 3 consecutive failures (~45 min of real downtime)
   for (const f of failures) {
+    if (ALERT_SILENCED.has(f.name)) continue;
     if (failureStreak[f.name] >= ALERT_AFTER_FAILURES) {
       const lastSent = lastAlertSent[f.name] || 0;
       // Re-alert every 2 hours if still down (not every check)
@@ -10049,7 +10053,7 @@ cron.schedule('*/15 * * * *', () => runHealthChecks());
 // Daily summary at 8am Bangkok — only email if there are failures
 cron.schedule('0 8 * * *', async () => {
   const checks = await runHealthChecks();
-  const allOk = checks.every(c => c.ok);
+  const allOk = checks.every(c => c.ok || ALERT_SILENCED.has(c.name));
   if (!allOk) {
     const lines = checks.map(c => `${c.ok ? '✅' : '❌'} ${c.name}${c.error ? ': ' + c.error : ''}`).join('\n');
     await sendAlertEmail(
