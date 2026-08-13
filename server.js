@@ -9752,32 +9752,6 @@ app.get(['/api/admin/lead-engine', '/admin/lead-engine'], authRateLimit, async (
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// TEMP DIAGNOSTIC — remove after investigating zero-leads issue
-app.get(['/api/admin/lead-engine/debug', '/admin/lead-engine/debug'], authRateLimit, async (req, res) => {
-  if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
-  try {
-    const { key: cseKey, count: cseCountBefore } = await getGoogleCseCallsToday();
-    const apiKey = process.env.GOOGLE_CSE_API_KEY;
-    const cseId = process.env.GOOGLE_CSE_ID;
-    const testQuery = '"County Recorder" contact email county USA site:*.gov OR site:*.us';
-    const url = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${cseId}&q=${encodeURIComponent(testQuery)}&num=10&start=1`;
-    const googleRes = await fetch(url);
-    const bodyText = await googleRes.text();
-    let parsed = null;
-    try { parsed = JSON.parse(bodyText); } catch {}
-    res.json({
-      cseKey, cseCountBefore, GOOGLE_CSE_DAILY_LIMIT,
-      googleStatus: googleRes.status,
-      googleOk: googleRes.ok,
-      itemCount: parsed?.items?.length ?? null,
-      searchInformation: parsed?.searchInformation || null,
-      errorBody: googleRes.ok ? null : bodyText.slice(0, 1500),
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
 app.post(['/api/admin/lead-engine/run', '/admin/lead-engine/run'], authRateLimit, async (req, res) => {
   if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
 
