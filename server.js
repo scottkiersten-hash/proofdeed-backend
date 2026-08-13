@@ -51,6 +51,16 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 
 
 dotenv.config();
 
+// Stripe price IDs are frequently re-pasted into the DO dashboard and can
+// pick up stray leading/trailing whitespace (tabs, newlines) that Stripe's
+// API rejects outright with an opaque "forbidden characters" error. Trim
+// every PRICE_* env var once at boot so this class of bug can't recur.
+for (const key of Object.keys(process.env)) {
+  if (key.startsWith('PRICE_') && typeof process.env[key] === 'string') {
+    process.env[key] = process.env[key].trim();
+  }
+}
+
 /* ---------------- EMAIL HELPER (Brevo SMTP via nodemailer) ---------------- */
 async function sendEmail({ to, from, subject, text, html }) {
   if (!to || !process.env.BREVO_SMTP_KEY) throw new Error('BREVO_SMTP_KEY missing');
@@ -10064,28 +10074,6 @@ setTimeout(async () => {
 }, 30000);
 
 // Expose health check endpoint for manual trigger
-// TEMP DIAGNOSTIC — remove after investigating broken enterprise-monthly checkout
-app.get(['/api/admin/stripe-price-debug', '/admin/stripe-price-debug'], authRateLimit, async (req, res) => {
-  if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
-  const plans = {
-    'professional-monthly': process.env.PRICE_PROFESSIONAL_MONTHLY,
-    'business-monthly': process.env.PRICE_BUSINESS_MONTHLY,
-    'enterprise-monthly': process.env.PRICE_ENTERPRISE_MONTHLY,
-    'government-monthly': process.env.PRICE_GOVERNMENT_MONTHLY,
-  };
-  const results = {};
-  for (const [plan, priceId] of Object.entries(plans)) {
-    if (!priceId) { results[plan] = { configured: false }; continue; }
-    try {
-      const price = await stripe.prices.retrieve(priceId);
-      results[plan] = { configured: true, priceId, active: price.active, livemode: price.livemode, currency: price.currency, unitAmount: price.unit_amount, recurring: price.recurring };
-    } catch (err) {
-      results[plan] = { configured: true, priceId, error: err.message };
-    }
-  }
-  res.json(results);
-});
-
 app.get(['/api/admin/health-check', '/admin/health-check'], authRateLimit, async (req, res) => {
   if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
   const checks = await runHealthChecks();
