@@ -562,7 +562,17 @@ app.get(["/api/user/profile", "/user/profile"], authenticateToken, async (req, r
       pool.query("SELECT api_key, plan, monthly_limit, used_this_month, active FROM api_keys WHERE email = $1 AND active = TRUE", [email]),
       pool.query("SELECT trust_id, entity_name, entity_type, created_at FROM trust_ids WHERE api_key_email = $1 ORDER BY created_at DESC LIMIT 10", [email]).catch(() => ({ rows: [] })),
       pool.query("SELECT passport_id, asset_type, asset_identifier, label, fields, created_at FROM asset_passports WHERE owner_email = $1 ORDER BY created_at DESC LIMIT 10", [email]).catch(() => ({ rows: [] })),
-      pool.query("SELECT analysis_id, risk_level, confidence, summary, created_at FROM trust_analyses WHERE created_at > NOW() - INTERVAL '30 days' ORDER BY created_at DESC LIMIT 5").catch(() => ({ rows: [] })),
+      pool.query(
+        `SELECT ta.analysis_id, ta.risk_level, ta.confidence, ta.summary, ta.created_at
+         FROM trust_analyses ta
+         LEFT JOIN certifications c ON c.certification_id = ta.proof_id
+         LEFT JOIN asset_passports ap ON ap.passport_id = ta.passport_id
+         LEFT JOIN trust_ids tid ON tid.trust_id = ta.trust_id_ref
+         WHERE ta.created_at > NOW() - INTERVAL '30 days'
+           AND (c.api_key_email = $1 OR ap.owner_email = $1 OR tid.api_key_email = $1)
+         ORDER BY ta.created_at DESC LIMIT 5`,
+        [email]
+      ).catch(() => ({ rows: [] })),
     ]);
 
     const apiKey = apiKeyRow.rows[0] || null;
@@ -2988,7 +2998,7 @@ function runTrustAnalysis({ certRows, passportRows, passportEvents, trustIdRows,
 }
 
 /* POST /api/v1/trust-analysis — Authenticated endpoint, runs rule-based trust analysis */
-app.post(['/api/v1/trust-analysis', '/v1/trust-analysis'], authenticateApiKey, async (req, res) => {
+app.post(['/api/v1/trust-analysis', '/v1/trust-analysis'], authenticateApiKeyOrSession, async (req, res) => {
   try {
     const { proof_id, passport_id, trust_id } = req.body;
     if (!proof_id && !passport_id && !trust_id) {
