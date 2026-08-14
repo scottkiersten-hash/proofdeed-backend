@@ -560,8 +560,8 @@ app.get(["/api/user/profile", "/user/profile"], authenticateToken, async (req, r
       pool.query("SELECT certification_id, hash, polygon_tx, created_at FROM certifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 20", [userId]),
       pool.query("SELECT COUNT(*) FROM certifications WHERE user_id = $1 AND created_at > date_trunc('month', NOW())", [userId]),
       pool.query("SELECT api_key, plan, monthly_limit, used_this_month, active FROM api_keys WHERE email = $1 AND active = TRUE", [email]),
-      pool.query("SELECT trust_id, entity_name, entity_type, created_at FROM trust_ids WHERE email = $1 ORDER BY created_at DESC LIMIT 10", [email]).catch(() => ({ rows: [] })),
-      pool.query("SELECT passport_id, asset_type, make, model, serial_number, created_at FROM asset_passports WHERE owner_email = $1 ORDER BY created_at DESC LIMIT 10", [email]).catch(() => ({ rows: [] })),
+      pool.query("SELECT trust_id, entity_name, entity_type, created_at FROM trust_ids WHERE api_key_email = $1 ORDER BY created_at DESC LIMIT 10", [email]).catch(() => ({ rows: [] })),
+      pool.query("SELECT passport_id, asset_type, asset_identifier, label, fields, created_at FROM asset_passports WHERE owner_email = $1 ORDER BY created_at DESC LIMIT 10", [email]).catch(() => ({ rows: [] })),
       pool.query("SELECT analysis_id, risk_level, confidence, summary, created_at FROM trust_analyses WHERE created_at > NOW() - INTERVAL '30 days' ORDER BY created_at DESC LIMIT 5").catch(() => ({ rows: [] })),
     ]);
 
@@ -1105,7 +1105,7 @@ app.post(['/api/v1/asset-passport', '/v1/asset-passport'], authenticateApiKeyOrS
     await pool.query(
       `INSERT INTO asset_passports (passport_id, asset_type, asset_identifier, label, owner_name, owner_email, fields, field_hashes, root_hash, proof_id, api_key_email, created_at, updated_at)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NOW(),NOW())`,
-      [passportId, asset_type, asset_identifier, label || null, owner_name || null, owner_email || null,
+      [passportId, asset_type, asset_identifier, label || null, owner_name || null, owner_email || req.apiKey.email,
        JSON.stringify(fields), JSON.stringify(fieldHashes), rootHash, proofId, req.apiKey.email]
     );
 
@@ -2583,6 +2583,32 @@ app.get(['/api/entities/:entityId', '/entities/:entityId'], async (req, res) => 
     );
     res.json({ success: true, entity: entity.rows[0], linked_records: linked.rows });
   } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/my/trust-graph — authenticated customer's own entities + relationships
+app.get(['/api/my/trust-graph', '/my/trust-graph'], authenticateApiKeyOrSession, async (req, res) => {
+  try {
+    const email = req.apiKey.email;
+    const entities = await pool.query(
+      `SELECT entity_id, entity_type, name, subtype, metadata, created_at
+       FROM trust_entities WHERE created_by = $1 ORDER BY created_at DESC LIMIT 100`,
+      [email]
+    );
+    const relationships = await pool.query(
+      `SELECT tr.certification_id, tr.entity_id, tr.relationship_type, tr.created_at,
+              te.name AS entity_name, te.entity_type
+       FROM trust_relationships tr
+       JOIN trust_entities te ON te.entity_id = tr.entity_id
+       WHERE tr.entity_id IN (SELECT entity_id FROM trust_entities WHERE created_by = $1)
+          OR tr.certification_id IN (SELECT certification_id FROM certifications WHERE user_id = (SELECT id FROM users WHERE email = $1))
+       ORDER BY tr.created_at DESC LIMIT 200`,
+      [email]
+    );
+    res.json({ success: true, entities: entities.rows, relationships: relationships.rows });
+  } catch (err) {
+    console.error('[TrustGraph] my-trust-graph error:', err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 });
