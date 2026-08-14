@@ -4479,26 +4479,6 @@ app.get(["/admin/revenue", "/api/admin/revenue"], authRateLimit, async (req, res
 });
 
 /* ---------------- ADMIN: OUTREACH CRM ---------------- */
-app.get(["/admin/outreach", "/api/admin/outreach"], authRateLimit, async (req, res) => {
-  if (!verifyAdminAuth(req)) return res.status(401).json({ error: "Unauthorized." });
-  try {
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS outreach_contacts (
-        id SERIAL PRIMARY KEY, name TEXT NOT NULL, email TEXT, company TEXT,
-        title TEXT, industry TEXT, county TEXT, state TEXT,
-        status TEXT DEFAULT 'sent', notes TEXT,
-        first_sent_at TIMESTAMPTZ, last_contact_at TIMESTAMPTZ,
-        created_at TIMESTAMPTZ DEFAULT NOW()
-      )
-    `);
-    const result = await pool.query(`SELECT * FROM outreach_contacts ORDER BY last_contact_at DESC NULLS LAST, created_at DESC`);
-    res.json({ contacts: result.rows });
-  } catch (error) {
-    console.error("Outreach CRM error:", error);
-    res.status(500).json({ error: "Failed to load outreach contacts." });
-  }
-});
-
 app.post(["/admin/outreach/import", "/api/admin/outreach/import"], authRateLimit, async (req, res) => {
   if (!verifyAdminAuth(req)) return res.status(401).json({ error: "Unauthorized." });
   try {
@@ -4516,19 +4496,6 @@ app.post(["/admin/outreach/import", "/api/admin/outreach/import"], authRateLimit
     res.json({ success: true, imported });
   } catch (error) {
     res.status(500).json({ error: "Import failed." });
-  }
-});
-
-app.post(["/admin/outreach/update", "/api/admin/outreach/update"], authRateLimit, async (req, res) => {
-  if (!verifyAdminAuth(req)) return res.status(401).json({ error: "Unauthorized." });
-  try {
-    const { id, status, notes } = req.body;
-    await pool.query(`
-      UPDATE outreach_contacts SET status=$1, notes=$2, last_contact_at=NOW() WHERE id=$3
-    `, [status, notes, id]);
-    res.json({ success: true });
-  } catch (error) {
-    res.status(500).json({ error: "Update failed." });
   }
 });
 
@@ -5567,32 +5534,6 @@ app.post('/api/reseller/apply', authRateLimit, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ---------- Admin: Export contacts as CSV ----------
-app.get(['/api/admin/outreach/export-csv', '/admin/outreach/export-csv'], authRateLimit, async (req, res) => {
-  if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
-  try {
-    const { status } = req.query; // optional filter e.g. ?status=sent
-    let query = `SELECT name, email, company, title, industry, state, status, first_sent_at FROM outreach_contacts WHERE email IS NOT NULL AND email != ''`;
-    const params = [];
-    if (status) { params.push(status); query += ` AND status=$${params.length}`; }
-    query += ` ORDER BY created_at DESC`;
-    const result = await pool.query(query, params);
-    const rows = result.rows;
-    const header = ['First Name','Last Name','Email','Company','Title','Industry','State','Status','First Contact'];
-    const lines = [header.join(',')];
-    for (const r of rows) {
-      const parts = (r.name || '').trim().split(/\s+/);
-      const first = parts[0] || '';
-      const last = parts.slice(1).join(' ') || '';
-      const esc = (v) => `"${(v||'').replace(/"/g,'""')}"`;
-      lines.push([esc(first),esc(last),esc(r.email),esc(r.company),esc(r.title),esc(r.industry),esc(r.state),esc(r.status),esc(r.first_sent_at)].join(','));
-    }
-    res.setHeader('Content-Type','text/csv');
-    res.setHeader('Content-Disposition','attachment; filename="proofdeed-leads.csv"');
-    res.send(lines.join('\n'));
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
 // ---------- Admin: Inbox (inbound emails) ----------
 app.get(['/api/admin/inbox', '/admin/inbox'], authRateLimit, async (req, res) => {
   if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
@@ -5642,20 +5583,6 @@ app.put(['/api/admin/inbox/:id/read', '/admin/inbox/:id/read'], authRateLimit, a
   try {
     await pool.query('UPDATE inbound_emails SET is_read=true WHERE id=$1', [req.params.id]);
     res.json({ success: true });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-// ---------- Admin: Get email thread ----------
-app.get(['/api/admin/inbox/thread/:threadId', '/admin/inbox/thread/:threadId'], authRateLimit, async (req, res) => {
-  if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
-  try {
-    const emails = await pool.query(
-      `SELECT i.*, c.name AS contact_name, c.company AS contact_company
-       FROM inbound_emails i LEFT JOIN outreach_contacts c ON c.id = i.contact_id
-       WHERE i.thread_id = $1 ORDER BY i.received_at ASC`,
-      [req.params.threadId]
-    );
-    res.json({ emails: emails.rows });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -6108,35 +6035,6 @@ app.put(['/api/admin/affiliates/payout-settings', '/admin/affiliates/payout-sett
       [String(day)]
     );
     res.json({ payout_day: day });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-// ── PUT /api/admin/affiliates/:id/brand — set white-label brand config
-app.put(['/api/admin/affiliates/:id/brand', '/admin/affiliates/:id/brand'], authRateLimit, async (req, res) => {
-  if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
-  try {
-    const { white_label_enabled, brand_name, brand_logo_url, brand_color, brand_tagline, brand_website } = req.body;
-    const result = await pool.query(
-      `UPDATE affiliates SET
-        white_label_enabled = COALESCE($1, white_label_enabled),
-        brand_name          = COALESCE($2, brand_name),
-        brand_logo_url      = COALESCE($3, brand_logo_url),
-        brand_color         = COALESCE($4, brand_color),
-        brand_tagline       = COALESCE($5, brand_tagline),
-        brand_website       = COALESCE($6, brand_website)
-       WHERE id=$7 RETURNING *`,
-      [
-        white_label_enabled !== undefined ? white_label_enabled : null,
-        brand_name || null,
-        brand_logo_url || null,
-        brand_color || null,
-        brand_tagline || null,
-        brand_website || null,
-        req.params.id
-      ]
-    );
-    if (!result.rows.length) return res.status(404).json({ error: 'Affiliate not found.' });
-    res.json({ affiliate: result.rows[0] });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -10263,64 +10161,6 @@ app.get(['/api/admin/health-check', '/admin/health-check'], authRateLimit, async
   res.json({ allOk, checks, timestamp: new Date().toISOString() });
 });
 
-// Clear alert streak for a named check — stops emails immediately
-app.post(['/api/admin/clear-alert', '/admin/clear-alert'], authRateLimit, async (req, res) => {
-  if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
-  const { name } = req.body;
-  if (name) {
-    delete failureStreak[name];
-    delete lastAlertSent[name];
-    res.json({ cleared: name });
-  } else {
-    // Clear all streaks
-    Object.keys(failureStreak).forEach(k => { delete failureStreak[k]; delete lastAlertSent[k]; });
-    res.json({ cleared: 'all' });
-  }
-});
-
-/* ---------------- One-Time Article Pitch Sender ---------------- */
-app.post(['/api/admin/send-articles', '/admin/send-articles'], authRateLimit, async (req, res) => {
-  if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
-  const { readFileSync } = await import('fs');
-  const { fileURLToPath } = await import('url');
-  const pathMod = await import('path');
-  const __dir = pathMod.default.dirname(fileURLToPath(import.meta.url));
-
-  const altaArticle = readFileSync(pathMod.default.join(__dir, 'outreach/article_alta.md'), 'utf8');
-  const govtechArticle = readFileSync(pathMod.default.join(__dir, 'outreach/article_govtech.txt'), 'utf8');
-  const igoArticle = readFileSync(pathMod.default.join(__dir, 'outreach/article_igo.txt'), 'utf8');
-
-  const emails = [
-    {
-      to: 'service@alta.org',
-      subject: 'Article Pitch — How Blockchain Certification Closes the Gap in Deed Fraud Prevention',
-      text: `Dear TitleNews Editorial Team,\n\nI'm Scott Kiersten, Founder & CEO of ProofDeed LLC, a Veteran-Owned Small Business in Oshkosh, Wisconsin. ProofDeed is a Trust Infrastructure Platform — we create permanent, legally defensible Trust Records for title companies, government agencies, and real estate attorneys at the moment of closing.\n\nI'd like to contribute an article for TitleNews: "Deed Fraud Is Happening After Closing — Here's the Technology That Stops It"\n\nThe piece is educational and objective. I can limit or remove any mention of ProofDeed per your guidelines. Full article below.\n\nScott Kiersten | Founder & CEO | ProofDeed LLC | VOSB\ninfo@proofdeed.com | proofdeed.com\n\n---\n\n${altaArticle}`
-    },
-    {
-      to: 'lkinkade@govtech.com',
-      subject: 'Guest Commentary Pitch — County Recorders Have a Document Fraud Problem. Blockchain Fixes It.',
-      text: `Dear Lauren,\n\nI'm Scott Kiersten, Founder & CEO of ProofDeed LLC, a VOSB providing trust infrastructure for county recorder offices and government agencies — permanent, independently verifiable Trust Records for public records and high-value documents.\n\nPitching a guest commentary for Govtech.com — policy and technology focused, not a product pitch. My company has submitted proposals to NSF SBIR and DHS LRBAA for this technology. Full article below.\n\nScott Kiersten | Founder & CEO | ProofDeed LLC | VOSB\ngov@proofdeed.com | proofdeed.com\n\n---\n\n${govtechArticle}`
-    },
-    {
-      to: 'kim@iaogo.org',
-      subject: 'Article for iGO Newsletter — After the FBI Warning on Deed Fraud: What Recorder Offices Can Do Right Now',
-      text: `Dear Kim,\n\nI'm Scott Kiersten, Founder & CEO of ProofDeed LLC — trust infrastructure for county recorder offices, providing permanent Trust Records and publicly verifiable proof of document authenticity.\n\nAsking if iGO's newsletter accepts contributed articles. Written a piece specifically for recorder audiences on closing the deed fraud gap the FBI warned about. Full article below.\n\nScott Kiersten | Founder & CEO | ProofDeed LLC | VOSB\ngov@proofdeed.com | proofdeed.com\n\n---\n\n${igoArticle}`
-    }
-  ];
-
-  const results = [];
-  for (const email of emails) {
-    try {
-      await sendEmail({ from: 'Scott Kiersten <gov@proofdeed.com>', to: email.to, subject: email.subject, text: email.text });
-      results.push({ to: email.to, status: 'sent' });
-      await new Promise(r => setTimeout(r, 3000));
-    } catch (err) {
-      results.push({ to: email.to, status: 'failed', error: err.message });
-    }
-  }
-  res.json({ results });
-});
-
 /* ---------------- Daily Health Check Endpoint ---------------- */
 app.get(["/health-check", "/api/health-check"], async (req, res) => {
   // Secured with a secret token to prevent public abuse
@@ -10397,62 +10237,6 @@ app.get(["/health-check", "/api/health-check"], async (req, res) => {
     failed: failed.length,
     results: { passed, failed, warnings }
   });
-});
-
-/* ---------------- CRM Health Endpoint ---------------- */
-app.get(['/api/admin/crm-health', '/admin/crm-health'], authRateLimit, async (req, res) => {
-  if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
-  try {
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS outreach_contacts (
-        id SERIAL PRIMARY KEY, name TEXT NOT NULL, email TEXT, company TEXT,
-        title TEXT, industry TEXT, county TEXT, state TEXT,
-        status TEXT DEFAULT 'sent', notes TEXT,
-        first_sent_at TIMESTAMPTZ, last_contact_at TIMESTAMPTZ,
-        created_at TIMESTAMPTZ DEFAULT NOW()
-      )
-    `);
-
-    const [totals, byStatus, recentlySent, bounced, replied, followUpDue] = await Promise.all([
-      pool.query(`SELECT COUNT(*) AS total FROM outreach_contacts`),
-      pool.query(`SELECT status, COUNT(*) AS count FROM outreach_contacts GROUP BY status ORDER BY count DESC`),
-      pool.query(`SELECT COUNT(*) AS count FROM outreach_contacts WHERE first_sent_at >= NOW() - INTERVAL '24 hours'`),
-      pool.query(`SELECT COUNT(*) AS count FROM outreach_contacts WHERE status IN ('bounced','hard_bounce','suppressed')`),
-      pool.query(`SELECT COUNT(*) AS count FROM outreach_contacts WHERE status = 'replied'`),
-      pool.query(`
-        SELECT COUNT(*) AS count FROM outreach_contacts
-        WHERE status = 'sent'
-          AND first_sent_at IS NOT NULL
-          AND (
-            (last_contact_at IS NULL AND first_sent_at <= NOW() - INTERVAL '7 days')
-            OR last_contact_at <= NOW() - INTERVAL '7 days'
-          )
-      `),
-    ]);
-
-    const recentContacts = await pool.query(`
-      SELECT name, email, company, status, first_sent_at, last_contact_at, pipeline_stage
-      FROM outreach_contacts
-      ORDER BY last_contact_at DESC NULLS LAST, created_at DESC
-      LIMIT 10
-    `);
-
-    res.json({
-      timestamp: new Date().toISOString(),
-      summary: {
-        total_contacts: parseInt(totals.rows[0].total),
-        sent_last_24h: parseInt(recentlySent.rows[0].count),
-        bounced: parseInt(bounced.rows[0].count),
-        replied: parseInt(replied.rows[0].count),
-        follow_up_due: parseInt(followUpDue.rows[0].count),
-      },
-      by_status: byStatus.rows.map(r => ({ status: r.status, count: parseInt(r.count) })),
-      recent_contacts: recentContacts.rows,
-    });
-  } catch (err) {
-    console.error('CRM health error:', err);
-    res.status(500).json({ error: 'Failed to load CRM health.' });
-  }
 });
 
 /* ---------------- Start Server ---------------- */
