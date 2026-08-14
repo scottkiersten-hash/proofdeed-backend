@@ -139,20 +139,6 @@ CREATE TABLE IF NOT EXISTS batches (
   created_at       TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS resellers (
-  id              SERIAL PRIMARY KEY,
-  reseller_id     TEXT UNIQUE NOT NULL,
-  slug            TEXT UNIQUE NOT NULL,
-  company_name    TEXT NOT NULL,
-  contact_email   TEXT NOT NULL,
-  api_key         TEXT UNIQUE NOT NULL,
-  commission_rate NUMERIC(5,2) NOT NULL DEFAULT 20.00,
-  brand_color     TEXT NOT NULL DEFAULT '#2563eb',
-  brand_logo_url  TEXT,
-  active          BOOLEAN NOT NULL DEFAULT true,
-  created_at      TIMESTAMPTZ DEFAULT NOW()
-);
-
 CREATE TABLE IF NOT EXISTS trust_entities (
   id          SERIAL PRIMARY KEY,
   entity_id   TEXT UNIQUE NOT NULL,
@@ -339,12 +325,6 @@ CREATE TABLE IF NOT EXISTS asset_passport_events (
 -- ADD COLUMN IF NOT EXISTS on every boot -- extracted verbatim)
 -- ============================================================
 
-ALTER TABLE affiliates ADD COLUMN IF NOT EXISTS brand_color TEXT DEFAULT '#1a3a8e';
-ALTER TABLE affiliates ADD COLUMN IF NOT EXISTS brand_logo_url TEXT;
-ALTER TABLE affiliates ADD COLUMN IF NOT EXISTS brand_name TEXT;
-ALTER TABLE affiliates ADD COLUMN IF NOT EXISTS brand_tagline TEXT;
-ALTER TABLE affiliates ADD COLUMN IF NOT EXISTS brand_website TEXT;
-ALTER TABLE affiliates ADD COLUMN IF NOT EXISTS white_label_enabled BOOLEAN DEFAULT FALSE;
 ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS contract_notes TEXT;
 ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS custom_price_per_cert NUMERIC(10,4);
 ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS notified_100 BOOLEAN DEFAULT FALSE;
@@ -408,8 +388,6 @@ CREATE INDEX IF NOT EXISTS idx_trust_ids_email                     ON trust_ids(
 CREATE INDEX IF NOT EXISTS idx_trust_id_records_trust_id           ON trust_id_records(trust_id);
 CREATE INDEX IF NOT EXISTS idx_trust_analyses_id                   ON trust_analyses(analysis_id);
 CREATE INDEX IF NOT EXISTS idx_trust_analyses_proof                ON trust_analyses(proof_id);
-CREATE INDEX IF NOT EXISTS idx_resellers_slug                      ON resellers(slug);
-CREATE INDEX IF NOT EXISTS idx_resellers_api_key                   ON resellers(api_key);
 CREATE INDEX IF NOT EXISTS idx_inbound_emails_contact               ON inbound_emails(contact_id);
 CREATE INDEX IF NOT EXISTS idx_inbound_emails_from                  ON inbound_emails(from_email);
 CREATE INDEX IF NOT EXISTS idx_inbound_emails_thread                ON inbound_emails(thread_id);
