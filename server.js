@@ -299,6 +299,40 @@ async function authenticateApiKeyNoLimit(req, res, next) {
   }
 }
 
+// Accepts either an X-API-Key header (existing programmatic/API users) OR a
+// logged-in dashboard session's JWT Bearer token — so features built for the
+// Developer API (Trust Graph entities/relationships, Asset Passports) also
+// work for a customer just browsing the site logged in, with no API key.
+async function authenticateApiKeyOrSession(req, res, next) {
+  const apiKey = req.headers["x-api-key"];
+  if (apiKey) return authenticateApiKey(req, res, next);
+
+  const authHeader = req.headers["authorization"];
+  const token = authHeader && authHeader.split(" ")[1];
+  if (!token) {
+    return res.status(401).json({ error: "Sign in or include an X-API-Key header." });
+  }
+  jwt.verify(token, process.env.JWT_SECRET, async (err, decoded) => {
+    if (err || !decoded?.email) return res.status(401).json({ error: "Session expired. Please sign in again." });
+    try {
+      // Look up the real api_keys row so downstream code (usage counters,
+      // notifications) behaves identically to the X-API-Key path — a
+      // session user IS that same account, just authenticated differently.
+      const result = await pool.query(
+        "SELECT * FROM api_keys WHERE email = $1 AND active = TRUE",
+        [decoded.email]
+      );
+      if (result.rows.length === 0) {
+        return res.status(403).json({ error: "No active plan found for this account." });
+      }
+      req.apiKey = result.rows[0];
+      next();
+    } catch (error) {
+      res.status(500).json({ error: "Internal server error." });
+    }
+  });
+}
+
 /* ---------------- Usage Notifications ---------------- */
 async function checkAndNotifyUsage(keyData) {
   const { email, api_key, used_this_month, monthly_limit, notified_80, notified_100 } = keyData;
@@ -1052,7 +1086,7 @@ function hashFields(fields) {
 }
 
 /* POST /api/v1/asset-passport — Create a new Asset Passport */
-app.post(['/api/v1/asset-passport', '/v1/asset-passport'], authenticateApiKey, async (req, res) => {
+app.post(['/api/v1/asset-passport', '/v1/asset-passport'], authenticateApiKeyOrSession, async (req, res) => {
   try {
     const { asset_type, asset_identifier, label, owner_name, owner_email, fields } = req.body;
 
@@ -1333,7 +1367,7 @@ function calcTrustScore(recordCount, onChainCount) {
 }
 
 /* POST /api/v1/trust-id — Create a new Trust ID™ for an entity */
-app.post(['/api/v1/trust-id', '/v1/trust-id'], authenticateApiKey, async (req, res) => {
+app.post(['/api/v1/trust-id', '/v1/trust-id'], authenticateApiKeyOrSession, async (req, res) => {
   try {
     const { entity_type, entity_name, entity_email, entity_org, metadata } = req.body;
     if (!entity_type || !entity_name) {
@@ -2466,7 +2500,7 @@ app.get(['/verify/:certId/evidence', '/api/verify/:certId/evidence'], async (req
    ============================================================ */
 
 // POST /api/entities — create a named entity (authenticated)
-app.post(['/api/entities', '/entities'], authenticateApiKey, async (req, res) => {
+app.post(['/api/entities', '/entities'], authenticateApiKeyOrSession, async (req, res) => {
   try {
     const { entity_type, name, subtype, metadata } = req.body;
     if (!entity_type || !name) return res.status(400).json({ success: false, error: 'entity_type and name required.' });
@@ -2486,7 +2520,7 @@ app.post(['/api/entities', '/entities'], authenticateApiKey, async (req, res) =>
 });
 
 // POST /api/certifications/:certId/relationships — link entity to cert (authenticated)
-app.post(['/api/certifications/:certId/relationships', '/certifications/:certId/relationships'], authenticateApiKey, async (req, res) => {
+app.post(['/api/certifications/:certId/relationships', '/certifications/:certId/relationships'], authenticateApiKeyOrSession, async (req, res) => {
   try {
     const { certId } = req.params;
     const { entity_id, relationship_type } = req.body;
