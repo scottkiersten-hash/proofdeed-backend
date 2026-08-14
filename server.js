@@ -4125,6 +4125,54 @@ app.delete(["/admin/delete-test-user", "/api/admin/delete-test-user"], async (re
   }
 });
 
+/* ---------------- ADMIN TEST ACCOUNT CLEANUP ---------------- */
+app.get(["/admin/find-test-accounts", "/api/admin/find-test-accounts"], async (req, res) => {
+  try {
+    if (!verifyAdminAuth(req)) return res.status(401).json({ error: "Unauthorized." });
+    const result = await pool.query(
+      `SELECT email FROM users
+       WHERE email ILIKE '%@example.com' OR email ILIKE 'demo-%' OR email ILIKE 'test-%'
+          OR email ILIKE 'systems-check-%' OR email ILIKE 'e2e-%' OR email ILIKE '%demo%test%'
+       ORDER BY email`
+    );
+    res.json({ success: true, emails: result.rows.map(r => r.email) });
+  } catch (err) {
+    console.error("/api/admin/find-test-accounts error:", err);
+    res.status(500).json({ error: "Server error." });
+  }
+});
+
+app.delete(["/admin/purge-account", "/api/admin/purge-account"], async (req, res) => {
+  try {
+    if (!verifyAdminAuth(req)) return res.status(401).json({ error: "Unauthorized." });
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: "email required." });
+
+    const certIds = (await pool.query('SELECT certification_id FROM certifications WHERE api_key_email=$1', [email])).rows.map(r => r.certification_id);
+    const passportIds = (await pool.query('SELECT passport_id FROM asset_passports WHERE owner_email=$1', [email])).rows.map(r => r.passport_id);
+    const trustIds = (await pool.query('SELECT trust_id FROM trust_ids WHERE api_key_email=$1', [email])).rows.map(r => r.trust_id);
+    const entityIds = (await pool.query('SELECT entity_id FROM trust_entities WHERE created_by=$1', [email])).rows.map(r => r.entity_id);
+
+    if (certIds.length) await pool.query('DELETE FROM certification_events WHERE certification_id = ANY($1)', [certIds]);
+    if (entityIds.length) await pool.query('DELETE FROM trust_relationships WHERE entity_id = ANY($1) OR certification_id = ANY($2)', [entityIds, certIds]);
+    if (passportIds.length) await pool.query('DELETE FROM asset_passport_events WHERE passport_id = ANY($1)', [passportIds]);
+    if (trustIds.length) await pool.query('DELETE FROM trust_id_records WHERE trust_id = ANY($1)', [trustIds]);
+    await pool.query('DELETE FROM trust_analyses WHERE proof_id = ANY($1) OR passport_id = ANY($2) OR trust_id_ref = ANY($3)', [certIds, passportIds, trustIds]);
+    if (certIds.length) await pool.query('DELETE FROM certifications WHERE certification_id = ANY($1)', [certIds]);
+    if (passportIds.length) await pool.query('DELETE FROM asset_passports WHERE passport_id = ANY($1)', [passportIds]);
+    if (trustIds.length) await pool.query('DELETE FROM trust_ids WHERE trust_id = ANY($1)', [trustIds]);
+    if (entityIds.length) await pool.query('DELETE FROM trust_entities WHERE entity_id = ANY($1)', [entityIds]);
+    await pool.query('DELETE FROM api_keys WHERE email=$1', [email]);
+    await pool.query('DELETE FROM magic_links WHERE email=$1', [email]);
+    await pool.query('DELETE FROM users WHERE email=$1', [email]);
+
+    res.json({ success: true, email, deleted: { certifications: certIds.length, asset_passports: passportIds.length, trust_ids: trustIds.length, trust_entities: entityIds.length } });
+  } catch (err) {
+    console.error("/api/admin/purge-account error:", err);
+    res.status(500).json({ error: "Server error.", detail: err.message });
+  }
+});
+
 /* ---------------- ADMIN TEST EMAIL ---------------- */
 app.post(["/admin/test-email", "/api/admin/test-email"], async (req, res) => {
   try {
