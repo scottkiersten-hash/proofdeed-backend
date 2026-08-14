@@ -2587,8 +2587,11 @@ app.get(['/api/entities/:entityId', '/entities/:entityId'], async (req, res) => 
   }
 });
 
-// GET /api/passport/:id — public, full Asset Passport™ data for the /passport verify page
-app.get(['/api/passport/:id', '/passport-data/:id'], async (req, res) => {
+// GET /api/passport-data/:id — public, full Asset Passport™ data for the /passport verify page
+// Deliberately NOT registered at /passport/:id or /api/passport/:id — DigitalOcean strips the
+// /api prefix before this reaches Express, and the bare /passport/:id path is already taken by
+// the legacy server-rendered HTML route above, which wins route-matching by registration order.
+app.get('/passport-data/:id', async (req, res) => {
   try {
     const passport = await pool.query('SELECT * FROM asset_passports WHERE passport_id=$1', [req.params.id]);
     if (!passport.rows[0]) return res.status(404).json({ success: false, error: 'Asset Passport not found.' });
@@ -2602,8 +2605,10 @@ app.get(['/api/passport/:id', '/passport-data/:id'], async (req, res) => {
   }
 });
 
-// GET /api/trust/:id — public, full Trust ID™ data for the /trust verify page
-app.get(['/api/trust/:id', '/trust-data/:id'], async (req, res) => {
+// GET /api/trust-data/:id — public, full Trust ID™ data for the /trust verify page
+// Same reasoning as /passport-data/:id above — /trust/:id is already taken by the legacy
+// server-rendered HTML route and is unreachable externally either way.
+app.get('/trust-data/:id', async (req, res) => {
   try {
     const tid = await pool.query('SELECT * FROM trust_ids WHERE trust_id=$1', [req.params.id]);
     if (!tid.rows[0]) return res.status(404).json({ success: false, error: 'Trust ID not found.' });
