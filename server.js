@@ -4294,14 +4294,6 @@ async function ensureIndexes() {
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
 
-      -- White-label feature retired -- drop the branding columns it used
-      ALTER TABLE affiliates DROP COLUMN IF EXISTS white_label_enabled;
-      ALTER TABLE affiliates DROP COLUMN IF EXISTS brand_name;
-      ALTER TABLE affiliates DROP COLUMN IF EXISTS brand_logo_url;
-      ALTER TABLE affiliates DROP COLUMN IF EXISTS brand_color;
-      ALTER TABLE affiliates DROP COLUMN IF EXISTS brand_tagline;
-      ALTER TABLE affiliates DROP COLUMN IF EXISTS brand_website;
-
       CREATE TABLE IF NOT EXISTS affiliate_referrals (
         id SERIAL PRIMARY KEY,
         affiliate_id INTEGER REFERENCES affiliates(id) ON DELETE CASCADE,
@@ -4480,9 +4472,6 @@ async function ensureIndexes() {
       CREATE INDEX IF NOT EXISTS idx_trust_analyses_id ON trust_analyses(analysis_id);
       CREATE INDEX IF NOT EXISTS idx_trust_analyses_proof ON trust_analyses(proof_id);
 
-      -- White-label reseller-portal feature retired -- drop the unused table
-      DROP TABLE IF EXISTS resellers;
-
       -- Document forensics columns
       ALTER TABLE certifications ADD COLUMN IF NOT EXISTS forensic_file_type TEXT;
       ALTER TABLE certifications ADD COLUMN IF NOT EXISTS forensic_declared_created_at TIMESTAMPTZ;
@@ -4522,6 +4511,27 @@ ensureIndexes();
     if (err.code !== "42710" /* constraint already exists */) {
       console.warn("[Migration] Could not add api_keys.email unique constraint (non-fatal):", err.message);
     }
+  }
+})();
+
+// White-label feature retired -- drop the resellers table and the branding
+// columns it and /api/partner added to affiliates. Isolated from
+// ensureIndexes() so an unrelated failure earlier in that batch can't
+// silently prevent this from ever running.
+(async () => {
+  try {
+    await pool.query(`DROP TABLE IF EXISTS resellers`);
+    await pool.query(`
+      ALTER TABLE affiliates DROP COLUMN IF EXISTS white_label_enabled;
+      ALTER TABLE affiliates DROP COLUMN IF EXISTS brand_name;
+      ALTER TABLE affiliates DROP COLUMN IF EXISTS brand_logo_url;
+      ALTER TABLE affiliates DROP COLUMN IF EXISTS brand_color;
+      ALTER TABLE affiliates DROP COLUMN IF EXISTS brand_tagline;
+      ALTER TABLE affiliates DROP COLUMN IF EXISTS brand_website;
+    `);
+    console.log("[Migration] Dropped resellers table and affiliates white-label columns");
+  } catch (err) {
+    console.error("[Migration] Could not drop white-label schema:", err.message);
   }
 })();
 
