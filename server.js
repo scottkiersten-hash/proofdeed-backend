@@ -569,9 +569,9 @@ app.get(["/api/user/profile", "/user/profile"], authenticateToken, async (req, r
          LEFT JOIN asset_passports ap ON ap.passport_id = ta.passport_id
          LEFT JOIN trust_ids tid ON tid.trust_id = ta.trust_id_ref
          WHERE ta.created_at > NOW() - INTERVAL '30 days'
-           AND (c.api_key_email = $1 OR ap.owner_email = $1 OR tid.api_key_email = $1)
+           AND (c.api_key_email = $1 OR c.user_id = $2 OR ap.owner_email = $1 OR tid.api_key_email = $1)
          ORDER BY ta.created_at DESC LIMIT 5`,
-        [email]
+        [email, userId]
       ).catch(() => ({ rows: [] })),
     ]);
 
@@ -4148,7 +4148,9 @@ app.delete(["/admin/purge-account", "/api/admin/purge-account"], async (req, res
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: "email required." });
 
-    const certIds = (await pool.query('SELECT certification_id FROM certifications WHERE api_key_email=$1', [email])).rows.map(r => r.certification_id);
+    const certIds = (await pool.query(
+      'SELECT certification_id FROM certifications WHERE api_key_email=$1 OR user_id = (SELECT id FROM users WHERE email=$1)', [email]
+    )).rows.map(r => r.certification_id);
     const passportIds = (await pool.query('SELECT passport_id FROM asset_passports WHERE owner_email=$1', [email])).rows.map(r => r.passport_id);
     const trustIds = (await pool.query('SELECT trust_id FROM trust_ids WHERE api_key_email=$1', [email])).rows.map(r => r.trust_id);
     const entityIds = (await pool.query('SELECT entity_id FROM trust_entities WHERE created_by=$1', [email])).rows.map(r => r.entity_id);
