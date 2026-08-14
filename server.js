@@ -2587,6 +2587,36 @@ app.get(['/api/entities/:entityId', '/entities/:entityId'], async (req, res) => 
   }
 });
 
+// GET /api/passport/:id — public, full Asset Passport™ data for the /passport verify page
+app.get(['/api/passport/:id', '/passport-data/:id'], async (req, res) => {
+  try {
+    const passport = await pool.query('SELECT * FROM asset_passports WHERE passport_id=$1', [req.params.id]);
+    if (!passport.rows[0]) return res.status(404).json({ success: false, error: 'Asset Passport not found.' });
+    const events = await pool.query(
+      'SELECT event_type, event_label, fields, root_hash, polygon_tx, occurred_at FROM asset_passport_events WHERE passport_id=$1 ORDER BY occurred_at ASC',
+      [req.params.id]
+    );
+    res.json({ success: true, passport: passport.rows[0], events: events.rows });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/trust/:id — public, full Trust ID™ data for the /trust verify page
+app.get(['/api/trust/:id', '/trust-data/:id'], async (req, res) => {
+  try {
+    const tid = await pool.query('SELECT * FROM trust_ids WHERE trust_id=$1', [req.params.id]);
+    if (!tid.rows[0]) return res.status(404).json({ success: false, error: 'Trust ID not found.' });
+    const records = await pool.query(
+      'SELECT record_type, record_label, proof_id, passport_id, root_hash, polygon_tx, issued_at FROM trust_id_records WHERE trust_id=$1 ORDER BY issued_at ASC',
+      [req.params.id]
+    );
+    res.json({ success: true, trust_id: tid.rows[0], records: records.rows });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // GET /api/my/trust-graph — authenticated customer's own entities + relationships
 app.get(['/api/my/trust-graph', '/my/trust-graph'], authenticateApiKeyOrSession, async (req, res) => {
   try {
