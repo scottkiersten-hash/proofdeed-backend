@@ -3857,6 +3857,64 @@ app.post(["/admin/test-email", "/api/admin/test-email"], async (req, res) => {
   }
 });
 
+/* ---------------- ONE-TIME: MICC Small Business Professional outreach ---------------- */
+// Sends the capability-brief request individually (not BCC) to each MICC installation
+// SBS distro address, from gov@proofdeed.com, via the working Brevo SMTP relay.
+app.post(["/admin/send-micc-brief", "/api/admin/send-micc-brief"], async (req, res) => {
+  if (!verifyAdminAuth(req)) return res.status(401).json({ error: "Unauthorized." });
+
+  const recipients = [
+    "usarmy.jbsa.acc-micc.list.hq-sbs-bliss@army.mil",
+    "usarmy.jbsa.acc-micc.list.hq-sbs-carson@army.mil",
+    "usarmy.jbsa.acc-micc.list.hq-sbs-dpg@army.mil",
+    "usarmy.jbsa.acc-micc.list.hq-sbs-hood@army.mil",
+    "usarmy.jbsa.acc-micc.list.hq-sbs-huachuca@army.mil",
+    "usarmy.jbsa.acc-micc.list.hq-sbs-irwin@army.mil",
+    "usarmy.jbsa.acc-micc.list.hq-sbs-jblm@army.mil",
+    "usarmy.jbsa.acc-micc.list.hq-sbs-polk@army.mil",
+    "usarmy.jbsa.acc-micc.list.hq-sbs-riley@army.mil",
+    "usarmy.jbsa.acc-micc.list.hq-sbs-ypg@army.mil",
+    "usarmy.jbsa.acc-micc.list.sbs.tsc@army.mil",
+    "usarmy.jbsa.acc-micc.list.hq-sbs-buchanan@army.mil",
+    "usarmy.jbsa.acc-micc.list.hq-sbs-campbell@army.mil",
+    "usarmy.jbsa.acc-micc.list.hq-sbs-drum@army.mil",
+    "usarmy.jbsa.acc-micc.list.hq-sbs-moore@army.mil",
+    "usarmy.jbsa.acc-micc.list.hq-sbs-carlisle@army.mil",
+    "usarmy.jbsa.acc-micc.list.hq-sbs-eustis@army.mil",
+    "usarmy.jbsa.acc-micc.list.hq-sbs-gordon@army.mil",
+    "usarmy.jbsa.acc-micc.list.hq-sbs-leavenworth@army.mil",
+    "usarmy.jbsa.acc-micc.list.hq-sbs-lee@army.mil",
+    "usarmy.jbsa.acc-micc.list.hq-sbs-leonardwood@army.mil",
+    "usarmy.jbsa.acc-micc.list.hq-sbs-rucker@army.mil",
+    "usarmy.jbsa.acc-micc.list.hq-sbs-sill@army.mil",
+    "usarmy.jbsa.acc-micc.list.hq-sbs-westpoint@army.mil",
+    "usarmy.jbsa.acc-micc.list.hq-sbs-belvoir@army.mil",
+  ];
+
+  const subject = "Capability Brief Request — ProofDeed LLC | VOSB | NAICS 541512";
+  const text = `To the Small Business Professional,
+
+I am reaching out to request your assistance. ProofDeed LLC is a Veteran-Owned Small Business (UEI: JG8FDJRQRFK1 / CAGE: 21LN4 / NAICS: 541512) providing trust and provenance infrastructure for government records systems.
+
+I would appreciate any guidance on contracting opportunities at your installation and the opportunity to schedule a brief capability presentation with your office.
+
+Scott Kiersten
+CEO, ProofDeed LLC
+gov@proofdeed.com | 727-619-4592 | proofdeed.com`;
+
+  const results = [];
+  for (const to of recipients) {
+    try {
+      await sendEmail({ to, from: "Scott Kiersten <gov@proofdeed.com>", subject, text });
+      results.push({ to, status: "sent" });
+    } catch (err) {
+      results.push({ to, status: "failed", error: err.message });
+    }
+    await new Promise(r => setTimeout(r, 3000));
+  }
+  res.json({ results });
+});
+
 /* ---------------- ADMIN: GOVERNMENT TRIAL CHECKOUT LINK ---------------- */
 // Admin-only. Generates a Stripe subscription checkout link for the real Government
 // plan with a 30-day trial attached (card required, auto-bills at $999/mo on day 30
