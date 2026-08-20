@@ -8677,24 +8677,18 @@ function queryNeedsGeo(query) {
   return true;
 }
 
-// Google's Custom Search JSON API free tier caps at 100 queries/day --
-// anything past that starts billing. This is a hard runtime guard so the
-// lead engine can never exceed the free tier regardless of how many cron
-// triggers or targetsPerRun get configured later. Keyed by date so it
-// resets naturally at midnight with no separate reset logic needed.
-const GOOGLE_CSE_DAILY_LIMIT = 90; // buffer under the real 100/day cap
-async function getGoogleCseCallsToday() {
-  // Must key off Pacific time, not UTC -- Google resets this quota at
-  // midnight Pacific. A UTC-keyed counter thinks it's a fresh day for
-  // several hours while Google still considers the previous (possibly
-  // exhausted) quota day active, letting requests through that Google
-  // then rejects with 429 anyway.
+// Serper is prepaid credits, not a hard free-tier cliff like Google CSE was,
+// but we keep the same daily-spend guard so cost stays small and predictable
+// regardless of how many cron triggers or targetsPerRun get configured later.
+// Keyed by date so it resets naturally at midnight with no separate reset logic.
+const SERPER_DAILY_LIMIT = 90;
+async function getSerperCallsToday() {
   const pacificDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
-  const key = 'cse_calls_' + pacificDate;
+  const key = 'serper_calls_' + pacificDate;
   const row = await pool.query(`SELECT value FROM lead_engine_state WHERE key=$1`, [key]).catch(() => ({ rows: [] }));
   return { key, count: row.rows[0] ? parseInt(row.rows[0].value) : 0 };
 }
-async function incrementGoogleCseCalls(key, current) {
+async function incrementSerperCalls(key, current) {
   await pool.query(
     `INSERT INTO lead_engine_state (key, value, updated_at) VALUES ($1, $2, NOW())
      ON CONFLICT (key) DO UPDATE SET value=$2, updated_at=NOW()`,
@@ -8702,11 +8696,10 @@ async function incrementGoogleCseCalls(key, current) {
   ).catch(() => {});
 }
 
-async function searchLeadsViaGoogle(target, targetIndex = 0) {
-  const apiKey = process.env.GOOGLE_CSE_API_KEY;
-  const cseId = process.env.GOOGLE_CSE_ID;
-  if (!apiKey || !cseId) {
-    console.log('[LeadEngine] Missing GOOGLE_CSE_API_KEY or GOOGLE_CSE_ID — skipping');
+async function searchLeadsViaSerper(target, targetIndex = 0) {
+  const apiKey = process.env.SERPER_API_KEY;
+  if (!apiKey) {
+    console.log('[LeadEngine] Missing SERPER_API_KEY — skipping');
     return [];
   }
 
@@ -8719,27 +8712,33 @@ async function searchLeadsViaGoogle(target, targetIndex = 0) {
   if (geoSuffix) console.log(`[LeadEngine] Geo-rotated query: "${query}"`);
 
   try {
-    // 2 pages of Google CSE results (10 per page = 20 URLs to mine)
-    for (let page = 0; page <= 1; page++) {
-      const { key: cseKey, count: cseCount } = await getGoogleCseCallsToday();
-      if (cseCount >= GOOGLE_CSE_DAILY_LIMIT) {
-        console.log(`[LeadEngine] Google CSE daily free-tier guard hit (${cseCount}/${GOOGLE_CSE_DAILY_LIMIT}) — stopping for today, zero cost preserved.`);
+    // 2 pages of Serper results (10 per page = 20 URLs to mine)
+    for (let page = 1; page <= 2; page++) {
+      const { key: serperKey, count: serperCount } = await getSerperCallsToday();
+      if (serperCount >= SERPER_DAILY_LIMIT) {
+        console.log(`[LeadEngine] Serper daily guard hit (${serperCount}/${SERPER_DAILY_LIMIT}) — stopping for today.`);
         break;
       }
-      const start = page * 10 + 1;
-      const url = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${cseId}&q=${encodeURIComponent(query)}&num=10&start=${start}`;
-      const res = await fetch(url);
-      await incrementGoogleCseCalls(cseKey, cseCount);
-      if (!res.ok) { console.log(`[LeadEngine] Google CSE error ${res.status}`); break; }
+      const res = await fetch('https://google.serper.dev/search', {
+        method: 'POST',
+        headers: { 'X-API-KEY': apiKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ q: query, num: 10, page }),
+      });
+      await incrementSerperCalls(serperKey, serperCount);
+      if (!res.ok) { console.log(`[LeadEngine] Serper error ${res.status}`); break; }
       const data = await res.json();
-      const items = data.items || [];
+      const items = data.organic || [];
       if (!items.length) break;
-      const mappedItems = items.map(item => ({
-        title: item.title || '',
-        snippet: item.snippet || '',
-        link: item.link || '',
-        displayLink: item.displayedLink || '',
-      }));
+      const mappedItems = items.map(item => {
+        let displayLink = '';
+        try { displayLink = new URL(item.link).hostname; } catch {}
+        return {
+          title: item.title || '',
+          snippet: item.snippet || '',
+          link: item.link || '',
+          displayLink,
+        };
+      });
 
       for (const item of mappedItems) {
         const domain = item.displayLink || '';
@@ -8790,10 +8789,10 @@ async function searchLeadsViaGoogle(target, targetIndex = 0) {
       await new Promise(r => setTimeout(r, 500));
     }
   } catch (err) {
-    console.error('[LeadEngine] Google search error:', err.message);
+    console.error('[LeadEngine] Serper search error:', err.message);
   }
 
-  console.log(`[LeadEngine] Google found ${leads.length} raw leads for "${target.title}"`);
+  console.log(`[LeadEngine] Serper found ${leads.length} raw leads for "${target.title}"`);
   return leads;
 }
 
@@ -9066,17 +9065,17 @@ async function recordEmailEvent(email, event) {
 }
 
 async function runLeadEngine(targetsPerRun = 3) {
-  if (!process.env.GOOGLE_CSE_API_KEY || !process.env.GOOGLE_CSE_ID || !process.env.BREVO_SMTP_KEY) {
-    console.log(`[LeadEngine] Missing API keys — GOOGLE_CSE_API_KEY: ${!!process.env.GOOGLE_CSE_API_KEY}, GOOGLE_CSE_ID: ${!!process.env.GOOGLE_CSE_ID}, BREVO_SMTP_KEY: ${!!process.env.BREVO_SMTP_KEY}`);
+  if (!process.env.SERPER_API_KEY || !process.env.BREVO_SMTP_KEY) {
+    console.log(`[LeadEngine] Missing API keys — SERPER_API_KEY: ${!!process.env.SERPER_API_KEY}, BREVO_SMTP_KEY: ${!!process.env.BREVO_SMTP_KEY}`);
     return;
   }
 
-  // Bail out immediately if today's free-tier Google CSE budget is already
-  // spent -- avoids looping through hundreds of targets that would each
-  // just no-op, and keeps this guaranteed zero-cost regardless of schedule.
-  const { count: cseCallsSoFar } = await getGoogleCseCallsToday();
-  if (cseCallsSoFar >= GOOGLE_CSE_DAILY_LIMIT) {
-    console.log(`[LeadEngine] Google CSE daily free-tier budget already spent (${cseCallsSoFar}/${GOOGLE_CSE_DAILY_LIMIT}) — skipping this run entirely.`);
+  // Bail out immediately if today's Serper spend guard is already hit --
+  // avoids looping through hundreds of targets that would each just no-op,
+  // and keeps daily cost small and predictable regardless of schedule.
+  const { count: serperCallsSoFar } = await getSerperCallsToday();
+  if (serperCallsSoFar >= SERPER_DAILY_LIMIT) {
+    console.log(`[LeadEngine] Serper daily guard already hit (${serperCallsSoFar}/${SERPER_DAILY_LIMIT}) — skipping this run entirely.`);
     return;
   }
 
@@ -9148,7 +9147,7 @@ async function runLeadEngine(targetsPerRun = 3) {
           ? await searchLeadsViaClinicalTrials(target)
           : target.source === 'pubmed'
             ? await searchLeadsViaPubMed(target)
-            : await searchLeadsViaGoogle(target, currentIdx + idx);
+            : await searchLeadsViaSerper(target, currentIdx + idx);
         if (!leads.length) {
           console.log(`[LeadEngine] No leads found for ${target.title}`);
           return { sent: 0, skipped: 0 };
@@ -9259,10 +9258,10 @@ async function runLeadEngine(targetsPerRun = 3) {
   ).catch(() => {});
 }
 
-// Lead engine — Mon-Fri, morning + afternoon. The GOOGLE_CSE_DAILY_LIMIT
-// guard above is what actually keeps this at zero cost; these two runs are
-// just sized to roughly match the free-tier budget so most of it isn't
-// spent looping through no-op targets after the cap hits early in the day.
+// Lead engine — Mon-Fri, morning + afternoon. The SERPER_DAILY_LIMIT guard
+// above is what actually keeps daily spend small; these two runs are just
+// sized to roughly match that budget so most of it isn't spent looping
+// through no-op targets after the cap hits early in the day.
 cron.schedule('0 8 * * 1-5',  () => runLeadEngine(25), { timezone: 'America/Chicago' });
 cron.schedule('0 13 * * 1-5', () => runLeadEngine(25), { timezone: 'America/Chicago' });
 
@@ -9283,8 +9282,7 @@ app.get(['/api/admin/lead-engine', '/admin/lead-engine'], authRateLimit, async (
       nextTarget: LEAD_TARGETS[parseInt(state.rotation_index?.value || '0') % LEAD_TARGETS.length],
       schedule: 'Tue/Wed/Thu 8am PT',
       envCheck: {
-        GOOGLE_CSE_API_KEY: !!process.env.GOOGLE_CSE_API_KEY,
-        GOOGLE_CSE_ID: !!process.env.GOOGLE_CSE_ID,
+        SERPER_API_KEY: !!process.env.SERPER_API_KEY,
         BREVO_SMTP_KEY: !!process.env.BREVO_SMTP_KEY,
       },
     });
@@ -9606,24 +9604,25 @@ setTimeout(async () => {
   }
 }, 30000);
 
-// Expose health check endpoint for manual trigger
-// TEMP DIAGNOSTIC — remove after confirming Google CSE project fix
+// Manual diagnostic — test Serper connectivity without running a full lead-engine cycle
 app.get(['/api/admin/lead-engine/debug', '/admin/lead-engine/debug'], authRateLimit, async (req, res) => {
   if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
   try {
-    const apiKey = process.env.GOOGLE_CSE_API_KEY;
-    const cseId = process.env.GOOGLE_CSE_ID;
+    const apiKey = process.env.SERPER_API_KEY;
     const testQuery = '"County Recorder" contact email county USA site:*.gov OR site:*.us';
-    const url = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${cseId}&q=${encodeURIComponent(testQuery)}&num=10&start=1`;
-    const googleRes = await fetch(url);
-    const bodyText = await googleRes.text();
+    const serperRes = await fetch('https://google.serper.dev/search', {
+      method: 'POST',
+      headers: { 'X-API-KEY': apiKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ q: testQuery, num: 10, page: 1 }),
+    });
+    const bodyText = await serperRes.text();
     let parsed = null;
     try { parsed = JSON.parse(bodyText); } catch {}
     res.json({
-      googleStatus: googleRes.status,
-      googleOk: googleRes.ok,
-      itemCount: parsed?.items?.length ?? null,
-      errorBody: googleRes.ok ? null : bodyText.slice(0, 1500),
+      serperStatus: serperRes.status,
+      serperOk: serperRes.ok,
+      itemCount: parsed?.organic?.length ?? null,
+      errorBody: serperRes.ok ? null : bodyText.slice(0, 1500),
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
