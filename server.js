@@ -9506,7 +9506,12 @@ async function runHealthChecks() {
   }
 
   // 11. Lead engine — Mon-Fri CT only. Weekends: always OK (engine is intentionally off).
-  // Weekdays: fail only if no email was sent in the last 25h (covers overnight gaps between runs).
+  // Weekdays: fail if no email was sent in the last 25h (covers overnight gaps between runs),
+  // OR if the most recent run found zero leads despite having targets to search. The second
+  // check exists because a backlog of already-found leads can keep the "email sent" signal
+  // green for days even while new lead discovery is completely dead (this is exactly how the
+  // Google Custom Search outage went unnoticed for over a week) -- checking the actual
+  // targets/sent/skipped counts from the last run catches a dead search provider immediately.
   try {
     const ctDay = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', weekday: 'long' }).format(new Date());
     const isWeekend = ctDay === 'Saturday' || ctDay === 'Sunday';
@@ -9516,8 +9521,19 @@ async function runHealthChecks() {
       const leRow = await pool.query(`SELECT MAX(last_contact_at) AS last_sent FROM outreach_contacts WHERE last_contact_at > NOW() - INTERVAL '25 hours'`);
       const lastSent = leRow.rows[0].last_sent;
       const hoursSince = lastSent ? (Date.now() - new Date(lastSent).getTime()) / 3600000 : null;
+
+      const lastResultRow = await pool.query(`SELECT value, updated_at FROM lead_engine_state WHERE key='last_result'`).catch(() => ({ rows: [] }));
+      let lastResult = null;
+      try { lastResult = lastResultRow.rows[0] ? JSON.parse(lastResultRow.rows[0].value) : null; } catch {}
+      const resultAt = lastResultRow.rows[0]?.updated_at;
+      const resultHoursSince = resultAt ? (Date.now() - new Date(resultAt).getTime()) / 3600000 : null;
+      const deadSearch = lastResult && resultHoursSince !== null && resultHoursSince < 25 &&
+        lastResult.targets > 0 && lastResult.sent === 0 && lastResult.skipped === 0;
+
       if (!lastSent) {
         checks.push({ name: 'Lead Engine', ok: false, error: 'No emails sent in last 25h — engine may be stopped' });
+      } else if (deadSearch) {
+        checks.push({ name: 'Lead Engine', ok: false, error: `Last run found zero leads across ${lastResult.targets} targets (sent 0, skipped 0) — search provider may be down, even though older queued emails are still going out` });
       } else {
         checks.push({ name: 'Lead Engine', ok: true, error: null, info: `Last sent ${hoursSince.toFixed(0)}h ago` });
       }
