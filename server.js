@@ -3857,20 +3857,6 @@ app.post(["/admin/test-email", "/api/admin/test-email"], async (req, res) => {
   }
 });
 
-/* ---------------- ADMIN: SEND CUSTOM EMAIL (one-off outreach) ---------------- */
-app.post(["/admin/send-email", "/api/admin/send-email"], async (req, res) => {
-  try {
-    if (!verifyAdminAuth(req)) return res.status(401).json({ error: "Unauthorized." });
-    const { to, from, subject, text, html } = req.body;
-    if (!to || !subject || (!text && !html)) return res.status(400).json({ error: "to, subject, and text or html required." });
-    await sendEmail({ to, from, subject, text, html });
-    res.json({ success: true, message: "Email sent to " + to });
-  } catch (err) {
-    console.error("Custom email failed:", err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
 /* ---------------- ADMIN: GOVERNMENT TRIAL CHECKOUT LINK ---------------- */
 // Admin-only. Generates a Stripe subscription checkout link for the real Government
 // plan with a 30-day trial attached (card required, auto-bills at $999/mo on day 30
