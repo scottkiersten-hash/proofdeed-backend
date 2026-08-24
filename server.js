@@ -6862,6 +6862,18 @@ const LEAD_TARGETS = [
   { industry: 'military', role: 'military_innovation', tier: 'influencer', title: 'Army Reserve Innovation Command', query: '"Innovation Command" OR "Innovation Officer" Army Reserve site:*.mil email contact' },
   { industry: 'military', role: 'military_innovation', tier: 'influencer', title: 'DoD Defense Innovation Unit / AFWERX / NavalX', query: '"Defense Innovation Unit" OR AFWERX OR NavalX partnerships director email contact site:*.mil' },
   { industry: 'military', role: 'military_audit', tier: 'primary', title: 'Service FIAR / Audit Readiness Office', query: '"Financial Improvement and Audit Readiness" OR FIAR director Army OR Navy OR "Air Force" site:*.mil email contact' },
+
+  // ════════════════════════════════════════════════════════
+  // ANTI-FRAUD — deed theft is a rising, headline-driven crisis (NY complaints +240%, new state laws)
+  // ════════════════════════════════════════════════════════
+  { industry: 'government', role: 'ag_fraud', tier: 'primary', title: 'State AG Real Property / Deed Theft Unit Chief', query: '"Attorney General" "Real Estate Enforcement" OR "Real Property Fraud" OR "Deed Theft" bureau chief OR section chief USA site:*.gov email contact' },
+  { industry: 'government', role: 'ag_fraud', tier: 'primary', title: 'State AG Public Integrity Bureau', query: '"Attorney General" "Public Integrity Bureau" director OR chief deed theft OR "real estate fraud" USA site:*.gov email contact' },
+
+  // ════════════════════════════════════════════════════════
+  // HEALTHCARE — EMR audit trail discovery is now a live malpractice-litigation flashpoint (PA/CA/IL/GA court orders 2025-2026)
+  // ════════════════════════════════════════════════════════
+  { industry: 'institutional', role: 'healthcare', tier: 'primary', title: 'Health System General Counsel — EMR Litigation Risk', query: '"General Counsel" OR "Chief Legal Officer" hospital OR "health system" "audit trail" OR "Epic" litigation USA contact email' },
+  { industry: 'institutional', role: 'healthcare', tier: 'primary', title: 'Medical Malpractice Defense Counsel — EMR Discovery', query: '"medical malpractice defense" partner OR director "audit trail" OR "EMR discovery" law firm USA contact email' },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
