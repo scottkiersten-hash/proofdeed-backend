@@ -8381,15 +8381,15 @@ info@proofdeed.com | proofdeed.com`;
   // ── Government Regulators / Enforcement — evidence integrity, audit documentation
   const gov_regulator = `Hi ${first},
 
-Enforcement actions fail when evidence integrity is challenged. Investigation documents, audit records, and regulatory findings can be questioned for authenticity — costing agencies years of litigation and, in some cases, entire prosecutions. The question is not whether your records are accurate. It is whether you can prove they were not altered after the fact.
+Auditors and oversight bodies rarely find that a government record doesn't exist. What they find is that nobody can independently prove it wasn't altered after the fact — DoD alone has failed seven consecutive financial audits on exactly this gap, with NDAA now mandating a clean opinion by December 31, 2028.
 
-ProofDeed creates an independent Trust Record for every investigation file, audit report, and regulatory finding at the moment it is generated — verifiable by any court or oversight body globally without relying on your internal infrastructure. If the integrity of a record is ever challenged, the answer is immediate.
+This isn't theoretical. Army Materiel Command already piloted a system built on the same principle — Operation Mission Truth, an independent, tamper-evident ledger tracking Presidential Drawdown Authority shipments. ProofDeed runs that same architecture in production today: any investigation file, audit record, or regulatory finding can prove it wasn't altered after certification — verifiable by any court or oversight body, without relying on your internal infrastructure or on ProofDeed itself.
 
-Single API integration. No system replacement.
+Single API integration. No system replacement, no migration.
 
 See it in 2 minutes: proofdeed.com/demo
 
-Worth a brief call with your records, digital evidence, or compliance team?
+Worth a brief call with whoever owns audit readiness, records integrity, or evidence chain of custody at your agency?
 
 Best,
 Scott Kiersten
