@@ -6027,17 +6027,6 @@ const LEAD_TARGETS = [
   { industry: 'title_escrow', role: 'mortgage_lender', tier: 'primary', title: 'Flat Branch Mortgage — Leadership', query: '"Flat Branch Mortgage" director manager compliance contact email' },
   { industry: 'title_escrow', role: 'mortgage_lender', tier: 'primary', title: 'CrossCountry Mortgage — Compliance/Ops', query: '"CrossCountry Mortgage" OR "Cross Country Mortgage" compliance operations director contact email' },
 
-  // DMS White-Label API targets — VP Product/Partnerships/BD at major document management platforms
-  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'DocuWare — VP Product/Partnerships', query: 'site:docuware.com OR "DocuWare" "VP Product" OR "VP Partnerships" OR "Business Development" director email contact' },
-  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'M-Files — VP Partnerships/Product', query: 'site:m-files.com OR "M-Files" "VP Partnerships" OR "VP Product" OR "Business Development" director email contact' },
-  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Laserfiche — VP Product/BD', query: 'site:laserfiche.com OR "Laserfiche" "VP Product" OR "Business Development" OR "VP Partnerships" director email contact' },
-  { industry: 'legal', role: 'transact', tier: 'primary', title: 'NetDocuments — VP Product/Partnerships', query: 'site:netdocuments.com OR "NetDocuments" "VP Product" OR "VP Partnerships" OR "Business Development" director email contact' },
-  { industry: 'legal', role: 'transact', tier: 'primary', title: 'iManage — VP Partnerships/BD', query: 'site:imanage.com OR "iManage" "VP Partnerships" OR "VP Product" OR "Business Development" director email contact' },
-  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'OpenText — BD Director/Partnerships', query: 'site:opentext.com OR "OpenText" "Business Development Director" OR "VP Partnerships" OR "Platform Partnerships" email contact' },
-  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'ShareFile (Citrix) — VP Product/Partnerships', query: '"ShareFile" OR "Citrix ShareFile" "VP Product" OR "VP Partnerships" OR "Business Development" director email contact' },
-  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Egnyte — VP Partnerships/BD', query: 'site:egnyte.com OR "Egnyte" "VP Partnerships" OR "VP Product" OR "Business Development" director email contact' },
-  { industry: 'real_estate', role: 'real_estate_ops', tier: 'primary', title: 'Box — VP Platform Partnerships', query: 'site:box.com "VP Platform" OR "VP Partnerships" OR "Platform Business Development" director email contact' },
-
   // Attorney General — home title theft prosecution
   { industry: 'government', role: 'ag_fraud', tier: 'primary',    title: 'Attorney General Consumer Protection', query: '"Attorney General" "consumer protection" OR "real estate fraud" OR "deed fraud" director counsel USA contact email site:*.gov' },
   { industry: 'government', role: 'ag_fraud', tier: 'primary',    title: 'State AG Real Estate Fraud Unit', query: '"Attorney General" "real estate fraud" OR "mortgage fraud" investigator OR director USA site:*.gov contact email' },
@@ -6861,6 +6850,18 @@ const LEAD_TARGETS = [
     query: '"Vinay Goel" "JLL" email contact OR speaker OR conference OR interview OR podcast' },
   { industry: 'global_insurance', role: 'global_insurance', tier: 'primary', title: 'Nelcia Oliveira — Zurich Regional Chief Claims Officer',
     query: '"Nelcia Oliveira" "Zurich" email contact OR speaker OR conference OR interview' },
+
+  // ════════════════════════════════════════════════════════
+  // MILITARY & DEFENSE — small-business, contracting, and audit-readiness offices
+  // ════════════════════════════════════════════════════════
+  { industry: 'military', role: 'military_sb', tier: 'primary', title: 'Army Small Business Program Manager', query: '"Small Business Program Manager" OR "OSBP Director" Army contracting command site:*.mil OR site:*.army.mil email contact' },
+  { industry: 'military', role: 'military_sb', tier: 'primary', title: 'Navy Small Business Office', query: '"Office of Small Business Programs" Navy OR "SYSCOM" director email contact site:*.navy.mil' },
+  { industry: 'military', role: 'military_sb', tier: 'primary', title: 'Air Force Small Business Office', query: '"Small Business Office" Air Force OR AFMC OR AFRL director email contact site:*.af.mil' },
+  { industry: 'military', role: 'military_sb', tier: 'primary', title: 'Space Force Small Business Office', query: '"Small Business Office" "Space Force" OR SSC director email contact site:*.mil' },
+  { industry: 'military', role: 'military_sb', tier: 'primary', title: 'DLA Small Business Office', query: '"Office of Small Business Programs" "Defense Logistics Agency" director email contact site:dla.mil' },
+  { industry: 'military', role: 'military_innovation', tier: 'influencer', title: 'Army Reserve Innovation Command', query: '"Innovation Command" OR "Innovation Officer" Army Reserve site:*.mil email contact' },
+  { industry: 'military', role: 'military_innovation', tier: 'influencer', title: 'DoD Defense Innovation Unit / AFWERX / NavalX', query: '"Defense Innovation Unit" OR AFWERX OR NavalX partnerships director email contact site:*.mil' },
+  { industry: 'military', role: 'military_audit', tier: 'primary', title: 'Service FIAR / Audit Readiness Office', query: '"Financial Improvement and Audit Readiness" OR FIAR director Army OR Navy OR "Air Force" site:*.mil email contact' },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -6999,18 +7000,16 @@ info@proofdeed.com | proofdeed.com`;
 const UAE_EMAIL = (name, company, role) => {
   const first = name.split(' ')[0];
 
-  // Real estate developer — Digital Transformation / CDO / CTO / CIO / Innovation
-  const uae_redev = `Hi ${first},
+  // ── UAE — Real Estate — Dubai Paperless 2026 / VARA compliance
+  const uae_real_estate = `Hi ${first},
 
-As the UAE accelerates toward its 2026 Paperless Government mandate, the risk sitting at the center of every major developer's operation is the same: digital property documents — title deeds, sale agreements, NOCs, handover certificates — are easy to duplicate, alter, and forge once they leave your system.
+As the UAE accelerates toward its 2026 Paperless Government mandate, the risk sitting at the center of every major developer's operation is the same: digital property documents — title deeds, sale agreements, NOCs, handover certificates — are easy to duplicate, alter, or forge once they leave your system, and disputes over handover conditions or payment terms are the most common post-sale complaint.
 
-The Dubai Land Department is already issuing blockchain-backed title deeds. The gap is in the private developer workflow: the documents your team creates, transfers, and stores before they ever reach DLD.
-
-ProofDeed provides a single API call that anchors each document field to an independent verification network at the moment of creation — sale price, unit number, buyer name, execution date — so any downstream alteration is immediately detectable. No system replacement. Compatible with your existing DMS and CRM.
+ProofDeed provides a single API call that anchors each document field to an independent verification network at the moment of creation — sale price, unit number, buyer name, execution date — so any downstream alteration is immediately detectable, and ${company}'s team, buyers, and the DLD all see the same verified original. No system replacement, works alongside your existing DMS and CRM.
 
 Relevant to ${company}'s current digital transformation priorities:
 → Aligns with Dubai Paperless Strategy 2026 and VARA's data integrity standards
-→ Provides cryptographic proof of document origination for DLD submissions
+→ Provides independent proof of document origination for DLD submissions
 → Reduces title dispute resolution time from weeks to minutes
 
 See it in 2 minutes: proofdeed.com/demo
@@ -7021,70 +7020,14 @@ Scott Kiersten
 Founder & CEO, ProofDeed
 info@proofdeed.com | proofdeed.com`;
 
-  // Real estate — Operations / Sales / Asset Management / Handover
-  const uae_reops = `Hi ${first},
+  // ── UAE — Automotive — import, title, and franchise document integrity
+  const uae_automotive = `Hi ${first},
 
-Property handover disputes and title transfer delays cost UAE developers significant time and legal exposure — and the root cause is almost always the same: a document that can't be independently verified as unaltered.
-
-With the UAE's 2026 Paperless Mandate requiring all government-adjacent transactions to be fully digital, the operational risk is only increasing. A digital document with no cryptographic proof of integrity is a liability.
-
-ProofDeed provides field-level cryptographic certification for every document in your handover and sales workflow — NOC, SPA, title deed, payment schedules — anchored at creation so ${company}'s team, your buyers, and the DLD all see the same verified original.
-
-One API call. No workflow disruption. Works alongside your existing property management system.
-
-See it in 2 minutes: proofdeed.com/demo
-
-Worth 20 minutes?
-
-Scott Kiersten
-Founder & CEO, ProofDeed
-info@proofdeed.com | proofdeed.com`;
-
-  // Real estate — Legal & Compliance
-  const uae_legal = `Hi ${first},
-
-VARA's expanding framework for virtual and digital assets in the UAE now requires demonstrable data integrity for any digital document used in regulated transactions. For a developer of ${company}'s scale, the exposure isn't just regulatory — it's the cost of a single contested title deed in arbitration.
-
-ProofDeed provides immutable, cryptographic proof that every property document is unaltered from the moment of creation — sale price, buyer identity, execution timestamp, unit details — each field individually anchored to the blockchain. Independent third-party verifiability without relying on your internal system logs.
-
-Relevant to your compliance posture:
-→ Aligns with VARA data integrity standards
-→ Supports DLD blockchain title deed ecosystem
-→ Defensible audit trail for DIFC and ADGM arbitration
-
-See it in 2 minutes: proofdeed.com/demo
-
-Worth a conversation with your team?
-
-Scott Kiersten
-Founder & CEO, ProofDeed
-info@proofdeed.com | proofdeed.com`;
-
-  // Real estate — Customer Experience / Post-Sales / CX
-  const uae_recx = `Hi ${first},
-
-The most common post-sale complaint at UAE property developers isn't price or quality — it's "that's not what my documents say." Buyers dispute handover conditions, payment schedules, and SPA terms because there's no cryptographic proof of what was agreed at signing.
-
-ProofDeed anchors every customer-facing document — SPA, payment plan, handover certificate, NOC — to the blockchain at the moment it's issued. When a buyer questions a term, ${company}'s team can produce an independently verifiable proof in seconds, not weeks of email chains.
-
-Reduces post-sale disputes. Builds buyer confidence. Aligns with Dubai's 2026 digital mandate.
-
-See it in 2 minutes: proofdeed.com/demo
-
-Worth a quick call?
-
-Scott Kiersten
-Founder & CEO, ProofDeed
-info@proofdeed.com | proofdeed.com`;
-
-  // UAE Automotive conglomerates — import docs, title, CoO, franchise agreements
-  const uae_autodev = `Hi ${first},
-
-UAE automotive conglomerates manage some of the most document-intensive operations in the region — import permits, customs declarations, Certificates of Origin, vehicle title transfers, and franchise agreements all flowing across multiple parties with no cryptographic proof of integrity between handoffs.
+UAE automotive conglomerates manage some of the most document-intensive operations in the region — import permits, customs declarations, Certificates of Origin, vehicle title transfers, and franchise agreements flowing across multiple parties with no independent proof of integrity between handoffs.
 
 With the UAE's broader push toward digital compliance (Dubai Paperless 2026, VARA standards), the question for operations of ${company}'s scale is no longer "should we digitize?" — it's "how do we prove our digital records are unaltered?"
 
-ProofDeed provides field-level cryptographic certification for every import and title document at the moment of origination. VIN, chassis number, country of origin, sale price — each individually hashed and anchored. Any post-facto alteration is immediately detectable by any party in the chain, including the Roads and Transport Authority (RTA).
+ProofDeed provides field-level cryptographic certification for every import and title document at the moment of origination — VIN, chassis number, country of origin, sale price — each individually anchored. Any post-facto alteration is immediately detectable by any party in the chain, including the Roads and Transport Authority (RTA).
 
 One API. No system replacement. Works alongside your existing DMS and ERP.
 
@@ -7097,14 +7040,14 @@ Founder & CEO, ProofDeed
 info@proofdeed.com | proofdeed.com`;
 
   const byRole = {
-    uae_redev,
-    uae_reops,
-    uae_legal,
-    uae_recx,
-    uae_autodev,
+    uae_redev: uae_real_estate,
+    uae_reops: uae_real_estate,
+    uae_legal: uae_real_estate,
+    uae_recx: uae_real_estate,
+    uae_autodev: uae_automotive,
   };
 
-  return byRole[role] || uae_redev;
+  return byRole[role] || uae_real_estate;
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -7562,90 +7505,50 @@ const INITIAL_EMAIL = (name, company, industry, role) => {
   // Guard: never greet as "Hi Team," — use title-cased first name only if it looks real
   const first = /^(team|unknown|contact|info|null|undefined)$/i.test(rawFirst) ? company.split(' ')[0] : rawFirst;
 
-  // ── Recorder / Clerk — "Prove document integrity when records are challenged"
-  const recorder = `Hi ${first},
+  // ── Military & Defense — audit-readiness precedent, small-business/innovation offices
+  const military = `Hi ${first},
 
-When a recorded document gets challenged — contested deed, disputed filing, chain-of-title dispute — your office has to prove it. The question isn't whether it's in your system. It's whether you can prove it hasn't been altered.
+DoD has failed seven consecutive financial audits. NDAA requires a clean opinion by December 31, 2028 — auditors don't find that records are missing, they find that nobody can independently prove they weren't altered after the fact.
 
-ProofDeed creates a Trust Record for every document at the moment of recording — a permanent, tamper-proof fingerprint anchored to an independent verification network. If the document is ever questioned, authenticity is provable in seconds. No system replacement. No document storage. No IT required. Works alongside your existing workflow — live in days.
+Army Materiel Command already piloted a system built on that exact principle — Operation Mission Truth, an independent, tamper-evident ledger tracking Presidential Drawdown Authority shipments, with the Air Force Research Laboratory and Defense Logistics Agency as collaborators. ProofDeed runs the same architecture in production today: any document or record can prove it wasn't altered after certification, without replacing or migrating any system already in use.
 
-Several county offices are using this to get ahead of fraud liability before it becomes a headline.
+Single API integration. No workflow change, no new storage system.
 
 See it in 2 minutes: proofdeed.com/demo
 
-Would a 20-minute call this week make sense?
+Worth a short call to see whether this fits a workflow your command is already trying to get audit-ready?
 
 Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
 gov@proofdeed.com | proofdeed.com`;
 
-  // ── Legal / Risk / Audit — "Reduce exposure when document authenticity is disputed"
-  const legal = `Hi ${first},
+  // ── Government — Civilian & Regulatory — enforcement, records, audit documentation
+  const government = `Hi ${first},
 
-When document authenticity gets disputed in litigation, the question your office faces is: can you prove the document hasn't been altered since it was created? Timestamps in internal systems don't answer that. A court wants independent, tamper-proof proof.
+Auditors and oversight bodies rarely find that a government record doesn't exist. What they find is that nobody can independently prove it wasn't altered after the fact — DoD alone has failed seven consecutive financial audits on exactly this gap, with NDAA now mandating a clean opinion by December 31, 2028.
 
-ProofDeed creates a Trust Record at the moment a document is processed — permanently anchored to an independent verification network, independently verifiable by any court, auditor, or opposing counsel without access to your internal systems. Legally defensible under FRE Rule 901. No system changes required.
+This isn't theoretical. Army Materiel Command already piloted a system built on the same principle — Operation Mission Truth, an independent, tamper-evident ledger tracking Presidential Drawdown Authority shipments. ProofDeed runs that same architecture in production today: any investigation file, audit record, or regulatory finding can prove it wasn't altered after certification — verifiable by any court or oversight body, without relying on your internal infrastructure or on ProofDeed itself.
 
-The cost of a single disputed record averages $50,000 in legal fees. The cost to protect against it is a fraction of that.
+Single API integration. No system replacement, no migration.
 
 See it in 2 minutes: proofdeed.com/demo
 
-Worth a 20-minute conversation?
+Worth a brief call with whoever owns audit readiness, records integrity, or evidence chain of custody at your agency?
 
 Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
 gov@proofdeed.com | proofdeed.com`;
 
-  // ── IT / CIO / Digital Services — "No system changes, no document storage, low-risk deployment"
-  const it = `Hi ${first},
+  // ── Title & Escrow — every closing document provable, deed and lien integrity
+  const title_escrow = `Hi ${first},
 
-I'll keep this short because I know your plate is full.
+Every real estate closing and title transaction generates documents that can be disputed years later — deeds, settlement statements, lien releases, wire instructions. The problem most offices don't realize: standard PDFs can be altered after signing without triggering any alert, making it impossible to prove what was in the document at the moment of closing or recording.
 
-ProofDeed adds tamper-proof Trust Records to your existing document workflow — no system replacement, no document storage on our end, single API call. Most county offices are live in under a week with no impact on existing infrastructure.
+ProofDeed creates a Trust Record for every closing or title document the instant it's processed — buyer name, sale price, legal description, lien amount, recording date, all individually locked on an independent verification network. If a single field is ever changed, it's immediately detectable. Buyers and lenders get a permanent verification link. You get legally defensible proof under FRE Rule 901.
 
-It creates a Trust Record for each document at the moment it's processed — permanently verifiable proof of authenticity and chain of custody that holds up in court under FRE Rule 901.
-
-No new user training. No data migration. No long-term lock-in.
-
-See it in 2 minutes: proofdeed.com/demo
-
-Would 20 minutes be worth it to see the integration?
-
-Best,
-Scott Kiersten
-Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`;
-
-  // ── Procurement / Budget — "Fixed-cost pilot, no long-term commitment"
-  const procurement = `Hi ${first},
-
-If your office is evaluating document integrity solutions, I want to make this easy.
-
-ProofDeed offers a fixed-cost 45-day Government Pilot — full API access, no variable costs, no long-term commitment. If it works, you continue on a monthly subscription. If not, your Trust Records remain on-chain permanently regardless.
-
-It anchors documents to an independent verification network at the moment of processing — tamper-proof, legally defensible proof under FRE Rule 901. Single API integration. No system replacement.
-
-ACH and purchase order accepted.
-
-See it in 2 minutes: proofdeed.com/demo
-
-Worth a quick call to discuss the pilot structure?
-
-Best,
-Scott Kiersten
-Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`;
-
-  // ── Auto Dealer / F&I / Title — "proof of ownership + transaction integrity"
-  const auto_dealer = `Hi ${first},
-
-Every title transfer, lien release, and odometer disclosure your operation processes is a liability the moment it's disputed. A forged title or altered sale price — if you can't prove the document at the exact moment it was created, you're defending yourself without evidence.
-
-ProofDeed creates a Trust Record for every deal document — VIN, odometer, sale price, buyer name — anchored individually on an independent verification network when the deal is finalized. If a single field is ever moved, it's immediately detectable. Buyers get a permanent Asset Passport™ to verify their vehicle's history. You get legally defensible proof under FRE Rule 901.
-
-No system replacement — one webhook into your existing DMS, live in a day.
+No software to install. No IT required. Works alongside your existing closing or title platform. Live in a day.
 
 See it in 2 minutes: proofdeed.com/demo
 
@@ -7656,46 +7559,32 @@ Scott Kiersten
 Founder & CEO, ProofDeed
 info@proofdeed.com | proofdeed.com`;
 
-  // ── Auto Lender / Collateral / Lien — "lien accuracy + title chain integrity"
-  const auto_lender = `Hi ${first},
+  // ── Automotive — title, lien, VIN, and supply chain document integrity
+  const automotive = `Hi ${first},
 
-Lien accuracy and title chain integrity are the foundation of your collateral position. When a borrower defaults and the title history is challenged — altered lien amounts, forged releases, disputed ownership — your recovery depends on whether you can prove each field in the document is authentic.
+Every vehicle transaction your operation touches — a title transfer, a lien release, an odometer disclosure, a Certificate of Conformity — becomes a liability the moment it's disputed. A forged title, an altered sale price, a falsified conformity certificate: if you can't prove the document at the exact moment it was created, you're defending yourself without evidence.
 
-ProofDeed creates a Trust Record for every loan document and lien at the field level — VIN, lien amount, lienholder, release date — each individually anchored on an independent verification network. If a single figure is altered after the fact, it's immediately provable. Legally defensible under FRE Rule 901. One API call, no system changes.
+ProofDeed creates a Trust Record for every vehicle document at the field level — VIN, odometer, sale price, lien amount, part number — each individually anchored on an independent verification network the moment the deal or certification is finalized. If a single field is altered afterward, it's immediately detectable. Every vehicle gets a permanent Asset Passport™ so buyers, lenders, and downstream owners can verify its history in seconds. Legally defensible under FRE Rule 901.
+
+One webhook into your existing DMS or ERP. No system replacement, live in a day.
 
 See it in 2 minutes: proofdeed.com/demo
 
-Would 20 minutes be worth it?
+Worth a 20-minute call this week?
 
 Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
 info@proofdeed.com | proofdeed.com`;
 
-  // ── Auto Auction / Remarketing — "chain of custody for high-volume transfers"
-  const auto_auction = `Hi ${first},
+  // ── Enterprise & Institutional — compliance, legal, PE/M&A, audit-proof documents
+  const enterprise = `Hi ${first},
 
-At auction volume, every vehicle transfer is a potential chain-of-custody dispute. Odometer fraud, salvage title laundering, forged condition reports — the liability lands on whoever processed the last transaction without proof.
+When an audit, dispute, or regulatory review puts a document's authenticity in question, your organization has to prove it — not just that it exists in your system, but that it hasn't been altered since it was created. Metadata in your DMS won't hold up. A court, regulator, or counterparty wants independent, tamper-proof evidence.
 
-ProofDeed creates a Trust Record for every vehicle sale — VIN, odometer, condition grade, seller/buyer fields — anchored on an independent verification network at the moment of transaction. Each buyer gets an Asset Passport™ showing the vehicle's verified history. Title washing becomes immediately detectable.
+ProofDeed creates a Trust Record for every critical document at the field level — dates, amounts, terms, signatures — the moment it's created or executed. Each Trust Record is independently verifiable by any court, auditor, or regulator without access to your internal systems. Legally defensible under FRE Rule 901. No system replacement, no document storage on our end.
 
-Legally defensible under FRE Rule 901. One webhook into your existing workflow, live in a day.
-
-See it in 2 minutes: proofdeed.com/demo
-
-Worth a quick call?
-
-Best,
-Scott Kiersten
-Founder & CEO, ProofDeed
-info@proofdeed.com | proofdeed.com`;
-
-  // ── Institutional Compliance / Records / GRC — "audit-proof document integrity"
-  const inst_compliance = `Hi ${first},
-
-When an audit, dispute, or regulatory review puts a document's authenticity in question, your organization has to prove it — not just that it exists in your system, but that it hasn't been altered since it was created. Most document management systems can't answer that. Courts and regulators increasingly expect independent proof.
-
-ProofDeed creates a Trust Record for every critical document at the moment it's processed — permanently anchored to an independent verification network, independently verifiable by any court or regulator without access to your internal systems. Legally defensible under FRE Rule 901. No system replacement. No document storage. Single API call.
+Single API call into your existing workflow.
 
 See it in 2 minutes: proofdeed.com/demo
 
@@ -7706,26 +7595,8 @@ Scott Kiersten
 Founder & CEO, ProofDeed
 info@proofdeed.com | proofdeed.com`;
 
-  // ── Institutional Legal / Risk — "verifiable proof for disputes and regulatory reviews"
-  const inst_legal = `Hi ${first},
-
-When document authenticity is disputed in litigation or a regulatory review, the question is simple: can you prove this document is unchanged from when it was created? Metadata in your DMS won't hold up. A court wants independent, tamper-proof evidence.
-
-ProofDeed creates a Trust Record for every critical document at the moment it's processed — independently verifiable by any court or regulator without access to your internal systems. Legally defensible under FRE Rule 901. No system changes required.
-
-The cost of a single disputed document in litigation dwarfs the annual cost of protecting against it.
-
-See it in 2 minutes: proofdeed.com/demo
-
-Worth a quick call?
-
-Best,
-Scott Kiersten
-Founder & CEO, ProofDeed
-info@proofdeed.com | proofdeed.com`;
-
-  // ── Healthcare — "tamper-proof EHR + compliance audit trail"
-  const inst_healthcare = `Hi ${first},
+  // ── Healthcare — clinical document and patient record integrity
+  const healthcare = `Hi ${first},
 
 When a patient record, prescription, or clinical document gets disputed — in litigation, a federal audit, or a CMS review — your organization has to prove it hasn't been altered. Most EHR systems log who accessed a record. None of them can prove the content hasn't changed since it was created.
 
@@ -7742,50 +7613,30 @@ Scott Kiersten
 Founder & CEO, ProofDeed
 info@proofdeed.com | proofdeed.com`;
 
-  // ── Title & Escrow — "make every closing document provable and tamper-proof"
-  const title_escrow = `Hi ${first},
+  // ── Higher Education — credential fraud, research data integrity
+  const higher_ed = `Hi ${first},
 
-Every real estate closing generates documents that can be disputed years later — deeds, settlement statements, wire instructions. The problem most agencies don't realize: standard PDFs can be altered after signing without triggering any alert, making it impossible to prove what was in the document at the moment of closing.
+Diploma mills, credential fraud, and research data tampering all share the same root cause: no independent way to prove a document is unchanged from the moment it was issued or recorded. Credential fraud costs employers millions annually and the reputational liability lands on the institution that issued it — not the forger. Research misconduct investigations carry the same burden-of-proof problem for IRB files, lab notebooks, and grant applications.
 
-ProofDeed creates a Trust Record for every closing document the instant it's processed — buyer name, sale price, legal description, recording date, all individually locked on an independent verification network. If a single field is ever changed, it's immediately detectable. Buyers get a permanent verification link. You get legally defensible proof under FRE Rule 901.
+ProofDeed turns diplomas, certificates, and research records into permanent Trust Records anchored to an independent verification network at the moment they're issued or submitted. Employers, auditors, and federal agencies can verify authenticity without ever contacting your office. Legally defensible under FRE Rule 901.
 
-No software to install. No IT required. Works alongside your existing closing platform. Live in a day.
+No records system replacement. Live in days.
 
 See it in 2 minutes: proofdeed.com/demo
 
-Worth a 20-minute call this week?
+Worth a 20-minute call with your registrar or research integrity office?
 
 Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
 info@proofdeed.com | proofdeed.com`;
 
-  // ── Legal / Law Firms — "lock document integrity at creation so it holds up in court"
-  const legal_firm = `Hi ${first},
+  // ── Insurance — claim and underwriting document integrity
+  const insurance = `Hi ${first},
 
-With AI editing tools and deepfake technology now capable of altering signed documents without a trace, proving the exact date and authenticity of a deed, will, or trust in court has become a serious liability for estate and real estate attorneys.
+Insurance fraud schemes succeed because claim photos, damage estimates, and loss documentation are easy to alter before submission — and by the time your SIU or claims team investigates, there's no way to prove what the original showed. Photoshopped damage, inflated repair estimates, backdated reports: the manipulation happens before it ever reaches your desk.
 
-The most damaging thing opposing counsel can do is allege a document was altered after creation — and if you can't prove otherwise independently, you're defending the document instead of the case.
-
-ProofDeed creates a Trust Record for every firm document — party names, dates, amounts, terms — each individually anchored on an independent verification network at the moment of creation. Documents become legally defensible under FRE Rule 901. If opposing counsel claims anything was changed after signing, you prove it in seconds.
-
-No system changes. No IT required.
-
-See it in 2 minutes: proofdeed.com/demo
-
-Would 20 minutes make sense?
-
-Best,
-Scott Kiersten
-Founder & CEO, ProofDeed
-info@proofdeed.com | proofdeed.com`;
-
-  // ── Insurance (non-auto) — "prove claim documents haven't been altered"
-  const insurance_gen = `Hi ${first},
-
-Insurance fraud schemes succeed because claim photos, damage estimates, and loss documentation are easy to alter before submission — and by the time your SIU team investigates, there's no way to prove what the original showed. Photoshopped damage, inflated repair estimates, backdated reports: the manipulation happens before it ever reaches your desk.
-
-ProofDeed lets your field adjusters create a Trust Record for claim photos and repair estimates the second they're captured — making it impossible for claimants to alter values after the fact. Each Trust Record is permanently anchored to an independent verification network, legally defensible under FRE Rule 901. No app for claimants. Single API call for your adjusters.
+ProofDeed lets field adjusters and underwriters create a Trust Record for claim photos, estimates, and underwriting documents the second they're captured — making it impossible to alter values after the fact. Each Trust Record is permanently anchored to an independent verification network, independently verifiable by any court or regulator worldwide. No app for claimants. Single API call for your team.
 
 Live in days.
 
@@ -7798,356 +7649,50 @@ Scott Kiersten
 Founder & CEO, ProofDeed
 info@proofdeed.com | proofdeed.com`;
 
-  // ── Construction & Lien — "ensure lien and waiver documents can't be challenged later"
-  const construction = `Hi ${first},
+  // ── Legal Services — outside counsel, litigation and transactional document integrity
+  const legal_services = `Hi ${first},
 
-Mechanic's liens, lien waivers, and release documents are among the most frequently disputed in construction litigation. A conditional waiver that looks like an unconditional one. A lien release with an altered amount. When the dispute hits, whoever processed the document has to prove it.
+With AI editing tools now capable of altering signed documents without a trace, proving the exact date and authenticity of a contract, deed, will, or trust in court has become a serious liability. The most damaging move opposing counsel can make is alleging a document was altered after signing — and if you can't independently prove otherwise, you're defending the document instead of the case.
 
-ProofDeed creates a Trust Record for every lien and contract document at the moment it's signed — permanent, tamper-proof proof of the exact document at the exact time, legally defensible under FRE Rule 901. No system replacement. Single API call.
+ProofDeed creates a Trust Record for every firm document — party names, dates, amounts, terms — individually anchored on an independent verification network the moment it's created or executed. Documents become legally defensible under FRE Rule 901. If authenticity is ever challenged, you prove it in seconds, independently verifiable by any court globally without access to your internal systems.
+
+No system changes. No IT required.
 
 See it in 2 minutes: proofdeed.com/demo
 
-Would 20 minutes be worth it?
+Worth 20 minutes?
 
 Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
 info@proofdeed.com | proofdeed.com`;
 
-  // ── Supply Chain / Logistics — "Bill of Lading fraud + cargo-cloning prevention"
-  const supply_chain = `Hi ${first},
+  // ── Pharma & Life Sciences — ALCOA+ / 21 CFR Part 11 data integrity
+  const pharma = `Hi ${first},
 
-Freight cargo theft and bill of lading fraud cost carriers billions annually — not because systems fail, but because PDF and digital documents can be altered in transit without leaving a trace. By the time a shipment dispute reaches your legal team, it's impossible to prove which version of the document is original.
+FDA and EMA enforcement of ALCOA+ data integrity standards keeps tightening, and the most common failure point isn't missing records — it's records that can't be proven unaltered. A Certificate of Analysis, a batch manufacturing record, a clinical data point, a deviation report: if you can't prove it hasn't been modified since creation, the batch, the submission, or the trial data is at risk.
 
-ProofDeed creates a Trust Record for every Bill of Lading at the origin point — stopping cargo-cloning and chain-of-custody fraud before it reaches the destination gate. Every Trust Record is permanently verifiable, legally defensible under FRE Rule 901. No system replacement. Single API call. Live in days.
+ProofDeed creates a Trust Record for every quality, supply chain, or clinical document at the field level — batch number, test results, patient ID, approval date — each individually anchored on an independent verification network at the moment of creation. Any change afterward is immediately detectable. Third-party proof that satisfies 21 CFR Part 11 and ALCOA+ without replacing your QMS or EDC system.
+
+One API call. No system replacement.
 
 See it in 2 minutes: proofdeed.com/demo
 
-Worth a 20-minute call this week?
+Worth 20 minutes with your QA or regulatory affairs team?
 
 Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
 info@proofdeed.com | proofdeed.com`;
 
-  // ── Academic / Professional Credentialing — "un-copyable digital credentials"
-  const credentialing = `Hi ${first},
+  // ── Aviation & Aerospace — airworthiness, MRO, anti-counterfeit parts documentation
+  const aviation = `Hi ${first},
 
-Diploma mills and credential fraud cost employers millions annually — and the institutions that issued the credentials bear reputational liability they didn't create. The problem: most verification systems require checking back with your office. If your records system is unavailable, or a credential is forged entirely, there's no independent proof.
+A plane is only as airworthy as its paperwork. When an incident investigation or airworthiness authority challenges a maintenance log, a parts certificate, or an inspection sign-off, the documentation is the evidence — and counterfeit parts (the FAA estimates 2% of installed parts in service are unapproved) look identical to certified ones on paper.
 
-ProofDeed turns diplomas and certificates into permanent Trust Records — anchored to an independent verification network at issuance. Employers self-verify for free without contacting your office. No forged document can replicate the cryptographic proof. Legally defensible under FRE Rule 901.
+ProofDeed creates a Trust Record for every maintenance entry, parts certificate, or inspection record at the field level — tail number, technician ID, part number, sign-off date — each individually anchored on an independent verification network the moment it's recorded. Any later modification is immediately detectable. Certified parts get a permanent Asset Passport™ that MRO teams and regulators can verify in seconds. Legally defensible under FRE Rule 901.
 
-No records system replacement. Live in days.
-
-See it in 2 minutes: proofdeed.com/demo
-
-Worth a 20-minute call?
-
-Best,
-Scott Kiersten
-Founder & CEO, ProofDeed
-info@proofdeed.com | proofdeed.com`;
-
-  // ── International Government Archives — vendor-independent preservation
-  const intl_archives = `Hi ${first},
-
-Government records outlive the software they were created in. When a vendor changes platforms, loses a contract, or shuts down — the records remain, but the ability to independently verify their integrity often doesn't. Future courts, auditors, and citizens need proof that doesn't depend on your current system still being operational.
-
-ProofDeed creates a permanent Trust Record for every document at the moment it's processed — independently verifiable by any court, auditor, or records requester worldwide, regardless of what happens to your internal infrastructure over time. When systems migrate, the proof stays with the record permanently.
-
-Single API integration. Live in days.
-
-See it in 2 minutes: proofdeed.com/demo
-
-Worth a 20-minute conversation?
-
-Best,
-Scott Kiersten
-Founder & CEO, ProofDeed
-info@proofdeed.com | proofdeed.com`;
-
-  // ── Global Law Firms — eDiscovery chain of custody + AI document tampering
-  const global_law_firm = `Hi ${first},
-
-Document authenticity disputes are becoming the defining issue in complex litigation. With AI tools now capable of altering signed contracts, executed agreements, and court-filed documents without a trace, opposing counsel has a new attack vector: allege the document was modified after execution and force the producing party to prove otherwise.
-
-Most firms have eDiscovery infrastructure for finding and producing documents. Very few have independent, tamper-proof chain of custody starting at the moment of document creation — the layer that shuts down authenticity challenges in seconds rather than defending them for months.
-
-ProofDeed creates a Trust Record at the moment any document is processed — independently verifiable by any court globally without access to your internal systems. No system replacement. Can be white-labeled or recommended to clients as a document integrity standard.
-
-See it in 2 minutes: proofdeed.com/demo
-
-Worth a 20-minute call with your innovation or eDiscovery team?
-
-Best,
-Scott Kiersten
-Founder & CEO, ProofDeed
-info@proofdeed.com | proofdeed.com`;
-
-  // ── Global Insurance — international claims fraud + field adjuster fingerprinting
-  const global_insurance = `Hi ${first},
-
-Insurance fraud schemes succeed because claim photos, damage estimates, and loss documentation are easy to alter before submission. By the time your investigation team reviews a claim, the original record may be unrecoverable. Inflated repair estimates, backdated reports, and photoshopped damage photos — the manipulation happens before the document reaches your desk.
-
-ProofDeed lets field adjusters create a Trust Record for claim photos and repair estimates at the moment they are captured — making it impossible to alter values after the fact. Each Trust Record is permanently anchored to an independent verification network, independently verifiable by any court or regulator worldwide. No app for claimants. Single API call for your adjusters.
-
-Live in days.
-
-See it in 2 minutes: proofdeed.com/demo
-
-Worth a 20-minute call with your claims or fraud team?
-
-Best,
-Scott Kiersten
-Founder & CEO, ProofDeed
-info@proofdeed.com | proofdeed.com`;
-
-  // ── Blockchain/Tech Companies — partnership/integration angle
-  const blockchain_partner = `Hi ${first},
-
-Your platform provides the infrastructure. The missing layer most enterprise clients ask for next is legal admissibility — the ability to prove a specific document or record is unchanged at a specific moment in time, in a way that holds up in US courts under FRE Rule 901 without requiring a judge to understand distributed ledgers.
-
-ProofDeed handles that last mile. We create a Trust Record anchored to Polygon at the moment documents are processed — legally defensible proof that complements what your platform does, not a competitor. Several of our conversations with enterprise buyers start because they already have blockchain infrastructure but need the trust layer on top of it.
-
-If there's a partnership, integration, or referral channel that makes sense, I'd like to explore it.
-
-See it in 2 minutes: proofdeed.com/demo
-
-Worth a 20-minute call?
-
-Best,
-Scott Kiersten
-Founder & CEO, ProofDeed
-info@proofdeed.com | proofdeed.com`;
-
-  // ── Automotive OEM — supply chain parts traceability + recall documentation
-  const auto_oem = `Hi ${first},
-
-When a recall investigation, parts fraud claim, or autonomous vehicle incident goes to litigation, your supply chain documentation has to prove authenticity — not just that it's in your systems, but that it hasn't been altered since it was created. Falsified Certificates of Conformity, altered build sheets, and tampered OTA firmware version records all start with a document that couldn't be independently verified.
-
-ProofDeed creates a Trust Record for every supply chain document and parts certification at the moment it's generated — part number, supplier ID, conformity date, firmware hash, all individually locked on an independent verification network. If any field is changed downstream, it's immediately detectable. Each record gets a permanent Asset Passport™ with public verification. Legally defensible under FRE Rule 901.
-
-No system replacement. Single webhook into your existing document workflow.
-
-See it in 2 minutes: proofdeed.com/demo
-
-Worth a 20-minute call this week?
-
-Best,
-Scott Kiersten
-Founder & CEO, ProofDeed
-info@proofdeed.com | proofdeed.com`;
-
-  // ── IP / R&D / Tech — "prior-art timestamp without revealing trade secrets"
-  const ip_timestamp = `Hi ${first},
-
-In patent disputes and trade secret litigation, the first question is always: who created this first, and can they prove it independently? Invention disclosures dated in internal systems don't hold up in court — judges want proof that wasn't controlled by the party claiming priority.
-
-ProofDeed creates a Trust Record for your code, design files, or trade secret documents at the moment they're created — securing bulletproof prior-art proof without exposing the contents. The cryptographic fingerprint is anchored to a public blockchain. If ownership is ever challenged, you prove creation date in seconds, legally defensible under FRE Rule 901.
-
-No document storage on our end. Takes minutes to integrate.
-
-See it in 2 minutes: proofdeed.com/demo
-
-Would 20 minutes make sense?
-
-Best,
-Scott Kiersten
-Founder & CEO, ProofDeed
-info@proofdeed.com | proofdeed.com`;
-
-  // ── Regulated Industries — "audit-proof regulatory records"
-  const regulated = `Hi ${first},
-
-When a regulator or auditor challenges a compliance document — an environmental filing, a pharma submission, an energy report — the question isn't just whether you have it. It's whether you can prove it hasn't been altered since it was filed.
-
-ProofDeed creates a Trust Record for every regulatory document at the moment it's submitted — independently verifiable proof of integrity and timestamp, legally defensible under FRE Rule 901. No system replacement. No document storage. Single API call.
-
-See it in 2 minutes: proofdeed.com/demo
-
-Would 20 minutes make sense this week?
-
-Best,
-Scott Kiersten
-Founder & CEO, ProofDeed
-info@proofdeed.com | proofdeed.com`;
-
-  // ── Accounting / Audit — "evidence assurance layer"
-  const accounting = `Hi ${first},
-
-Audit work depends on document integrity — but auditors verify what clients provide, not whether the underlying documents have been altered before they arrive. When an audit is challenged or a fraud surfaces, the question is whether the documents your team reviewed were the originals.
-
-ProofDeed creates a Trust Record at the moment a document is created — independently verifiable proof that it hasn't been altered since. Not a replacement for your process — a trust layer underneath it.
-
-See it in 2 minutes: proofdeed.com/demo
-
-Worth a 20-minute conversation?
-
-Best,
-Scott Kiersten
-Founder & CEO, ProofDeed
-info@proofdeed.com | proofdeed.com`;
-
-  // ── Private Equity / M&A — "lock deal documents at every stage"
-  const pe_ma = `Hi ${first},
-
-In M&A and PE deals, documents change hands across dozens of parties over months. By the time a dispute surfaces — a rep and warranty claim, a contested disclosure, a post-close disagreement — the question is which version of the document was signed and when. If you can't prove it independently, you're litigating the paper trail instead of the deal.
-
-ProofDeed creates a Trust Record for every deal document at each stage — permanent, tamper-proof proof of the exact document at the exact time, legally defensible under FRE Rule 901. No system replacement. Single API call.
-
-See it in 2 minutes: proofdeed.com/demo
-
-Worth a quick call?
-
-Best,
-Scott Kiersten
-Founder & CEO, ProofDeed
-info@proofdeed.com | proofdeed.com`;
-
-  // ── PE / Institutional COO — back-office document workflow integrity
-  const inst_coo = `Hi ${first},
-
-In private equity and asset management, the back office handles documents where a single altered digit can cost millions — subscription agreements, side letters, PPMs, capital call notices. Most document systems can tell you when a file was last modified. None can prove it wasn't.
-
-ProofDeed creates a Trust Record for every critical document at the field level — investor name, commitment amount, terms, execution date — each individually anchored on an independent verification network at the moment of execution. If a single decimal point is moved after the fact, it's immediately detectable. Independent proof that doesn't rely on your internal IT.
-
-Integrates via API into your existing document workflow. No system replacement. Live in a day.
-
-See it in 2 minutes: proofdeed.com/demo
-
-Worth a 20-minute conversation?
-
-Best,
-Scott Kiersten
-Founder & CEO, ProofDeed
-info@proofdeed.com | proofdeed.com`;
-
-  // ── Head of Investor Relations — LP document security
-  const inst_ir = `Hi ${first},
-
-When an LP questions whether the subscription agreement or capital account statement they received is exactly what was executed — your word against theirs without an independent record.
-
-ProofDeed creates a Trust Record for every LP document at the field level — commitment amount, terms, execution date — each individually anchored on the blockchain at the moment it's sent. LPs can verify their own records independently without accessing your systems. If anything was altered in transit or after the fact, it's immediately provable.
-
-Third-party verified. Auditors accept it. Regulators expect it. One API call, no system changes.
-
-See it in 2 minutes: proofdeed.com/demo
-
-Would a brief call make sense?
-
-Best,
-Scott Kiersten
-Founder & CEO, ProofDeed
-info@proofdeed.com | proofdeed.com`;
-
-  // ── General Counsel / CCO — SEC audit trail
-  const inst_gcc = `Hi ${first},
-
-SEC examiners and regulators increasingly ask whether audit trails are immutable — not just whether you have records, but whether those records can be proven unaltered since creation. When a compliance document is questioned in an examination, "we have it on file" is not the same as "we can prove it hasn't changed."
-
-ProofDeed creates a Trust Record for every compliance document at the moment it's filed — independently verifiable proof of integrity and timestamp, legally defensible under FRE Rule 901.
-
-See it in 2 minutes: proofdeed.com/demo
-
-Worth 20 minutes this week?
-
-Best,
-Scott Kiersten
-Founder & CEO, ProofDeed
-info@proofdeed.com | proofdeed.com`;
-
-  // ── Director of Due Diligence — verify documents provided by targets
-  const inst_dd = `Hi ${first},
-
-In due diligence, you're reviewing documents provided by the target — financials, contracts, IP filings, compliance records. You have no way to verify those documents are the originals and haven't been altered before they reached you. When a rep and warranty claim surfaces post-close, that's exactly the question.
-
-ProofDeed lets counterparties anchor documents to the blockchain at the moment they're created — so when you receive them in diligence, you can verify independently that they're unaltered originals. Turns document integrity from an assumption into a proof.
-
-See it in 2 minutes: proofdeed.com/demo
-
-Worth a quick call?
-
-Best,
-Scott Kiersten
-Founder & CEO, ProofDeed
-info@proofdeed.com | proofdeed.com`;
-
-  // ── Pharma QA/QC — ALCOA+ data integrity, CoA tamper detection
-  const pharma_qa = `Hi ${first},
-
-FDA and EMA are tightening enforcement of ALCOA+ data integrity standards — and the most common failure point isn't missing records, it's records that can't be proven unaltered. A Certificate of Analysis, a batch manufacturing record, a deviation report — if you can't prove the document hasn't been modified since creation, the entire batch is at risk.
-
-ProofDeed creates a Trust Record for every quality document at the field level — batch number, test results, analyst signature, approval date — each individually anchored on an independent verification network at the moment of creation. If a single value is changed after the fact, it's immediately detectable. Third-party proof that satisfies 21 CFR Part 11 and ALCOA+ without replacing your QMS.
-
-One API call. No system replacement. Live in a day.
-
-See it in 2 minutes: proofdeed.com/demo
-
-Worth 20 minutes with your QA team?
-
-Best,
-Scott Kiersten
-Founder & CEO, ProofDeed
-info@proofdeed.com | proofdeed.com`;
-
-  // ── Pharma CCO / Regulatory Affairs — FDA audit trail
-  const pharma_cco = `Hi ${first},
-
-When the FDA or EMA audits your data integrity, the question isn't just whether records exist — it's whether those records can be proven unaltered since creation. ALCOA+ requires that every data point be attributable, legible, contemporaneous, original, and accurate. "We have it in our system" doesn't satisfy the original requirement.
-
-ProofDeed creates a Trust Record for every regulatory document at the moment it's filed — tamper-proof, independently verifiable proof under 21 CFR Part 11 and legally defensible under FRE Rule 901. Third-party verified, not dependent on your internal IT.
-
-One API call into your existing document workflow. No system replacement.
-
-See it in 2 minutes: proofdeed.com/demo
-
-Worth a brief conversation this week?
-
-Best,
-Scott Kiersten
-Founder & CEO, ProofDeed
-info@proofdeed.com | proofdeed.com`;
-
-  // ── Pharma Supply Chain — serialization + track and trace
-  const pharma_supply = `Hi ${first},
-
-The Certificate of Analysis travels from factory to pharmacy through multiple hands. If a CoA is altered at any point in the chain — test results adjusted, batch numbers changed — the tampered document looks identical to the original. Serialization systems track the package. They don't prove the document inside it is unaltered.
-
-ProofDeed creates a Trust Record for every CoA and supply chain document at the field level at the moment of creation — independently verifiable proof that what arrived at the pharmacy is exactly what left the factory. One webhook into your existing serialization workflow.
-
-See it in 2 minutes: proofdeed.com/demo
-
-Would a quick call make sense?
-
-Best,
-Scott Kiersten
-Founder & CEO, ProofDeed
-info@proofdeed.com | proofdeed.com`;
-
-  // ── Pharma Clinical — trial data integrity
-  const pharma_clinical = `Hi ${first},
-
-Post-market scrutiny of clinical trial data increasingly focuses on whether patient data was "cleaned" or modified after collection. If a regulator or opposing counsel alleges data manipulation, the question is whether you can prove every data point is unchanged from the moment it was recorded.
-
-ProofDeed creates a Trust Record for every clinical data point — patient ID, measurement, date, site — each individually anchored on the blockchain at the moment of entry. Any modification after the fact is immediately detectable and independently provable. Satisfies 21 CFR Part 11 without replacing your EDC system.
-
-See it in 2 minutes: proofdeed.com/demo
-
-Worth 20 minutes to walk through the integration?
-
-Best,
-Scott Kiersten
-Founder & CEO, ProofDeed
-info@proofdeed.com | proofdeed.com`;
-
-  // ── Aviation DOM / Safety — maintenance log integrity
-  const aviation_dom = `Hi ${first},
-
-In aviation, a plane is only as airworthy as its paperwork. When an incident investigation or airworthiness authority challenges a maintenance log — whether an inspection was actually signed off on that date, whether a part was genuinely certified — the documentation is the evidence. If it can't be proven unaltered, the liability is open.
-
-ProofDeed creates a Trust Record for every maintenance log entry at the field level — tail number, inspection type, technician ID, sign-off date, part number — each individually anchored on an independent verification network at the moment it's recorded. If a single field is ever modified, it's immediately detectable. Legally defensible under FRE Rule 901.
-
-One webhook into your MRO management system. No system replacement.
+One webhook into your existing MRO management system.
 
 See it in 2 minutes: proofdeed.com/demo
 
@@ -8158,191 +7703,25 @@ Scott Kiersten
 Founder & CEO, ProofDeed
 info@proofdeed.com | proofdeed.com`;
 
-  // ── Aviation CTO / Digital Transformation — MRO records digitization
-  const aviation_cto = `Hi ${first},
+  // ── Construction & Engineering — lien, RFI, and change order integrity
+  const construction = `Hi ${first},
 
-As MRO operations move from paper to digital, the core question regulators and airlines ask is: how do you prove a digitized record is identical to the original, and that it hasn't been altered since? Paper had a physical chain of custody. Digital records need cryptographic proof.
+Construction disputes — change order fraud, backdated RFIs, altered scope-of-work documents, contested lien waivers — succeed because the producing party cannot prove what was in the document at the time it was issued. By the time arbitration or litigation begins, document integrity has been compromised and both sides are working from competing versions.
 
-ProofDeed provides that proof layer. Every maintenance record, parts certificate, and airworthiness document gets a Trust Record anchored to an independent verification network at the moment it's created or digitized — independently verifiable by any airline, regulator, or auditor without access to your systems.
+ProofDeed creates a Trust Record for every contract, RFI, change order, lien, and progress report at the moment it is issued — establishing a permanent, independently verifiable record of the original document. If authenticity is ever disputed, proof is immediate. Legally defensible under FRE Rule 901.
 
-One API call into your existing document workflow.
+Single API integration alongside your existing document management system.
 
 See it in 2 minutes: proofdeed.com/demo
 
-Worth 20 minutes?
+Worth a 20-minute call?
 
 Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
 info@proofdeed.com | proofdeed.com`;
 
-  // ── Aviation Parts — anti-counterfeit birth certificates
-  const aviation_parts = `Hi ${first},
-
-Bogus parts are the single biggest undetected risk in aviation maintenance. A counterfeit part looks identical to a certified one — until it fails. The FAA estimates 2% of installed parts in service are unapproved. The only way to close that gap is to make the paper trail unforgeable.
-
-ProofDeed creates a permanent Asset Passport™ for every certified part at the moment it leaves the manufacturer — part number, serial number, manufacturer, test certification, date — each field individually anchored on the blockchain. Any document presented later can be verified against the original in seconds. Counterfeit parts can't pass verification.
-
-One API call for manufacturers. One verification link for MRO teams.
-
-See it in 2 minutes: proofdeed.com/demo
-
-Worth a quick conversation?
-
-Best,
-Scott Kiersten
-Founder & CEO, ProofDeed
-info@proofdeed.com | proofdeed.com`;
-
-  // ── Auto OEM Supply Chain — VIN-linked document integrity
-  const auto_supply = `Hi ${first},
-
-From supplier Certificates of Conformity to VIN-linked build sheets, your supply chain documentation is the proof that a vehicle's history is clean. Title washing, falsified maintenance records, and altered part certifications all start with a document someone couldn't prove original.
-
-ProofDeed creates a Trust Record for each field in your supply chain documents — part number, supplier ID, conformity date, test results — individually anchored on an independent verification network at the moment they're created. If any field is altered downstream, it's immediately detectable. Each document gets an Asset Passport™ with a public verification link tied to the VIN.
-
-One webhook into your existing document workflow. No system replacement. Live in a day.
-
-See it in 2 minutes: proofdeed.com/demo
-
-Worth a quick conversation?
-
-Best,
-Scott Kiersten
-Founder & CEO, ProofDeed
-info@proofdeed.com | proofdeed.com`;
-
-  // ── Auto CDO — Digital Twin integrity
-  const auto_cdo = `Hi ${first},
-
-The Digital Twin is only as reliable as the documents behind it. If a maintenance log, inspection record, or build sheet can be altered without detection, the twin reflects a history that may not be real — and the liability follows the OEM.
-
-ProofDeed creates a Trust Record for every document in the vehicle's lifecycle at the moment it's created. The digital fingerprint is permanent, VIN-linked, and independently verifiable. If anything changes downstream, it's immediately provable.
-
-See it in 2 minutes: proofdeed.com/demo
-
-Worth 20 minutes to explore?
-
-Best,
-Scott Kiersten
-Founder & CEO, ProofDeed
-info@proofdeed.com | proofdeed.com`;
-
-  // ── Auto Remarketing / Fleet — title and service record integrity
-  const auto_remarketing = `Hi ${first},
-
-When you're moving thousands of vehicles through remarketing channels, the title and service record documentation is what determines resale value — and liability exposure. A single document dispute on a fleet vehicle can unwind an entire transaction.
-
-ProofDeed creates a Trust Record for every title and service document at the moment it's processed. Buyers receive an Asset Passport™ with verified history. You get protection if a record is ever challenged.
-
-See it in 2 minutes: proofdeed.com/demo
-
-Would a brief call make sense?
-
-Best,
-Scott Kiersten
-Founder & CEO, ProofDeed
-info@proofdeed.com | proofdeed.com`;
-
-  // ── Auto ISO / Quality Director — parts and safety documentation
-  const auto_iso = `Hi ${first},
-
-ISO/IATF audits require you to prove that safety and quality documentation is untampered — that the Certificate of Conformity your supplier submitted is the same one in your records today. When an audit or recall hits, that proof is what protects the organization.
-
-ProofDeed creates a Trust Record for every quality and compliance document at the moment it's submitted — independently verifiable, legally defensible proof of integrity under FRE Rule 901. One API call alongside your existing QMS.
-
-See it in 2 minutes: proofdeed.com/demo
-
-Worth 20 minutes?
-
-Best,
-Scott Kiersten
-Founder & CEO, ProofDeed
-info@proofdeed.com | proofdeed.com`;
-
-  // ── County Recorder Anti-Fraud / Clouded Title
-  const anti_fraud_recorder = `Hi ${first},
-
-Deed fraud and clouded titles are becoming a significant operational burden for county recorders. Once a fraudulent deed is recorded, the damage to the chain of title — and the staff time to unwind it — is substantial.
-
-ProofDeed creates a Trust Record for every deed at the moment of recording — a permanent digital fingerprint anchored to an independent verification network. If that document is ever altered, the fingerprint doesn't match — immediate, irrefutable evidence of tampering. Legally defensible under FRE Rule 901.
-
-No system replacement. Works alongside your existing recording software via a single API call.
-
-See it in 2 minutes: proofdeed.com/demo
-
-Worth a brief conversation this week?
-
-Best,
-Scott Kiersten
-Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`;
-
-  // ── Secretary of State / RON / e-Notarization
-  const ron_director = `Hi ${first},
-
-As states move toward Remote Online Notarization, the core challenge is proving document integrity after the fact — that what was notarized remotely is exactly what exists in the record today.
-
-ProofDeed provides the cryptographic proof layer that RON is missing: a Trust Record created at the moment of notarization, independently verifiable by any party, legally defensible under FRE Rule 901.
-
-We're currently working with state-level offices exploring how to make RON records defensible long-term.
-
-Would a brief call make sense?
-
-Best,
-Scott Kiersten
-Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`;
-
-  // ── ALTA / Title Associations / Underwriters
-  const alta_title = `Hi ${first},
-
-Title fraud claims are expensive — and most of them come down to a document that can't be proven original. A deed that may have been altered. A release that doesn't match the recorded version. When the claim hits, the title company pays if they can't prove integrity.
-
-ProofDeed creates a Trust Record for every title document at the moment it's processed — permanent, tamper-proof proof of the exact document at the exact time. Every claim that hinges on document integrity becomes immediately resolvable.
-
-This reduces your fraud claim exposure directly.
-
-See it in 2 minutes: proofdeed.com/demo
-
-Worth 20 minutes?
-
-Best,
-Scott Kiersten
-Founder & CEO, ProofDeed
-info@proofdeed.com | proofdeed.com`;
-
-  // ── Attorney General / Fraud Unit
-  const ag_fraud = `Hi ${first},
-
-Home title theft and deed fraud cases are increasingly difficult to prosecute because the fraudulent document, by the time it's discovered, has passed through multiple hands. Proving which version was recorded and when — without an immutable record — often comes down to competing paper trails.
-
-ProofDeed creates a Trust Record for every document at recording — a cryptographic fingerprint anchored to an independent verification network. Legally defensible proof of integrity and timestamp under FRE Rule 901. It turns deed fraud into a provable, prosecutable offense.
-
-Would a brief conversation make sense?
-
-Best,
-Scott Kiersten
-Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`;
-
-  // ── Tax Assessor — ownership data accuracy
-  const tax_assessor = `Hi ${first},
-
-Incorrect ownership data in assessment records often traces back to a title transfer that wasn't properly documented — or a deed where the recorded version doesn't match what was actually signed. The assessor's office bears the burden of reconciling disputes they didn't create.
-
-ProofDeed creates a Trust Record for every deed and title document at the moment of recording — a permanent, tamper-proof anchor that makes ownership disputes immediately resolvable. No system replacement — single API call alongside your existing workflow.
-
-See it in 2 minutes: proofdeed.com/demo
-
-Worth a quick call?
-
-Best,
-Scott Kiersten
-Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`;
-
-  // ── Real Estate / PropTech — transaction document fraud, deed/agreement tampering
+  // ── Real Estate — executed agreement and closing document integrity
   const real_estate = `Hi ${first},
 
 Property transaction fraud is surging. Forged deeds, altered purchase agreements, and backdated lease amendments are being used to challenge title, dispute valuations, and manufacture claims in commercial and residential disputes. When a document's authenticity is challenged in court, the producing party has to prove it wasn't altered — without a chain of custody that starts at creation, that defense is expensive and uncertain.
@@ -8360,190 +7739,157 @@ Scott Kiersten
 Founder & CEO, ProofDeed
 info@proofdeed.com | proofdeed.com`;
 
-  // ── University / Research — research integrity, data fabrication, retraction risk
-  const university_research = `Hi ${first},
+  // ── Supply Chain & Logistics — bill of lading and shipment document integrity
+  const supply_chain = `Hi ${first},
 
-Research data fabrication and document tampering are behind the majority of high-profile retractions — and increasingly the target of federal investigation. IRB files, lab notebooks, clinical datasets, and grant applications can all be altered after the fact, with no independent record of what was originally submitted. When misconduct is alleged, the institution carries the burden of proof.
+Freight cargo theft and bill of lading fraud cost carriers billions annually — not because systems fail, but because PDF and digital documents can be altered in transit without leaving a trace. By the time a shipment dispute reaches your legal team, it's impossible to prove which version of the document is original.
 
-ProofDeed creates a Trust Record for research documents at the moment they are created or submitted — tamper-proof, independently verifiable proof of the original. Any auditor, federal agency, or institutional review board can verify the record's integrity without accessing your internal systems. Legally defensible under FRE Rule 901.
-
-No workflow change required.
+ProofDeed creates a Trust Record for every Bill of Lading at the origin point — stopping cargo-cloning and chain-of-custody fraud before it reaches the destination gate. Every Trust Record is permanently verifiable, legally defensible under FRE Rule 901. No system replacement. Single API call. Live in days.
 
 See it in 2 minutes: proofdeed.com/demo
 
-Worth a 20-minute call with your research integrity or compliance office?
+Worth a 20-minute call this week?
 
 Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
 info@proofdeed.com | proofdeed.com`;
 
-  // ── Government Regulators / Enforcement — evidence integrity, audit documentation
-  const gov_regulator = `Hi ${first},
+  // ── Banking & Financial Services — loan, compliance, and wire document integrity
+  const banking = `Hi ${first},
 
-Auditors and oversight bodies rarely find that a government record doesn't exist. What they find is that nobody can independently prove it wasn't altered after the fact — DoD alone has failed seven consecutive financial audits on exactly this gap, with NDAA now mandating a clean opinion by December 31, 2028.
+When a regulator, auditor, or counterparty questions whether a loan document, wire instruction, or compliance filing is exactly what your institution originally created, the answer usually depends on internal system logs — not independent proof. That gap is exactly what examiners are starting to ask about.
 
-This isn't theoretical. Army Materiel Command already piloted a system built on the same principle — Operation Mission Truth, an independent, tamper-evident ledger tracking Presidential Drawdown Authority shipments. ProofDeed runs that same architecture in production today: any investigation file, audit record, or regulatory finding can prove it wasn't altered after certification — verifiable by any court or oversight body, without relying on your internal infrastructure or on ProofDeed itself.
+ProofDeed creates a Trust Record for critical financial documents at the field level — loan terms, account data, compliance filings — each individually anchored on an independent verification network at the moment of creation. If anything is altered afterward, it's immediately detectable, independently verifiable by any regulator or counterparty without access to your internal systems. Legally defensible under FRE Rule 901.
 
-Single API integration. No system replacement, no migration.
-
-See it in 2 minutes: proofdeed.com/demo
-
-Worth a brief call with whoever owns audit readiness, records integrity, or evidence chain of custody at your agency?
-
-Best,
-Scott Kiersten
-Founder & CEO, ProofDeed
-gov@proofdeed.com | proofdeed.com`;
-
-  // ── Construction / Engineering — contract dispute documentation, claims evidence
-  const construction_eng = `Hi ${first},
-
-Construction disputes — change order fraud, backdated RFIs, altered scope-of-work documents — succeed because the producing party cannot prove what was in the document at the time it was issued. By the time arbitration or litigation begins, document integrity has been compromised and both sides are working from competing versions.
-
-ProofDeed creates a Trust Record for every contract, RFI, change order, and progress report at the moment it is issued — establishing a permanent, immutable record of the original document. If authenticity is ever disputed, proof is immediate. Legally defensible under FRE Rule 901.
-
-Single API integration alongside your existing document management system.
+Single API integration. No system replacement, no document storage on our end.
 
 See it in 2 minutes: proofdeed.com/demo
 
-Worth a 20-minute call?
+Worth a 20-minute conversation with your digital trust or operational risk team?
 
 Best,
 Scott Kiersten
 Founder & CEO, ProofDeed
 info@proofdeed.com | proofdeed.com`;
+
+  // ── IP & Trade Secret Timestamping — prior-art and creation-date proof
+  const ip_timestamp = `Hi ${first},
+
+In patent disputes and trade secret litigation, the first question is always: who created this first, and can they prove it independently? Invention disclosures dated in internal systems don't hold up in court — judges want proof that wasn't controlled by the party claiming priority.
+
+ProofDeed creates a Trust Record for your code, design files, or trade secret documents at the moment they're created — securing prior-art proof without exposing the contents. The cryptographic fingerprint is anchored to an independent, public verification network. If ownership is ever challenged, you prove the creation date in seconds — legally defensible under FRE Rule 901.
+
+No document storage on our end. Takes minutes to integrate.
+
+See it in 2 minutes: proofdeed.com/demo
+
+Would 20 minutes make sense?
+
+Best,
+Scott Kiersten
+Founder & CEO, ProofDeed
+info@proofdeed.com | proofdeed.com`;
+
+  // ── UAE — Real Estate — Dubai Paperless 2026 / VARA compliance
+  const uae_real_estate = `Hi ${first},
+
+As the UAE accelerates toward its 2026 Paperless Government mandate, the risk sitting at the center of every major developer's operation is the same: digital property documents — title deeds, sale agreements, NOCs, handover certificates — are easy to duplicate, alter, or forge once they leave your system, and disputes over handover conditions or payment terms are the most common post-sale complaint.
+
+ProofDeed provides a single API call that anchors each document field to an independent verification network at the moment of creation — sale price, unit number, buyer name, execution date — so any downstream alteration is immediately detectable, and ${company}'s team, buyers, and the DLD all see the same verified original. No system replacement, works alongside your existing DMS and CRM.
+
+Relevant to ${company}'s current digital transformation priorities:
+→ Aligns with Dubai Paperless Strategy 2026 and VARA's data integrity standards
+→ Provides independent proof of document origination for DLD submissions
+→ Reduces title dispute resolution time from weeks to minutes
+
+See it in 2 minutes: proofdeed.com/demo
+
+Worth a quick call?
+
+Scott Kiersten
+Founder & CEO, ProofDeed
+info@proofdeed.com | proofdeed.com`;
+
+  // ── UAE — Automotive — import, title, and franchise document integrity
+  const uae_automotive = `Hi ${first},
+
+UAE automotive conglomerates manage some of the most document-intensive operations in the region — import permits, customs declarations, Certificates of Origin, vehicle title transfers, and franchise agreements flowing across multiple parties with no independent proof of integrity between handoffs.
+
+With the UAE's broader push toward digital compliance (Dubai Paperless 2026, VARA standards), the question for operations of ${company}'s scale is no longer "should we digitize?" — it's "how do we prove our digital records are unaltered?"
+
+ProofDeed provides field-level cryptographic certification for every import and title document at the moment of origination — VIN, chassis number, country of origin, sale price — each individually anchored. Any post-facto alteration is immediately detectable by any party in the chain, including the Roads and Transport Authority (RTA).
+
+One API. No system replacement. Works alongside your existing DMS and ERP.
+
+See it in 2 minutes: proofdeed.com/demo
+
+Worth a conversation?
+
+Scott Kiersten
+Founder & CEO, ProofDeed
+info@proofdeed.com | proofdeed.com`;
+
+  // ════════════════════════════════════════════════════════
+  // ROUTING — industry is the primary key (17 divisions).
+  // byRole is a compatibility fallback for legacy role values
+  // and any lead where industry alone doesn't resolve.
+  // ════════════════════════════════════════════════════════
   const byRole = {
-    // Government
-    recorder:       recorder,
-    legal:          legal,
-    risk:           legal,
-    it:             it,
-    procurement:    procurement,
-    expansion:      recorder,
-    // Automotive
-    dealer:         auto_dealer,
-    lender:         auto_lender,
-    auction:        auto_auction,
-    fleet:          auto_auction,
-    digital:        auto_dealer,
-    insurance:      auto_lender,
-    // Institutional
-    compliance:     inst_compliance,
-    operations:     inst_compliance,
-    education:         credentialing,
-    ip_timestamp:      ip_timestamp,
-    blockchain_partner:  blockchain_partner,
-    auto_oem:            auto_oem,
-    intl_archives:       intl_archives,
-    global_law_firm:     global_law_firm,
-    global_insurance:    global_insurance,
-    real_estate_ops:     real_estate,
-    university_research: university_research,
-    gov_regulator:       gov_regulator,
-    construction_eng:    construction_eng,
-    financial:      inst_legal,
-    healthcare:     inst_healthcare,
-    // Title & Escrow
-    title_ops:      title_escrow,
-    title_risk:     title_escrow,
-    // Legal
-    litigation:     legal_firm,
-    transact:       legal_firm,
-    legal_ops:      legal_firm,
-    // Insurance
-    claims:         insurance_gen,
-    underwrite:     insurance_gen,
-    // Construction
-    lien:           construction,
-    // Supply Chain
-    trade_docs:     supply_chain,
-    // Regulated
-    records:        regulated,
-    // Accounting
-    audit:          accounting,
-    // PE / M&A
-    deal:           pe_ma,
-    // Higher Ed / Healthcare
-    inst_ciso:         inst_gcc,      // Third-party verifier angle resonates with CISOs
-    inst_registrar:    inst_ir,       // Document integrity for diplomas/transcripts
-    inst_him:          inst_gcc, // Third-party verifier angle for medical record integrity
-    // PE / Institutional Trust-as-a-Service
-    inst_coo:          inst_coo,
-    inst_ir:           inst_ir,
-    inst_gcc:          inst_gcc,
-    inst_dd:           inst_dd,
-    // Pharma / Life Sciences
-    pharma_qa:         pharma_qa,
-    pharma_cco:        pharma_cco,
-    pharma_supply:     pharma_supply,
-    pharma_clinical:   pharma_clinical,
-    // Aviation / MRO
-    aviation_dom:      aviation_dom,
-    aviation_cto:      aviation_cto,
-    aviation_parts:    aviation_parts,
-    // Auto OEM / VIN integrity
-    auto_supply:       auto_supply,
-    auto_cdo:          auto_cdo,
-    auto_remarketing:  auto_remarketing,
-    auto_iso:          auto_iso,
-    // Anti-fraud / Title Integrity
-    anti_fraud:     anti_fraud_recorder,
-    ron:            ron_director,
-    alta:           alta_title,
-    ag_fraud:       ag_fraud,
-    tax:            tax_assessor,
-    // Sandbox / Design Partner roles — routed through SANDBOX_EMAIL at send time;
-    // these entries provide fallback text if called directly through INITIAL_EMAIL
-    auto_remarketing2:      auto_remarketing,
-    auto_warranty:          auto_iso,
-    auto_dds:               auto_cdo,
-    auto_coo:               auto_supply,
-    auto_blockchain:        auto_cdo,
-    inst_ethics:            inst_gcc,
-    inst_fund:              inst_ir,
-    inst_ma:                inst_dd,
-    inst_aml:               inst_compliance,
-    inst_digital_assets:    inst_gcc,
-    pharma_gxp:             pharma_qa,
-    pharma_trial:           pharma_clinical,
-    pharma_serial:          pharma_supply,
-    pharma_lims:            pharma_qa,
-    pharma_coldchain:       pharma_supply,
-    aviation_airworthy:     aviation_dom,
-    aviation_logistics:     aviation_parts,
-    aviation_cdo:           aviation_cto,
-    aviation_sms:           aviation_dom,
-    aviation_records:       aviation_parts,
-    // UAE — routed through UAE_EMAIL at send time; these provide fallback text
-    uae_redev:      recorder,
-    uae_reops:      recorder,
-    uae_legal:      inst_compliance,
-    uae_recx:       recorder,
-    uae_autodev:    auto_supply,
-    // Shared fallbacks
-    ops:            inst_compliance,
-    finance:        inst_legal,
+    military_sb: military, military_innovation: military, military_audit: military,
+    recorder: government, legal: government, risk: government, it: government, procurement: government,
+    expansion: government, anti_fraud: government, ron: government, ag_fraud: government, tax: government,
+    title_ops: title_escrow, title_risk: title_escrow, alta: title_escrow, mortgage_lender: title_escrow,
+    dealer: automotive, lender: automotive, auction: automotive, fleet: automotive, digital: automotive,
+    insurance: automotive, auto_supply: automotive, auto_cdo: automotive, auto_remarketing: automotive,
+    auto_iso: automotive, auto_oem: automotive, auto_remarketing2: automotive, auto_warranty: automotive,
+    auto_dds: automotive, auto_coo: automotive, auto_blockchain: automotive,
+    compliance: enterprise, operations: enterprise, financial: enterprise, deal: enterprise,
+    inst_coo: enterprise, inst_ir: enterprise, inst_gcc: enterprise, inst_dd: enterprise,
+    inst_ethics: enterprise, inst_fund: enterprise, inst_ma: enterprise, inst_aml: enterprise,
+    inst_digital_assets: enterprise, audit: enterprise, ops: enterprise, finance: enterprise,
+    litigation: legal_services, transact: legal_services, legal_ops: legal_services,
+    claims: insurance, underwrite: insurance,
+    lien: construction,
+    trade_docs: supply_chain,
+    records: government,
+    education: higher_ed, inst_ciso: higher_ed, inst_registrar: higher_ed, inst_him: higher_ed,
+    healthcare: healthcare,
+    pharma_qa: pharma, pharma_cco: pharma, pharma_supply: pharma, pharma_clinical: pharma,
+    pharma_gxp: pharma, pharma_trial: pharma, pharma_serial: pharma, pharma_lims: pharma, pharma_coldchain: pharma,
+    aviation_dom: aviation, aviation_cto: aviation, aviation_parts: aviation,
+    aviation_airworthy: aviation, aviation_logistics: aviation, aviation_cdo: aviation,
+    aviation_sms: aviation, aviation_records: aviation,
+    real_estate_ops: real_estate,
+    university_research: higher_ed,
+    construction_eng: construction,
+    ip_timestamp: ip_timestamp,
+    // UAE — role-only fallback if ever routed through INITIAL_EMAIL instead of UAE_EMAIL
+    uae_redev: uae_real_estate, uae_reops: uae_real_estate, uae_legal: uae_real_estate, uae_recx: uae_real_estate,
+    uae_autodev: uae_automotive,
   };
 
-  // Industry-based overrides — ensure the right template regardless of role assignment
-  if (industry === 'healthcare') return inst_healthcare;
-  if (industry === 'supply_chain') return supply_chain;
-  if (industry === 'ip_research') return ip_timestamp;
-  if (industry === 'insurance') return insurance_gen;
-  if (industry === 'education') return credentialing;
-  if (industry === 'blockchain_tech') return blockchain_partner;
-  if (industry === 'auto_oem') return auto_oem;
-  if (industry === 'pharma') return pharma_cco;
-  if (industry === 'intl_archives') return intl_archives;
-  if (industry === 'global_legal') return global_law_firm;
-  if (industry === 'global_insurance') return global_insurance;
+  // Industry is now the primary router — every division has one clean override.
+  if (industry === 'military') return military;
+  if (industry === 'government' || industry === 'gov_regulator' || industry === 'intl_archives') return government;
+  if (industry === 'title_escrow') return title_escrow;
+  if (industry === 'auto') return automotive;
+  if (industry === 'institutional' || industry === 'pe_ma' || industry === 'regulated' || industry === 'accounting') return enterprise;
+  if (industry === 'healthcare') return healthcare;
+  if (industry === 'education' || industry === 'university_research') return higher_ed;
+  if (industry === 'insurance' || industry === 'global_insurance') return insurance;
+  if (industry === 'legal' || industry === 'global_legal') return legal_services;
+  if (industry === 'pharma') return pharma;
+  if (industry === 'aviation') return aviation;
+  if (industry === 'construction' || industry === 'construction_detail') return construction;
   if (industry === 'real_estate') return real_estate;
-  if (industry === 'university_research') return university_research;
-  if (industry === 'gov_regulator') return gov_regulator;
-  if (industry === 'construction_detail') return construction_eng;
+  if (industry === 'supply_chain') return supply_chain;
+  if (industry === 'banking') return banking;
+  if (industry === 'ip_research') return ip_timestamp;
+  if (industry === 'uae_realestate') return uae_real_estate;
+  if (industry === 'uae_auto') return uae_automotive;
 
-  return byRole[role] || recorder;
+  return byRole[role] || government;
 };
 
 function calcPriorityScore(title, industry, role) {
