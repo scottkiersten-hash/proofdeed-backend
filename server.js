@@ -148,6 +148,16 @@ function logCertEvent(certId, eventType, eventLabel, metadata = {}) {
   ).catch(() => {});
 }
 
+// Generate a scan-to-verify QR PNG buffer for a ProofDeed verification path, e.g. "/verify/PD-123"
+function generateVerifyQR(path) {
+  return QRCode.toBuffer(`https://proofdeed.com${path}`, {
+    type: 'png',
+    width: 320,
+    margin: 1,
+    color: { dark: '#032D60', light: '#FFFFFF' }
+  });
+}
+
 /* ---------------- CORS ---------------- */
 const configuredOrigins = [
   process.env.FRONTEND_URL,
@@ -2104,6 +2114,20 @@ app.get(["/api/v1/certificate/:proofId/pdf", "/v1/certificate/:proofId/pdf"], au
     }
 
     doc.moveDown(1);
+
+    // Scan-to-verify QR
+    try {
+      const qrPng = await generateVerifyQR(`/verify/${cert.certification_id}`);
+      const qrSize = 100;
+      const qrX = (doc.page.width - qrSize) / 2;
+      doc.image(qrPng, qrX, doc.y, { width: qrSize, height: qrSize });
+      doc.moveDown((qrSize / 12) + 0.5);
+      doc.fontSize(8).font("Helvetica-Bold").fillColor("#64748b").text("Scan to verify", { align: "center" });
+      doc.moveDown(0.8);
+    } catch (qrErr) {
+      console.error("[Certificate QR] Error:", qrErr.message);
+    }
+
     doc.moveTo(60, doc.y).lineTo(doc.page.width - 60, doc.y).strokeColor("#e2e8f0").lineWidth(1).stroke();
     doc.moveDown(1);
 
@@ -2475,6 +2499,17 @@ app.get(['/verify/:certId/evidence', '/api/verify/:certId/evidence'], async (req
       doc.moveDown(0.8);
     }
 
+    // Scan-to-verify QR
+    try {
+      const qrPng = await generateVerifyQR(`/verify/${cert.certification_id}`);
+      const qrSize = 90;
+      doc.image(qrPng, 60, doc.y, { width: qrSize, height: qrSize });
+      doc.fontSize(8).font('Helvetica-Bold').fillColor('#64748b').text('Scan to verify', 60, doc.y + qrSize + 4);
+      doc.moveDown(1);
+    } catch (qrErr) {
+      console.error('[Evidence QR] Error:', qrErr.message);
+    }
+
     doc.moveDown(0.5);
     doc.moveTo(60, doc.y).lineTo(doc.page.width - 60, doc.y).strokeColor('#e2e8f0').lineWidth(1).stroke();
     doc.moveDown(1);
@@ -2629,6 +2664,25 @@ app.get('/trust-data/:id', async (req, res) => {
     res.json({ success: true, trust_id: tid.rows[0], records: records.rows });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/qr?path=/verify/PD-123 — public scan-to-verify QR code (PNG) for a Trust Record,
+// Asset Passport, or Trust ID verification page. Path is whitelisted to those three prefixes
+// so this can't be used as an open QR-generation service.
+app.get(['/api/qr', '/qr'], async (req, res) => {
+  try {
+    const path = req.query.path;
+    if (!path || !/^\/(verify|passport|trust)\/[A-Za-z0-9_-]+$/.test(path)) {
+      return res.status(400).json({ success: false, error: 'Invalid or missing path.' });
+    }
+    const png = await generateVerifyQR(path);
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    res.send(png);
+  } catch (err) {
+    console.error('[QR] Error:', err.message);
+    res.status(500).json({ success: false, error: 'Failed to generate QR code.' });
   }
 });
 
