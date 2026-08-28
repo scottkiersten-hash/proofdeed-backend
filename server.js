@@ -1381,9 +1381,54 @@ function generateTrustId(entityType) {
   return `TID-${slug}-${rand}`;
 }
 
-// Score increases with each verified record: base 10 per record, bonus for on-chain
-function calcTrustScore(recordCount, onChainCount) {
-  return Math.min(100, recordCount * 8 + onChainCount * 4);
+// Evidence Strength — replaces the old volume-only Trust Score (recordCount*8 + onChainCount*4),
+// which rewarded uploading more records regardless of whether anything actually corroborated them.
+// This weighs: record depth (diminishing returns, not linear), on-chain completion rate,
+// independent issuers (distinct api_key_email across the entity's records — corroboration from
+// more than one source), relationship connectivity (distinct linked entities in the Trust Graph),
+// and a small time-span bonus (a real history beats a single batch upload).
+async function calcEvidenceStrength(trustId) {
+  const recordStats = await pool.query(
+    `SELECT COUNT(*) AS total, COUNT(polygon_tx) AS onchain,
+            MIN(issued_at) AS earliest, MAX(issued_at) AS latest
+     FROM trust_id_records WHERE trust_id = $1`,
+    [trustId]
+  );
+  const { total, onchain, earliest, latest } = recordStats.rows[0];
+  const recordCount = parseInt(total) || 0;
+  const onChainCount = parseInt(onchain) || 0;
+
+  if (recordCount === 0) {
+    return { score: 0, recordCount: 0, onChainCount: 0, distinctIssuers: 0, distinctLinks: 0, spanDays: 0 };
+  }
+
+  const issuerStats = await pool.query(
+    `SELECT COUNT(DISTINCT c.api_key_email) AS issuers
+     FROM trust_id_records r JOIN certifications c ON c.certification_id = r.proof_id
+     WHERE r.trust_id = $1 AND c.api_key_email IS NOT NULL`,
+    [trustId]
+  );
+  const distinctIssuers = parseInt(issuerStats.rows[0].issuers) || 0;
+
+  const linkStats = await pool.query(
+    `SELECT COUNT(DISTINCT rel.entity_id) AS links
+     FROM trust_relationships rel
+     WHERE rel.certification_id IN (SELECT proof_id FROM trust_id_records WHERE trust_id = $1)`,
+    [trustId]
+  );
+  const distinctLinks = parseInt(linkStats.rows[0].links) || 0;
+
+  const spanDays = earliest && latest ? Math.round((new Date(latest) - new Date(earliest)) / 86400000) : 0;
+
+  const recordDepth = Math.min(30, Math.sqrt(recordCount) * 8);
+  const onChainRatio = Math.min(20, (onChainCount / recordCount) * 20);
+  const issuerCorroboration = Math.min(25, distinctIssuers * 8);
+  const relationshipConnectivity = Math.min(15, distinctLinks * 5);
+  const timeSpanBonus = Math.min(10, spanDays / 30);
+
+  const score = Math.round(Math.min(100, recordDepth + onChainRatio + issuerCorroboration + relationshipConnectivity + timeSpanBonus));
+
+  return { score, recordCount, onChainCount, distinctIssuers, distinctLinks, spanDays };
 }
 
 /* POST /api/v1/trust-id — Create a new Trust ID™ for an entity */
@@ -1450,41 +1495,35 @@ app.post(['/api/v1/trust-id/:id/record', '/v1/trust-id/:id/record'], authenticat
        JSON.stringify(fields), JSON.stringify(fieldHashes)]
     );
 
-    // Recompute score
-    const counts = await pool.query(
-      `SELECT COUNT(*) as total, COUNT(polygon_tx) as onchain FROM trust_id_records WHERE trust_id=$1`, [id]
-    );
-    const total = parseInt(counts.rows[0].total);
-    const onchain = parseInt(counts.rows[0].onchain);
-    const newScore = calcTrustScore(total, onchain);
-
-    await pool.query(
-      `UPDATE trust_ids SET record_count=$1, trust_score=$2, updated_at=NOW() WHERE trust_id=$3`,
-      [total, newScore, id]
-    );
-
+    // Certifications row must exist before we compute Evidence Strength, since the issuer
+    // and relationship joins key off certifications.certification_id = trust_id_records.proof_id.
     await pool.query(
       `INSERT INTO certifications (certification_id, hash, polygon_tx, api_key_email, ip_address, created_at)
        VALUES ($1,$2,NULL,$3,$4,NOW()) ON CONFLICT (certification_id) DO NOTHING`,
       [proofId, rootHash, req.apiKey.email, req.ip || req.headers['x-forwarded-for'] || null]
     );
+
+    const strength = await calcEvidenceStrength(id);
+    await pool.query(
+      `UPDATE trust_ids SET record_count=$1, trust_score=$2, updated_at=NOW() WHERE trust_id=$3`,
+      [strength.recordCount, strength.score, id]
+    );
+
     const updatedKeyUsage = await pool.query('UPDATE api_keys SET used_this_month = used_this_month + 1 WHERE api_key = $1 RETURNING *', [req.apiKey.api_key]);
     checkAndNotifyUsage(updatedKeyUsage.rows[0]).catch(() => {});
     if (req.apiKey.stripe_subscription_item_id) await reportUsageToStripe(req.apiKey.stripe_subscription_item_id, 1);
 
     res.json({ trust_id: id, proofId, rootHash, record_type, record_label: record_label || record_type,
-      trust_score: newScore, record_count: total,
+      trust_score: strength.score, record_count: strength.recordCount,
+      evidence_strength: strength,
       publicUrl: `https://proofdeed.com/trust/${id}`,
       message: 'Trust Record attached and anchored to blockchain.' });
 
     anchorToPolygon(rootHash).then(async (txHash) => {
       await pool.query('UPDATE certifications SET polygon_tx=$1 WHERE certification_id=$2', [txHash, proofId]);
       await pool.query('UPDATE trust_id_records SET polygon_tx=$1 WHERE proof_id=$2', [txHash, proofId]);
-      const updated = await pool.query(
-        `SELECT COUNT(*) as total, COUNT(polygon_tx) as onchain FROM trust_id_records WHERE trust_id=$1`, [id]
-      );
-      const t = parseInt(updated.rows[0].total), oc = parseInt(updated.rows[0].onchain);
-      await pool.query('UPDATE trust_ids SET trust_score=$1 WHERE trust_id=$2', [calcTrustScore(t, oc), id]);
+      const rescored = await calcEvidenceStrength(id);
+      await pool.query('UPDATE trust_ids SET trust_score=$1 WHERE trust_id=$2', [rescored.score, id]);
       sendAnchorConfirmationEmail({ to: req.apiKey.email, proofId, txHash, fileName: req.body.record_label, verifyUrl: `https://proofdeed.com/trust/${id}` });
     }).catch(err => console.error('[TrustID] Anchor failed:', err.message));
 
@@ -1536,9 +1575,10 @@ app.get('/trust/:id', async (req, res) => {
     const records = await pool.query(
       'SELECT * FROM trust_id_records WHERE trust_id=$1 ORDER BY issued_at ASC', [req.params.id]
     );
+    const strength = await calcEvidenceStrength(req.params.id);
 
-    const scoreColor = t.trust_score >= 75 ? '#16a34a' : t.trust_score >= 40 ? '#d97706' : '#dc2626';
-    const scoreBg = t.trust_score >= 75 ? '#dcfce7' : t.trust_score >= 40 ? '#fef9c3' : '#fee2e2';
+    const scoreColor = strength.score >= 75 ? '#16a34a' : strength.score >= 40 ? '#d97706' : '#dc2626';
+    const scoreBg = strength.score >= 75 ? '#dcfce7' : strength.score >= 40 ? '#fef9c3' : '#fee2e2';
 
     const recordsHtml = records.rows.map((r, i) => `
       <div style="display:flex;align-items:flex-start;gap:16px;padding:16px 0;border-bottom:1px solid #f1f5f9">
@@ -1588,12 +1628,18 @@ app.get('/trust/:id', async (req, res) => {
         </div>
         <div style="text-align:center">
           <div style="width:88px;height:88px;border-radius:50%;background:${scoreBg};border:3px solid ${scoreColor};display:flex;flex-direction:column;align-items:center;justify-content:center;margin-bottom:8px">
-            <div style="font-size:28px;font-weight:800;color:${scoreColor};line-height:1">${t.trust_score}</div>
+            <div style="font-size:28px;font-weight:800;color:${scoreColor};line-height:1">${strength.score}</div>
             <div style="font-size:9px;font-weight:700;color:${scoreColor};text-transform:uppercase;letter-spacing:0.05em">/ 100</div>
           </div>
-          <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.05em">Trust Score</div>
-          <div style="font-size:12px;color:#64748b;margin-top:4px">${t.record_count} verified record${t.record_count !== 1 ? 's' : ''}</div>
+          <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.05em">Evidence Strength</div>
+          <div style="font-size:12px;color:#64748b;margin-top:4px">${strength.recordCount} verified record${strength.recordCount !== 1 ? 's' : ''}</div>
         </div>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:18px;padding-top:16px;border-top:1px solid #f1f5f9">
+        <span style="font-size:11px;background:#f8fafc;color:#334155;padding:4px 10px;border-radius:20px;border:1px solid #e2e8f0">${strength.recordCount} verified record${strength.recordCount !== 1 ? 's' : ''}</span>
+        <span style="font-size:11px;background:#f8fafc;color:#334155;padding:4px 10px;border-radius:20px;border:1px solid #e2e8f0">${strength.distinctIssuers} independent issuer${strength.distinctIssuers !== 1 ? 's' : ''}</span>
+        <span style="font-size:11px;background:#f8fafc;color:#334155;padding:4px 10px;border-radius:20px;border:1px solid #e2e8f0">${strength.recordCount > 0 ? Math.round((strength.onChainCount / strength.recordCount) * 100) : 0}% on-chain</span>
+        <span style="font-size:11px;background:#f8fafc;color:#334155;padding:4px 10px;border-radius:20px;border:1px solid #e2e8f0">connected to ${strength.distinctLinks} related record${strength.distinctLinks !== 1 ? 's' : ''}</span>
       </div>
     </div>
 
@@ -2993,13 +3039,13 @@ function runTrustAnalysis({ certRows, passportRows, passportEvents, trustIdRows,
     const t = trustIdRows[0];
     const score = parseInt(t.trust_score) || 0;
     if (score >= 80) {
-      findings.push({ type: 'positive', title: 'High Trust Score', detail: `Trust ID for ${t.entity_name} carries a Trust Score of ${score}/100, reflecting a strong record of verified activity.` });
+      findings.push({ type: 'positive', title: 'High Evidence Strength', detail: `Trust ID for ${t.entity_name} carries an Evidence Strength of ${score}/100, reflecting verified records corroborated by multiple independent issuers.` });
     } else if (score >= 50) {
       riskScore += 10;
-      findings.push({ type: 'warning', title: 'Moderate Trust Score', detail: `Trust ID for ${t.entity_name} has a Trust Score of ${score}/100. Additional verified records would strengthen this entity's trust profile.` });
+      findings.push({ type: 'warning', title: 'Moderate Evidence Strength', detail: `Trust ID for ${t.entity_name} has an Evidence Strength of ${score}/100. Additional independently-issued records would strengthen this entity's evidence profile.` });
     } else {
       riskScore += 25;
-      findings.push({ type: 'critical', title: 'Low Trust Score', detail: `Trust ID for ${t.entity_name} has a Trust Score of ${score}/100. This entity has limited verified history in the ProofDeed system.` });
+      findings.push({ type: 'critical', title: 'Low Evidence Strength', detail: `Trust ID for ${t.entity_name} has an Evidence Strength of ${score}/100. This entity has limited or uncorroborated verified history in the ProofDeed system.` });
     }
     if (trustRecords.length > 0) {
       findings.push({ type: 'positive', title: `${trustRecords.length} Linked Trust Record(s)`, detail: `This entity has ${trustRecords.length} verified record(s) linked to their Trust ID, including: ${trustRecords.slice(0,3).map(r => r.record_label).join(', ')}${trustRecords.length > 3 ? ' and more' : ''}.` });
@@ -3186,7 +3232,7 @@ app.get('/analysis/:id', async (req, res) => {
     <div class="card-title">Summary</div>
     <div class="summary-text">${a.summary || 'No summary available.'}</div>
     <div class="confidence-bar"><div class="confidence-fill"></div></div>
-    <div class="confidence-label">AI Confidence: ${a.confidence}%</div>
+    <div class="confidence-label">Analysis Confidence: ${a.confidence}%</div>
   </div>
 
   <div class="card">
@@ -3202,7 +3248,7 @@ app.get('/analysis/:id', async (req, res) => {
   ${linkedIds ? `<div class="card"><div class="card-title">Linked Records</div><div class="linked">${linkedIds}</div></div>` : ''}
 
   <div class="legal">
-    This AI Trust Analysis™ is generated by Claude (Anthropic) based solely on the verified records stored in the ProofDeed system at the time of analysis. It does not constitute legal advice. The findings are informational and should be reviewed by a qualified professional before reliance in legal, regulatory, or financial proceedings. ProofDeed Trust Records are independently verifiable on an independent verification network.
+    This AI Trust Analysis™ is generated by ProofDeed's automated integrity engine, applying a fixed set of verification rules solely to the verified records stored in the ProofDeed system at the time of analysis. It does not constitute legal advice. The findings are informational and should be reviewed by a qualified professional before reliance in legal, regulatory, or financial proceedings. ProofDeed Trust Records are independently verifiable on an independent verification network.
   </div>
 
   <div class="footer" style="margin-top:24px">
