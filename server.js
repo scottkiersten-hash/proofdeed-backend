@@ -5534,6 +5534,27 @@ app.get(['/api/admin/import/pending', '/admin/import/pending'], authRateLimit, a
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Send a single custom email to one contact and mark it sent in CRM
+app.post(['/api/admin/outreach/send-one', '/admin/outreach/send-one'], authRateLimit, async (req, res) => {
+  if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
+  const { contact_id, to, from, subject, body } = req.body;
+  if (!to || !subject || !body) return res.status(400).json({ error: 'to, subject, body required.' });
+  try {
+    const fromAddr = from || 'Scott Kiersten <gov@proofdeed.com>';
+    await sendEmail({ from: fromAddr, to, subject, text: body });
+    if (contact_id) {
+      const replyTag = require('crypto').randomBytes(8).toString('hex');
+      await pool.query(
+        "UPDATE outreach_contacts SET status='sent', reply_to_tag=$1, pipeline_stage='contacted', first_sent_at=COALESCE(first_sent_at,NOW()), last_contact_at=NOW() WHERE id=$2",
+        [replyTag, contact_id]
+      );
+    }
+    res.json({ success: true, to, subject });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post(['/api/admin/import/send-pending', '/admin/import/send-pending'], authRateLimit, async (req, res) => {
   if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
   try {
