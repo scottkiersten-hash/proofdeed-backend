@@ -5535,7 +5535,7 @@ app.get(['/api/admin/import/pending', '/admin/import/pending'], authRateLimit, a
 });
 
 // Send a single custom email to one contact and mark it sent in CRM
-app.post(['/api/admin/outreach/send-one', '/admin/outreach/send-one'], authRateLimit, async (req, res) => {
+app.post(['/api/admin/outreach/send-one', '/admin/outreach/send-one'], async (req, res) => {
   if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
   const { contact_id, to, from, subject, body } = req.body;
   if (!to || !subject || !body) return res.status(400).json({ error: 'to, subject, body required.' });
