@@ -5543,7 +5543,7 @@ app.post(['/api/admin/outreach/send-one', '/admin/outreach/send-one'], authRateL
     const fromAddr = from || 'Scott Kiersten <gov@proofdeed.com>';
     await sendEmail({ from: fromAddr, to, subject, text: body });
     if (contact_id) {
-      const replyTag = require('crypto').randomBytes(8).toString('hex');
+      const replyTag = crypto.randomBytes(8).toString('hex');
       await pool.query(
         "UPDATE outreach_contacts SET status='sent', reply_to_tag=$1, pipeline_stage='contacted', first_sent_at=COALESCE(first_sent_at,NOW()), last_contact_at=NOW() WHERE id=$2",
         [replyTag, contact_id]
