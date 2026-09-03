@@ -8716,12 +8716,12 @@ async function runLeadEngine(targetsPerRun = 3) {
   ).catch(() => {});
 }
 
-// Lead engine — Mon-Fri, morning + afternoon. The SERPER_DAILY_LIMIT guard
+// Lead engine — every day, morning + afternoon. The SERPER_DAILY_LIMIT guard
 // above is what actually keeps daily spend small; these two runs are just
 // sized to roughly match that budget so most of it isn't spent looping
 // through no-op targets after the cap hits early in the day.
-cron.schedule('0 8 * * 1-5',  () => runLeadEngine(25), { timezone: 'America/Chicago' });
-cron.schedule('0 13 * * 1-5', () => runLeadEngine(25), { timezone: 'America/Chicago' });
+cron.schedule('0 8 * * *',  () => runLeadEngine(25), { timezone: 'America/Chicago' });
+cron.schedule('0 13 * * *', () => runLeadEngine(25), { timezone: 'America/Chicago' });
 
 /* ---------------- Lead Engine API ----------------  */
 app.get(['/api/admin/lead-engine', '/admin/lead-engine'], authRateLimit, async (req, res) => {
