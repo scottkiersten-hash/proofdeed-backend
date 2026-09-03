@@ -5856,6 +5856,24 @@ info@proofdeed.com | proofdeed.com`,
 
 /* ---------------- Lead Engine ---------------- */
 const LEAD_TARGETS = [
+  // ── TIER 0: DoD / Pentagon / Federal Defense — placed first so rotation hits these every run.
+  // Added Sep 3 2026 per Scott: focus lead-hunting on the DoD/Pentagon offices we're pursuing
+  // (CMMC reform, DIBCAC, FIAR/audit readiness, PIEE/WAWF, ELMS/DLA, MICC, Army/AF/Navy small business).
+  { industry: 'government', role: 'federal_defense', tier: 'primary', title: 'CMMC / Cyber Compliance Lead',      query: '"CMMC" OR "Cyber AB" compliance program manager contact email site:*.mil OR site:*.gov 2025 2026' },
+  { industry: 'government', role: 'federal_defense', tier: 'primary', title: 'DIBCAC / DCMA Cybersecurity',       query: '"DIBCAC" OR "Defense Contract Management Agency" cybersecurity assessment contact email site:dcma.mil' },
+  { industry: 'government', role: 'federal_defense', tier: 'primary', title: 'FIAR / Audit Readiness Lead',       query: '"Financial Improvement and Audit Readiness" OR "FIAR" director OR lead contact email site:*.mil OR site:*.gov' },
+  { industry: 'government', role: 'federal_defense', tier: 'primary', title: 'Comptroller / Resource Management', query: '"Comptroller" OR "Resource Management" director Army OR "Air Force" OR Navy command contact email site:*.mil' },
+  { industry: 'government', role: 'federal_defense', tier: 'primary', title: 'PIEE / WAWF Contracting eBusiness', query: '"Contracting eBusiness" OR "PIEE" OR "WAWF" program office contact email site:*.mil OR site:*.gov' },
+  { industry: 'government', role: 'federal_defense', tier: 'primary', title: 'DLA / ELMS Property Accountability', query: '"ELMS" OR "DPAS" property accountability program manager DLA contact email site:dla.mil' },
+  { industry: 'government', role: 'federal_defense', tier: 'primary', title: 'MICC Small Business Professional',   query: '"Small Business Professional" OR "OSBP" MICC OR "Mission and Installation Contracting" Army contact email site:army.mil' },
+  { industry: 'government', role: 'federal_defense', tier: 'primary', title: 'AFRL / Air Force Small Business',    query: '"AFRL" OR "Air Force Research Laboratory" small business office contact email site:*.af.mil' },
+  { industry: 'government', role: 'federal_defense', tier: 'primary', title: 'ONR / Navy Small Business',         query: '"Office of Naval Research" OR "ONR" small business OR public affairs contact email site:*.navy.mil' },
+  { industry: 'government', role: 'federal_defense', tier: 'primary', title: 'MCSC Small Business',               query: '"Marine Corps Systems Command" small business office contact email site:*.usmc.mil' },
+  { industry: 'government', role: 'federal_defense', tier: 'primary', title: 'Army Reserve Innovation Command',   query: '"Army Reserve Innovation Command" OR "USARIC" innovation officer contact email site:usar.army.mil OR site:army.mil' },
+  { industry: 'government', role: 'federal_defense', tier: 'primary', title: 'DoD Inspector General / Fraud',     query: '"Inspector General" fraud OR investigations contact email site:*.mil OR site:dodig.mil' },
+  { industry: 'government', role: 'federal_defense', tier: 'primary', title: 'Army/AF/Navy Records Management',   query: '"Records Management" officer OR director Army OR "Air Force" OR Navy contact email site:*.mil' },
+  { industry: 'government', role: 'federal_defense', tier: 'primary', title: 'DoD Program Manager — Audit/Compliance', query: '"Program Manager" audit readiness OR compliance DoD OR Army OR "Air Force" contact email site:*.mil' },
+
   // ── TIER 1: Primary Buyers — Recorder/Clerk roles (fastest path to revenue)
   { industry: 'government', role: 'recorder', tier: 'primary',    title: 'County Recorder',              query: '"County Recorder" contact email county USA site:*.gov OR site:*.us 2024 2025' },
   { industry: 'government', role: 'recorder', tier: 'primary',    title: 'Register of Deeds',            query: '"Register of Deeds" contact email county USA site:*.gov' },
