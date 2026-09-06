@@ -2743,9 +2743,10 @@ app.get(['/api/my/trust-graph', '/my/trust-graph'], authenticateApiKeyOrSession,
     );
     const relationships = await pool.query(
       `SELECT tr.certification_id, tr.entity_id, tr.relationship_type, tr.created_at,
-              te.name AS entity_name, te.entity_type
+              te.name AS entity_name, te.entity_type, c.label AS certification_label
        FROM trust_relationships tr
        JOIN trust_entities te ON te.entity_id = tr.entity_id
+       LEFT JOIN certifications c ON c.certification_id = tr.certification_id
        WHERE tr.entity_id IN (SELECT entity_id FROM trust_entities WHERE created_by = $1)
           OR tr.certification_id IN (SELECT certification_id FROM certifications WHERE user_id = (SELECT id FROM users WHERE email = $1))
        ORDER BY tr.created_at DESC LIMIT 200`,
