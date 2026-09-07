@@ -1808,7 +1808,11 @@ app.post(["/api/v1/batch", "/v1/batch"], authenticateApiKey, async (req, res) =>
     if (!Array.isArray(documents) || documents.length === 0) {
       return res.status(400).json({ error: "documents array required." });
     }
-    const batchLimit = req.apiKey.plan === 'enterprise' ? 500000 : 1000;
+    // Real stored plan values are 'enterprise-monthly'/'enterprise-annual' and
+    // 'government-monthly'/'government-annual'/'government-pilot' — bare 'enterprise'
+    // never actually occurs, so this check previously gave nobody the 500k limit.
+    const HIGH_BATCH_PLANS = ['enterprise', 'enterprise-monthly', 'enterprise-annual', 'government-monthly', 'government-annual', 'government-pilot'];
+    const batchLimit = HIGH_BATCH_PLANS.includes(req.apiKey.plan) ? 500000 : 1000;
     if (documents.length > batchLimit) {
       return res.status(400).json({ error: `Maximum ${batchLimit.toLocaleString()} documents per batch.` });
     }
