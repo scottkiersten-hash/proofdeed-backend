@@ -4946,6 +4946,9 @@ app.post(['/api/webhooks/resend-inbound', '/webhooks/resend-inbound'], async (re
       await pool.query(`INSERT INTO outreach_events (contact_id,event_type,event_source,metadata,occurred_at) VALUES ($1,'replied','resend_inbound',$2,NOW())`,
         [contact.id, JSON.stringify({ from: fromEmail, subject, snippet: bodyText.substring(0,200), intent })]);
 
+      // Pause any active sequence enrollments for this contact
+      pauseEnrollmentsForContact(contact.id).catch(() => {});
+
       // Forward to ProtonMail so Scott sees it in his inbox
       await sendEmail({
         from: `${fromName} via ProofDeed <info@proofdeed.com>`,
@@ -9378,6 +9381,446 @@ Return: first line = subreddit, second line = title, then body.` }]
 
 // Run daily at 9am CT (15:00 UTC)
 cron.schedule('0 15 * * *', runDailySocialPosts, { timezone: 'America/Chicago' });
+
+/* ================================================================
+   OUTREACH SEQUENCE ENGINE
+   Multi-touch email sequences using existing Brevo infra.
+   Tables: outreach_sequences, outreach_enrollments
+   Cron: hourly check, sends next step when due, stops on reply.
+================================================================ */
+
+// -- Schema migration (isolated IIFE so other migrations can't block this)
+(async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS outreach_sequences (
+        id              SERIAL PRIMARY KEY,
+        name            TEXT NOT NULL,
+        description     TEXT,
+        target_vertical TEXT,
+        steps           JSONB NOT NULL DEFAULT '[]',
+        active          BOOLEAN DEFAULT true,
+        created_at      TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE TABLE IF NOT EXISTS outreach_enrollments (
+        id              SERIAL PRIMARY KEY,
+        contact_id      INTEGER REFERENCES outreach_contacts(id) ON DELETE CASCADE,
+        sequence_id     INTEGER REFERENCES outreach_sequences(id) ON DELETE CASCADE,
+        current_step    INTEGER DEFAULT 0,
+        enrolled_at     TIMESTAMPTZ DEFAULT NOW(),
+        next_send_at    TIMESTAMPTZ DEFAULT NOW(),
+        status          TEXT DEFAULT 'active',
+        completed_steps INTEGER DEFAULT 0,
+        UNIQUE(contact_id, sequence_id)
+      );
+    `);
+    console.log('[SequenceEngine] Tables ready');
+  } catch (err) {
+    console.error('[SequenceEngine] Schema error:', err.message);
+  }
+})();
+
+// -- Seed the 3 pre-built sequences from the outreach toolkit
+(async () => {
+  try {
+    const existing = await pool.query(`SELECT COUNT(*) as c FROM outreach_sequences`);
+    if (parseInt(existing.rows[0].c) > 0) return; // already seeded
+
+    const SEQUENCES = [
+      {
+        name: 'Insurance Claims — 3-Step',
+        description: 'Contested claim authenticity pitch for SIU/claims leaders. Loom mention, SIU angle, breakup.',
+        target_vertical: 'insurance',
+        steps: [
+          {
+            day: 0,
+            subject: 'A question about [Company]\'s contested claim files',
+            from: 'Scott Kiersten <info@proofdeed.com>',
+            body: `Hi [FirstName],
+
+When a claim goes to litigation, can your team prove the original inspection report wasn't altered after it was filed?
+
+Most claims systems can show an auditor the document. They can't prove it hasn't changed — the system that stored the file is the same one certifying its integrity. That's circular.
+
+ProofDeed is the independent layer. Every document gets certified at the moment of creation. When litigation hits, the document proves itself — no forensics firm, no he-said-she-said.
+
+One API call. No data migration. No workflow change for your team.
+
+Worth 15 minutes to see the verification flow?
+
+Scott Kiersten
+Founder, ProofDeed
+proofdeed.com`
+          },
+          {
+            day: 4,
+            subject: 'Re: [Company] — the SIU angle on document integrity',
+            from: 'Scott Kiersten <info@proofdeed.com>',
+            body: `Hi [FirstName],
+
+Following up — the specific pattern SIU teams tell us they run into most in contested claims:
+
+A claimant submits an inspection report. The insurer records it. Months later in litigation, the question isn't whether the document exists — it's whether anyone altered it between filing and today. The answer "our system says so" doesn't hold up when opposing counsel knows how your system works.
+
+ProofDeed makes the original independently verifiable. The verifier doesn't trust us — they run the same math. Match means unchanged.
+
+Happy to show you a live verification in 10 minutes. Worth scheduling?
+
+Scott`
+          },
+          {
+            day: 9,
+            subject: 'Last note — ProofDeed',
+            from: 'Scott Kiersten <info@proofdeed.com>',
+            body: `Hi [FirstName],
+
+One last reach-out.
+
+If contested claim authenticity isn't something your team is currently focused on, I understand — timing matters. I'll leave you alone after this.
+
+If it is on your radar, even peripherally, I'm happy to send over a one-pager first and let you decide if a call is worth it.
+
+Either way — thank you for the time.
+
+Scott Kiersten, ProofDeed
+proofdeed.com`
+          }
+        ]
+      },
+      {
+        name: 'Government / FIAR — 3-Step',
+        description: 'DoD audit readiness pitch targeting Comptrollers, G8 directors, FIAR program managers.',
+        target_vertical: 'government',
+        steps: [
+          {
+            day: 0,
+            subject: 'DoD\'s 7 failed audits — the provenance gap nobody\'s closed',
+            from: 'Scott Kiersten <gov@proofdeed.com>',
+            body: `Hi [FirstName],
+
+DoD has failed seven straight financial audits. The finding isn't missing records — it's that auditors can't verify records weren't altered after the fact. The system storing the record is the same one being asked to certify it.
+
+ProofDeed certifies records at the moment of creation — so when an auditor looks at a property book entry, a contract modification, or a personnel action, the document proves itself. No call to the originating system. No chain of custody question.
+
+With the NDAA's 2028 clean-audit deadline about two and a half budget cycles away, I'd like 15 minutes with whoever owns your command's FIAR or audit-readiness effort.
+
+Worth it?
+
+Scott Kiersten
+Founder, ProofDeed | gov@proofdeed.com
+UEI: JG8FDJRQRFK1 | CAGE: 21LN4`
+          },
+          {
+            day: 5,
+            subject: 'Re: DoD audit — the one gap that\'s structural',
+            from: 'Scott Kiersten <gov@proofdeed.com>',
+            body: `Hi [FirstName],
+
+Following up — a specific detail that might be relevant:
+
+The DoD OIG's findings describe audit failures in terms of "unsupported transactions" and "inadequate documentation" — but when you dig in, it's not that records were missing. Auditors couldn't independently verify the records presented were the original, unaltered versions.
+
+That's a provenance problem, not a process problem. No current DoD system closes it.
+
+If you can connect me to whoever owns your command's FIAR or audit readiness work — even just a quick email introduction — that would be genuinely valuable. Happy to send a two-pager first.
+
+Scott`
+          },
+          {
+            day: 12,
+            subject: 'Last note — ProofDeed / FIAR',
+            from: 'Scott Kiersten <gov@proofdeed.com>',
+            body: `Hi [FirstName],
+
+Final reach-out.
+
+If the 2028 audit deadline isn't something your office is currently prioritizing, I understand completely. No follow-up after this.
+
+If there's a better contact at your command for the FIAR or audit readiness conversation, a quick pointer would be appreciated — happy to take it from there without taking more of your time.
+
+Thank you,
+Scott Kiersten
+ProofDeed | gov@proofdeed.com`
+          }
+        ]
+      },
+      {
+        name: 'CMMC / Defense Contractors — 3-Step',
+        description: 'CMMC Phase 2 suspension angle. Self-attestation risk, False Claims Act exposure.',
+        target_vertical: 'cmmc',
+        steps: [
+          {
+            day: 0,
+            subject: 'CMMC Phase 2 suspended — self-attestation without independent verification',
+            from: 'Scott Kiersten <gov@proofdeed.com>',
+            body: `Hi [FirstName],
+
+With CMMC Phase 2 indefinitely suspended, defense contractors are self-attesting their SPRS scores with no external check.
+
+The gap: there's no independent record of what was actually submitted and when. If DoD later audits a contractor and the self-assessed score doesn't match what was claimed — that's False Claims Act exposure, not just a compliance finding.
+
+ProofDeed is the independent evidence layer. Every compliance document gets certified at creation — tamper-evident proof of what was filed and when. Not another compliance tier. Just the thing that protects your existing attestation.
+
+Worth 15 minutes?
+
+Scott Kiersten
+Founder, ProofDeed | gov@proofdeed.com
+CAGE: 21LN4`
+          },
+          {
+            day: 4,
+            subject: 'Re: CMMC self-attestation — the False Claims Act angle',
+            from: 'Scott Kiersten <gov@proofdeed.com>',
+            body: `Hi [FirstName],
+
+Following up with something specific: the FCA risk in CMMC self-attestation isn't hypothetical. Under the False Claims Act, any contractor submitting a self-assessment that overstates compliance posture faces potential liability — even if unintentional.
+
+Without an independent evidence layer, "we submitted X" and "what the system shows now" can diverge with no record of which is true. That's exactly what plaintiffs' counsel will probe in a qui tam action.
+
+ProofDeed closes it: every SPRS score, every SSP, every POA&M filed carries a tamper-evident timestamp of what was submitted. If anything changes after filing, the original is still independently verifiable.
+
+Happy to show you the verification flow in 15 minutes. Worth scheduling?
+
+Scott`
+          },
+          {
+            day: 10,
+            subject: 'Last note — CMMC documentation integrity',
+            from: 'Scott Kiersten <gov@proofdeed.com>',
+            body: `Hi [FirstName],
+
+One last note.
+
+CMMC Phase 2 being suspended doesn't reduce the documentation burden — it removes the external check that would have caught gaps. Self-attestation remains, and so does the exposure.
+
+If this isn't a priority for your organization right now, I completely understand. If it is — or if there's a better person internally to have this conversation with — I'd appreciate a quick pointer.
+
+Thank you for your time either way.
+
+Scott Kiersten
+ProofDeed | gov@proofdeed.com`
+          }
+        ]
+      }
+    ];
+
+    for (const seq of SEQUENCES) {
+      await pool.query(
+        `INSERT INTO outreach_sequences (name, description, target_vertical, steps)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT DO NOTHING`,
+        [seq.name, seq.description, seq.target_vertical, JSON.stringify(seq.steps)]
+      );
+    }
+    console.log('[SequenceEngine] Seeded 3 pre-built sequences');
+  } catch (err) {
+    console.error('[SequenceEngine] Seed error:', err.message);
+  }
+})();
+
+// -- Sequence runner: replace [FirstName] and [Company] from contact row
+function applyMerge(text, contact) {
+  const first = (contact.name || '').split(' ')[0] || 'there';
+  const company = contact.company || 'your organization';
+  return text.replace(/\[FirstName\]/g, first).replace(/\[Company\]/g, company);
+}
+
+// -- Hourly cron: process due enrollments
+async function runSequenceEngine() {
+  try {
+    const due = await pool.query(`
+      SELECT e.*, c.email, c.name, c.company, c.status as contact_status,
+             s.steps, s.name as seq_name
+      FROM outreach_enrollments e
+      JOIN outreach_contacts c ON c.id = e.contact_id
+      JOIN outreach_sequences s ON s.id = e.sequence_id
+      WHERE e.status = 'active'
+        AND e.next_send_at <= NOW()
+        AND c.status NOT IN ('replied','in_talks','closed_won','bounced','complained','unsubscribed','suppressed')
+      LIMIT 50
+    `);
+
+    let sent = 0, paused = 0, completed = 0;
+
+    for (const enrollment of due.rows) {
+      const steps = enrollment.steps;
+      const stepIdx = enrollment.current_step;
+
+      if (stepIdx >= steps.length) {
+        await pool.query(`UPDATE outreach_enrollments SET status='completed' WHERE id=$1`, [enrollment.id]);
+        completed++;
+        continue;
+      }
+
+      const step = steps[stepIdx];
+      const subject = applyMerge(step.subject, enrollment);
+      const body = applyMerge(step.body, enrollment);
+
+      try {
+        await sendEmail({ from: step.from, to: enrollment.email, subject, text: body });
+
+        const nextStepIdx = stepIdx + 1;
+        const isLast = nextStepIdx >= steps.length;
+        let nextSendAt = null;
+
+        if (!isLast) {
+          const nextStep = steps[nextStepIdx];
+          const daysFromNow = (nextStep.day - step.day) || 1;
+          nextSendAt = new Date(Date.now() + daysFromNow * 86400000).toISOString();
+        }
+
+        await pool.query(`
+          UPDATE outreach_enrollments
+          SET current_step=$1, completed_steps=$2, status=$3, next_send_at=$4
+          WHERE id=$5`,
+          [
+            nextStepIdx,
+            enrollment.completed_steps + 1,
+            isLast ? 'completed' : 'active',
+            nextSendAt,
+            enrollment.id
+          ]
+        );
+
+        await pool.query(`
+          UPDATE outreach_contacts
+          SET last_contact_at=NOW(),
+              status=CASE WHEN status='targeted' THEN 'sent' ELSE status END,
+              pipeline_stage=CASE WHEN pipeline_stage IN ('targeted','') THEN 'contacted' ELSE pipeline_stage END
+          WHERE id=$1`,
+          [enrollment.contact_id]
+        );
+
+        await pool.query(`
+          INSERT INTO outreach_events (contact_id, event_type, event_source, metadata, occurred_at)
+          VALUES ($1, 'sent', 'sequence_engine', $2, NOW())`,
+          [enrollment.contact_id, JSON.stringify({ sequence: enrollment.seq_name, step: stepIdx, subject })]
+        );
+
+        sent++;
+        console.log(`[SequenceEngine] Sent step ${stepIdx} to ${enrollment.email} (seq: ${enrollment.seq_name})`);
+      } catch (sendErr) {
+        console.error(`[SequenceEngine] Send failed for ${enrollment.email}:`, sendErr.message);
+        paused++;
+      }
+    }
+
+    if (sent + paused + completed > 0) {
+      console.log(`[SequenceEngine] Cycle complete — sent:${sent} paused:${paused} completed:${completed}`);
+    }
+  } catch (err) {
+    console.error('[SequenceEngine] Runner error:', err.message);
+  }
+}
+
+// Pause enrollments when contact replies (wire into existing reply handler)
+async function pauseEnrollmentsForContact(contactId) {
+  try {
+    await pool.query(
+      `UPDATE outreach_enrollments SET status='replied' WHERE contact_id=$1 AND status='active'`,
+      [contactId]
+    );
+  } catch (_) {}
+}
+
+cron.schedule('0 * * * *', runSequenceEngine, { timezone: 'America/Chicago' });
+
+// -- Sequence admin endpoints --
+
+// List all sequences
+app.get(['/api/admin/sequences', '/admin/sequences'], async (req, res) => {
+  if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
+  try {
+    const rows = await pool.query(`SELECT id, name, description, target_vertical, active, jsonb_array_length(steps) as step_count, created_at FROM outreach_sequences ORDER BY id`);
+    res.json(rows.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Get one sequence with full steps
+app.get(['/api/admin/sequences/:id', '/admin/sequences/:id'], async (req, res) => {
+  if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
+  try {
+    const seq = await pool.query(`SELECT * FROM outreach_sequences WHERE id=$1`, [req.params.id]);
+    if (!seq.rows.length) return res.status(404).json({ error: 'Not found' });
+    const enrollments = await pool.query(`
+      SELECT e.*, c.name, c.email, c.company FROM outreach_enrollments e
+      JOIN outreach_contacts c ON c.id = e.contact_id
+      WHERE e.sequence_id=$1 ORDER BY e.enrolled_at DESC LIMIT 100`, [req.params.id]);
+    res.json({ ...seq.rows[0], enrollments: enrollments.rows });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Create a new sequence
+app.post(['/api/admin/sequences', '/admin/sequences'], async (req, res) => {
+  if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
+  const { name, description, target_vertical, steps } = req.body;
+  if (!name || !steps?.length) return res.status(400).json({ error: 'name and steps[] required' });
+  try {
+    const row = await pool.query(
+      `INSERT INTO outreach_sequences (name, description, target_vertical, steps) VALUES ($1,$2,$3,$4) RETURNING *`,
+      [name, description, target_vertical, JSON.stringify(steps)]
+    );
+    res.json(row.rows[0]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Enroll one or many contacts in a sequence
+// Body: { sequence_id, contact_ids: [1,2,3] } OR { sequence_id, contact_id: 5 }
+app.post(['/api/admin/sequences/enroll', '/admin/sequences/enroll'], async (req, res) => {
+  if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
+  const { sequence_id, contact_id, contact_ids } = req.body;
+  if (!sequence_id) return res.status(400).json({ error: 'sequence_id required' });
+  const ids = contact_ids || (contact_id ? [contact_id] : []);
+  if (!ids.length) return res.status(400).json({ error: 'contact_id or contact_ids required' });
+  try {
+    let enrolled = 0, skipped = 0;
+    for (const cid of ids) {
+      const result = await pool.query(
+        `INSERT INTO outreach_enrollments (contact_id, sequence_id, next_send_at)
+         VALUES ($1, $2, NOW())
+         ON CONFLICT (contact_id, sequence_id) DO NOTHING`,
+        [cid, sequence_id]
+      );
+      if (result.rowCount > 0) enrolled++; else skipped++;
+    }
+    res.json({ enrolled, skipped });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// List active enrollments (with optional sequence_id filter)
+app.get(['/api/admin/sequences/enrollments', '/admin/sequences/enrollments'], async (req, res) => {
+  if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
+  try {
+    const seqFilter = req.query.sequence_id ? `AND e.sequence_id=${parseInt(req.query.sequence_id)}` : '';
+    const rows = await pool.query(`
+      SELECT e.*, c.name, c.email, c.company, s.name as sequence_name, s.target_vertical
+      FROM outreach_enrollments e
+      JOIN outreach_contacts c ON c.id = e.contact_id
+      JOIN outreach_sequences s ON s.id = e.sequence_id
+      WHERE 1=1 ${seqFilter}
+      ORDER BY e.enrolled_at DESC
+      LIMIT 200`);
+    res.json(rows.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Pause or cancel an enrollment
+app.put(['/api/admin/sequences/enrollments/:id', '/admin/sequences/enrollments/:id'], async (req, res) => {
+  if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
+  const { status } = req.body; // 'paused' or 'cancelled'
+  if (!['paused','cancelled'].includes(status)) return res.status(400).json({ error: 'status must be paused or cancelled' });
+  try {
+    await pool.query(`UPDATE outreach_enrollments SET status=$1 WHERE id=$2`, [status, req.params.id]);
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Run sequence engine now (manual trigger)
+app.post(['/api/admin/sequences/run', '/admin/sequences/run'], async (req, res) => {
+  if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
+  res.json({ ok: true, message: 'Sequence engine triggered in background' });
+  runSequenceEngine().catch(console.error);
+});
 
 /* ---------------- Start Server ---------------- */
 const server = app.listen(PORT, () => {
