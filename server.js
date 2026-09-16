@@ -11,6 +11,7 @@ import cron from "node-cron";
 import PDFDocument from "pdfkit";
 import QRCode from "qrcode";
 import * as OTPAuth from "otpauth";
+import Anthropic from "@anthropic-ai/sdk";
 
 function verifyTOTP(secret, token) {
   try {
@@ -9231,6 +9232,152 @@ app.get(["/health-check", "/api/health-check"], async (req, res) => {
     results: { passed, failed, warnings }
   });
 });
+
+/* ---------------- Daily Multi-Platform Content Engine ---------------- */
+
+const DAILY_CORE_TOPICS = [
+  { angle: 'government_audit', idea: "The DoD has failed 7 consecutive financial audits. Auditors aren't failing because records don't exist — they're failing because nobody can independently prove a record wasn't changed after the fact. That's what ProofDeed closes." },
+  { angle: 'insider_threat', idea: "Document fraud isn't always external. The scariest alterations happen inside the originating system — where current tools only see the edited version. ProofDeed certifies the original at the moment of creation." },
+  { angle: 'fraud_scenarios', idea: "DD-214 dates changed in a PDF editor. Medical records backdated for VA claims. Contractor invoices edited after submission. Every case has one thing in common: the receiving system had no way to detect the change." },
+  { angle: 'no_trust_required', idea: "Most document verification tools ask you to trust their ledger. ProofDeed lets you not have to. Any third party can verify authenticity with open math — no trust in ProofDeed required." },
+  { angle: 'cmmc', idea: "CMMC Phase 2 audits are suspended. Self-attestation has no independent check. ProofDeed creates a tamper-evident record of what was actually submitted and when — protecting you if DoD later disputes it." },
+  { angle: 'property_accountability', idea: "Property accountability is one of the Army's top audit failure points. Serial number mismatches, transfer gaps, missing signatures. ProofDeed anchors each record at creation so the chain of custody is provable, not reconstructed." },
+  { angle: 'zero_custody', idea: "ProofDeed never stores your documents. It certifies a cryptographic fingerprint at the moment of creation. Change one word after the fact — the fingerprint fails. That's the integrity layer government compliance has been missing." },
+  { angle: 'insurance_fraud', idea: "Insurance fraud often starts with a document: an inspection altered after filing, a claim backdated, a photo description edited. The approval built on it becomes the problem. ProofDeed makes the original provable — before the dispute." },
+  { angle: 'self_verifying', idea: "A record that can prove itself is worth more than a record that requires a phone call. ProofDeed turns every certification into a self-verifying trust passport — independently readable by any authorized third party." },
+  { angle: 'fre_901', idea: "FRE Rule 901 requires authentication of evidence. ProofDeed generates a mathematically provable chain of custody for every record — exportable as an Evidence Mode PDF, legally defensible without calling anyone." },
+  { angle: 'operation_mission_truth', idea: "The Army, Air Force, and DLA already piloted independent record certification through Operation Mission Truth. The next step is making it standard — not just for materiel, but for every compliance record that gets audited." },
+  { angle: 'stripe_analogy', idea: "Stripe doesn't replace your bank. ProofDeed doesn't replace your document management system. It's the integrity layer that sits on top — verifying authenticity independently, after the fact, without touching the original." },
+  { angle: 'nara_requirements', idea: "NARA requires all federal agencies to ensure records have Reliability, Authenticity, and Integrity under 36 CFR Part 1236. Most agencies can show a record exists. Almost none can prove it hasn't been altered since creation." },
+  { angle: 'decision_defense', idea: "A decision is only as defensible as the records it was built on. If those records can be silently altered, every decision built on them is vulnerable. ProofDeed anchors the evidence — so the decision can be defended years later." },
+];
+
+// Post via Buffer to one channel, returns {ok, id, error}
+async function bufferPost(token, channelId, text) {
+  // Try GraphQL first
+  try {
+    const res = await fetch('https://graph.buffer.com/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({
+        query: `mutation CreatePost($input: PostInput!) {
+          createPost(input: $input) {
+            ... on CreatePostSuccess { post { id status } }
+            ... on CoreWebAppCommonError { type message }
+          }
+        }`,
+        variables: { input: { channelId, text, scheduledAt: null } }
+      })
+    });
+    const data = await res.json();
+    const post = data?.data?.createPost?.post;
+    if (post?.id) return { ok: true, id: post.id };
+    const err = data?.data?.createPost?.message || JSON.stringify(data).substring(0, 150);
+    // Fall through to legacy
+    console.log('[SocialEngine] GraphQL failed, trying legacy:', err);
+  } catch (e) { console.log('[SocialEngine] GraphQL error:', e.message); }
+
+  // Legacy v1 fallback
+  const res2 = await fetch('https://api.bufferapp.com/1/updates/create.json', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ access_token: token, 'profile_ids[]': channelId, text, now: 'true' })
+  });
+  const data2 = await res2.json();
+  if (data2.success) return { ok: true, id: data2.updates?.[0]?.id || 'legacy' };
+  return { ok: false, error: JSON.stringify(data2).substring(0, 150) };
+}
+
+async function runDailySocialPosts() {
+  const bufferToken = process.env.BUFFER_ACCESS_TOKEN;
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  if (!bufferToken || !anthropicKey) {
+    console.log('[SocialEngine] Missing BUFFER_ACCESS_TOKEN or ANTHROPIC_API_KEY, skipping');
+    return;
+  }
+
+  const channels = {
+    linkedin: process.env.BUFFER_LINKEDIN_CHANNEL_ID || '6aaa2ae3ea19ca0bde54b3ac',
+    twitter: process.env.BUFFER_TWITTER_CHANNEL_ID || '',   // set after connecting X to Buffer
+  };
+
+  const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0)) / 86400000);
+  const { angle, idea } = DAILY_CORE_TOPICS[dayOfYear % DAILY_CORE_TOPICS.length];
+
+  const banned = 'Never use: blockchain, Polygon, SHA-256, hash, immutable ledger, Web3. Use instead: authenticity, provenance, independently verifiable, chain of custody, trust infrastructure, integrity layer, cryptographic fingerprint.';
+
+  const anthropic = new Anthropic({ apiKey: anthropicKey });
+
+  try {
+    // Generate all platform content in parallel
+    const [liMsg, twMsg, rdMsg] = await Promise.all([
+      // LinkedIn: long-form, founder voice
+      anthropic.messages.create({
+        model: 'claude-haiku-4-5-20251001', max_tokens: 450,
+        messages: [{ role: 'user', content: `Write a LinkedIn post for ProofDeed (proofdeed.com).
+Core idea: "${idea}"
+${banned}
+Rules: 160-220 words. First line is a sharp hook — no emoji, no hashtag. Short paragraphs, no bullets. End with 3-4 hashtags on their own line. Sound like a founder who understands the problem deeply, not a marketer.
+Return only the post text.` }]
+      }),
+      // X/Twitter: punchy, 240 chars max, no hashtag spam
+      anthropic.messages.create({
+        model: 'claude-haiku-4-5-20251001', max_tokens: 120,
+        messages: [{ role: 'user', content: `Write a tweet for ProofDeed (proofdeed.com).
+Core idea: "${idea}"
+${banned}
+Rules: Max 240 characters total including any hashtags. One sharp sentence or two short ones. Max 2 hashtags. No em dashes. No fluff. Punchy.
+Return only the tweet text.` }]
+      }),
+      // Reddit: discussion framing, no promotion
+      anthropic.messages.create({
+        model: 'claude-haiku-4-5-20251001', max_tokens: 350,
+        messages: [{ role: 'user', content: `Write a Reddit post for r/cybersecurity or r/GRC (include the best subreddit as the first line).
+Core idea: "${idea}"
+${banned}
+Rules: Frame as a genuine question or discussion, NOT a product pitch. Title line first (max 90 chars), then 2-3 short paragraphs raising the issue as a problem the community faces. Only mention ProofDeed at the very end as "we built something for this" — one sentence, not a sales pitch. 100-150 words total.
+Return: first line = subreddit, second line = title, then body.` }]
+      })
+    ]);
+
+    const liPost = liMsg.content[0].text.trim();
+    const twPost = twMsg.content[0].text.trim().substring(0, 280);
+    const rdRaw  = rdMsg.content[0].text.trim();
+    const rdLines = rdRaw.split('\n').filter(l => l.trim());
+    const rdSubreddit = rdLines[0].replace(/^r\//, '').trim();
+    const rdTitle = rdLines[1] || '';
+    const rdBody  = rdLines.slice(2).join('\n').trim();
+
+    console.log(`[SocialEngine] Day ${dayOfYear}, angle: ${angle}`);
+
+    // Post LinkedIn
+    if (channels.linkedin) {
+      const r = await bufferPost(bufferToken, channels.linkedin, liPost);
+      console.log(`[SocialEngine] LinkedIn: ${r.ok ? 'OK id=' + r.id : 'FAILED ' + r.error}`);
+    }
+
+    // Post X/Twitter (only if channel is connected)
+    if (channels.twitter) {
+      const r = await bufferPost(bufferToken, channels.twitter, twPost);
+      console.log(`[SocialEngine] X/Twitter: ${r.ok ? 'OK id=' + r.id : 'FAILED ' + r.error}`);
+    } else {
+      console.log('[SocialEngine] X/Twitter channel not configured — connect X to Buffer and set BUFFER_TWITTER_CHANNEL_ID');
+    }
+
+    // Reddit: email draft to Scott for manual posting (auto-posting gets accounts banned)
+    if (rdTitle && rdBody) {
+      const rdEmail = `ProofDeed Reddit Draft — post manually at reddit.com/r/${rdSubreddit}/submit\n\nTitle: ${rdTitle}\n\nBody:\n${rdBody}`;
+      await sendEmail('info@proofdeed.com', 'Daily Reddit Post Draft', rdEmail).catch(() => {});
+      console.log(`[SocialEngine] Reddit draft emailed → r/${rdSubreddit}`);
+    }
+
+  } catch (err) {
+    console.error('[SocialEngine] Error:', err.message);
+  }
+}
+
+// Run daily at 9am CT (15:00 UTC)
+cron.schedule('0 15 * * *', runDailySocialPosts, { timezone: 'America/Chicago' });
 
 /* ---------------- Start Server ---------------- */
 const server = app.listen(PORT, () => {
