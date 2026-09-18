@@ -3899,6 +3899,21 @@ app.delete(["/admin/delete-test-user", "/api/admin/delete-test-user"], async (re
   }
 });
 
+/* ---------------- ADMIN: LIST PAYING USERS ---------------- */
+app.get(["/admin/paying-users", "/api/admin/paying-users"], async (req, res) => {
+  try {
+    if (!verifyAdminAuth(req)) return res.status(401).json({ error: "Unauthorized." });
+    const result = await pool.query(
+      `SELECT email, stripe_customer_id, subscription_id, revenue_generated, created_at
+       FROM users WHERE subscription_id IS NOT NULL ORDER BY created_at DESC`
+    );
+    res.json({ success: true, count: result.rows.length, users: result.rows });
+  } catch (err) {
+    console.error("/api/admin/paying-users error:", err);
+    res.status(500).json({ error: "Server error.", detail: err.message });
+  }
+});
+
 /* ---------------- ADMIN TEST ACCOUNT CLEANUP ---------------- */
 app.get(["/admin/find-test-accounts", "/api/admin/find-test-accounts"], async (req, res) => {
   try {
