@@ -2366,6 +2366,46 @@ app.post(["/api/demo/certify", "/demo/certify"], demoRateLimit, async (req, res)
   }
 });
 
+// POST /verify-by-hash — public, zero-knowledge document verification.
+// The caller never uploads the actual file — the frontend hashes it client-side
+// (same crypto.subtle.digest pattern as the certify flow in upload/page.tsx) and
+// sends only the SHA-256 hex string. This resolves the "I have the document but
+// lost the QR code / Trust ID" case: the document itself is enough to find its
+// certification record, matching the site's own "verify by running the same math"
+// claim, which previously had no self-serve implementation.
+app.post(["/verify-by-hash", "/api/verify-by-hash"], async (req, res) => {
+  try {
+    const { documentHash } = req.body;
+    if (!documentHash || typeof documentHash !== "string" || !/^[a-f0-9]{64}$/i.test(documentHash)) {
+      return res.status(400).json({ success: false, error: "Invalid SHA-256 hash. Must be a 64-character hex string." });
+    }
+    const hash = documentHash.toLowerCase();
+
+    const [certRows, passportRows] = await Promise.all([
+      pool.query(
+        `SELECT certification_id AS id, label, created_at, polygon_tx
+         FROM certifications WHERE hash=$1 ORDER BY created_at ASC LIMIT 5`,
+        [hash]
+      ),
+      pool.query(
+        `SELECT passport_id AS id, label, created_at, polygon_tx
+         FROM asset_passports WHERE root_hash=$1 ORDER BY created_at ASC LIMIT 5`,
+        [hash]
+      ),
+    ]);
+
+    const matches = [
+      ...certRows.rows.map(r => ({ type: "trust_record", ...r })),
+      ...passportRows.rows.map(r => ({ type: "asset_passport", ...r })),
+    ];
+
+    res.json({ success: true, found: matches.length > 0, matches });
+  } catch (error) {
+    console.error("Verify-by-hash error:", error.message);
+    res.status(500).json({ success: false, error: "Server error." });
+  }
+});
+
 app.get(["/verify/:certId", "/api/verify/:certId"], async (req, res) => {
   try {
     const { certId } = req.params;
