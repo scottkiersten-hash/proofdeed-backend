@@ -2373,33 +2373,69 @@ app.post(["/api/demo/certify", "/demo/certify"], demoRateLimit, async (req, res)
 // lost the QR code / Trust ID" case: the document itself is enough to find its
 // certification record, matching the site's own "verify by running the same math"
 // claim, which previously had no self-serve implementation.
+//
+// Accepts either a single `documentHash` (used by the /verify page's upload box)
+// or a `documentHashes` array up to 1,000 (bulk/API use — e.g. an agency checking
+// a whole batch of old records at once). Same zero-knowledge rule applies at any
+// scale: only hashes ever cross the wire, never file contents.
 app.post(["/verify-by-hash", "/api/verify-by-hash"], async (req, res) => {
   try {
-    const { documentHash } = req.body;
-    if (!documentHash || typeof documentHash !== "string" || !/^[a-f0-9]{64}$/i.test(documentHash)) {
+    const { documentHash, documentHashes } = req.body;
+    const isBulk = Array.isArray(documentHashes);
+    const isValidHash = (h) => typeof h === "string" && /^[a-f0-9]{64}$/i.test(h);
+
+    if (!isBulk && !isValidHash(documentHash)) {
       return res.status(400).json({ success: false, error: "Invalid SHA-256 hash. Must be a 64-character hex string." });
     }
-    const hash = documentHash.toLowerCase();
+    if (isBulk) {
+      if (documentHashes.length === 0) {
+        return res.status(400).json({ success: false, error: "documentHashes must be a non-empty array." });
+      }
+      if (documentHashes.length > 1000) {
+        return res.status(400).json({ success: false, error: "Maximum 1,000 hashes per request." });
+      }
+      const invalidCount = documentHashes.filter((h) => !isValidHash(h)).length;
+      if (invalidCount > 0) {
+        return res.status(400).json({ success: false, error: `${invalidCount} of ${documentHashes.length} entries are not valid 64-character SHA-256 hex strings.` });
+      }
+    }
+
+    const hashes = (isBulk ? documentHashes : [documentHash]).map((h) => h.toLowerCase());
 
     const [certRows, passportRows] = await Promise.all([
       pool.query(
-        `SELECT certification_id AS id, label, created_at, polygon_tx
-         FROM certifications WHERE hash=$1 ORDER BY created_at ASC LIMIT 5`,
-        [hash]
+        `SELECT certification_id AS id, label, created_at, polygon_tx, hash
+         FROM certifications WHERE hash = ANY($1) ORDER BY created_at ASC`,
+        [hashes]
       ),
       pool.query(
-        `SELECT passport_id AS id, label, created_at, polygon_tx
-         FROM asset_passports WHERE root_hash=$1 ORDER BY created_at ASC LIMIT 5`,
-        [hash]
+        `SELECT passport_id AS id, label, created_at, polygon_tx, root_hash AS hash
+         FROM asset_passports WHERE root_hash = ANY($1) ORDER BY created_at ASC`,
+        [hashes]
       ),
     ]);
 
-    const matches = [
-      ...certRows.rows.map(r => ({ type: "trust_record", ...r })),
-      ...passportRows.rows.map(r => ({ type: "asset_passport", ...r })),
-    ];
+    const byHash = new Map(hashes.map((h) => [h, []]));
+    for (const r of certRows.rows) byHash.get(r.hash)?.push({ type: "trust_record", id: r.id, label: r.label, created_at: r.created_at, polygon_tx: r.polygon_tx });
+    for (const r of passportRows.rows) byHash.get(r.hash)?.push({ type: "asset_passport", id: r.id, label: r.label, created_at: r.created_at, polygon_tx: r.polygon_tx });
 
-    res.json({ success: true, found: matches.length > 0, matches });
+    if (!isBulk) {
+      const matches = byHash.get(hashes[0]) || [];
+      return res.json({ success: true, found: matches.length > 0, matches });
+    }
+
+    const results = hashes.map((h) => {
+      const matches = byHash.get(h) || [];
+      return { documentHash: h, found: matches.length > 0, matches };
+    });
+
+    res.json({
+      success: true,
+      total: results.length,
+      found: results.filter((r) => r.found).length,
+      not_found: results.filter((r) => !r.found).length,
+      results,
+    });
   } catch (error) {
     console.error("Verify-by-hash error:", error.message);
     res.status(500).json({ success: false, error: "Server error." });
