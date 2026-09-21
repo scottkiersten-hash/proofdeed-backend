@@ -1790,7 +1790,8 @@ async function processBatchBackground(batchId, certRecords, apiKey) {
             merkleRoot: r.merkle_root || null,
             merkleProof: r.merkle_proof || null,
             timestamp: r.created_at,
-            verifyUrl: `https://proofdeed.com/verify/${r.certification_id}`
+            verifyUrl: `https://proofdeed.com/verify/${r.certification_id}`,
+            qrUrl: `https://proofdeed.com/api/qr?path=/verify/${r.certification_id}`
           }))
         })
       });
@@ -1898,7 +1899,8 @@ app.post(["/api/v1/batch", "/v1/batch"], authenticateApiKey, async (req, res) =>
         label: r.label,
         timestamp,
         polygon_tx: null,
-        verifyUrl: `https://proofdeed.com/verify/${r.proofId}`
+        verifyUrl: `https://proofdeed.com/verify/${r.proofId}`,
+        qrUrl: `https://proofdeed.com/api/qr?path=/verify/${r.proofId}`
       })),
       ...(invalid.length > 0 && { invalidDocuments: invalid })
     });
@@ -1948,7 +1950,8 @@ app.get(["/api/v1/batch/:batchId", "/v1/batch/:batchId"], authenticateApiKey, as
         merkleProof: r.merkle_proof || null,
         anchored: !!r.polygon_tx,
         timestamp: r.created_at,
-        verifyUrl: `https://proofdeed.com/verify/${r.certification_id}`
+        verifyUrl: `https://proofdeed.com/verify/${r.certification_id}`,
+        qrUrl: `https://proofdeed.com/api/qr?path=/verify/${r.certification_id}`
       }))
     });
   } catch (error) {
