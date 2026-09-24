@@ -9393,38 +9393,32 @@ const DAILY_CORE_TOPICS = [
 
 // Post via Buffer to one channel, returns {ok, id, error}
 async function bufferPost(token, channelId, text) {
-  // Try GraphQL first
+  // Buffer retired their old REST API and old GraphQL domain for personal access tokens
+  // (https://developers.buffer.com/guides/rest-migration.html) — the current API lives at
+  // api.buffer.com, input type is CreatePostInput, and success/error come back as a union
+  // (PostActionSuccess / MutationError). Confirmed live against the real schema Sep 24, 2026.
   try {
-    const res = await fetch('https://graph.buffer.com/', {
+    const res = await fetch('https://api.buffer.com/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
       body: JSON.stringify({
-        query: `mutation CreatePost($input: PostInput!) {
+        query: `mutation CreatePost($input: CreatePostInput!) {
           createPost(input: $input) {
-            ... on CreatePostSuccess { post { id status } }
-            ... on CoreWebAppCommonError { type message }
+            ... on PostActionSuccess { post { id text dueAt } }
+            ... on MutationError { message }
           }
         }`,
-        variables: { input: { channelId, text, scheduledAt: null } }
+        variables: { input: { text, channelId, schedulingType: 'automatic', mode: 'addToQueue' } }
       })
     });
     const data = await res.json();
+    if (data.errors) return { ok: false, error: data.errors[0]?.message || JSON.stringify(data.errors).substring(0, 200) };
     const post = data?.data?.createPost?.post;
     if (post?.id) return { ok: true, id: post.id };
-    const err = data?.data?.createPost?.message || JSON.stringify(data).substring(0, 150);
-    // Fall through to legacy
-    console.log('[SocialEngine] GraphQL failed, trying legacy:', err);
-  } catch (e) { console.log('[SocialEngine] GraphQL error:', e.message); }
-
-  // Legacy v1 fallback
-  const res2 = await fetch('https://api.bufferapp.com/1/updates/create.json', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ access_token: token, 'profile_ids[]': channelId, text, now: 'true' })
-  });
-  const data2 = await res2.json();
-  if (data2.success) return { ok: true, id: data2.updates?.[0]?.id || 'legacy' };
-  return { ok: false, error: JSON.stringify(data2).substring(0, 150) };
+    return { ok: false, error: data?.data?.createPost?.message || JSON.stringify(data).substring(0, 200) };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
 }
 
 (async () => {
@@ -9544,10 +9538,15 @@ Return: first line = subreddit, second line = title, then body.` }]
 cron.schedule('0 9 * * *', runDailySocialPosts, { timezone: 'America/Chicago' });
 
 // Manual trigger — for confirming a fix (e.g. API credits) without waiting for the next 9am CT run
+let socialEngineRunning = false;
 app.post(['/api/admin/social-engine/run', '/admin/social-engine/run'], authRateLimit, async (req, res) => {
   if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
+  if (socialEngineRunning) return res.json({ success: false, message: 'Already running — wait for it to finish before retrying.' });
+  socialEngineRunning = true;
   res.json({ success: true, message: 'Social engine started — check back in ~30 seconds.' });
-  runDailySocialPosts().catch(err => console.error('[SocialEngine] Manual run fatal error:', err.message));
+  runDailySocialPosts()
+    .catch(err => console.error('[SocialEngine] Manual run fatal error:', err.message))
+    .finally(() => { socialEngineRunning = false; });
 });
 
 /* ================================================================
