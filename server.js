@@ -9543,6 +9543,13 @@ Return: first line = subreddit, second line = title, then body.` }]
 // Run daily at 9am CT
 cron.schedule('0 9 * * *', runDailySocialPosts, { timezone: 'America/Chicago' });
 
+// Manual trigger — for confirming a fix (e.g. API credits) without waiting for the next 9am CT run
+app.post(['/api/admin/social-engine/run', '/admin/social-engine/run'], authRateLimit, async (req, res) => {
+  if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
+  res.json({ success: true, message: 'Social engine started — check back in ~30 seconds.' });
+  runDailySocialPosts().catch(err => console.error('[SocialEngine] Manual run fatal error:', err.message));
+});
+
 /* ================================================================
    OUTREACH SEQUENCE ENGINE
    Multi-touch email sequences using existing Brevo infra.
