@@ -8325,7 +8325,17 @@ async function searchLeadsViaSerper(target, targetIndex = 0) {
         body: JSON.stringify({ q: query, num: 10, page }),
       });
       await incrementSerperCalls(serperKey, serperCount);
-      if (!res.ok) { console.log(`[LeadEngine] Serper error ${res.status}`); break; }
+      if (!res.ok) {
+        const bodyText = await res.text().catch(() => '');
+        console.log(`[LeadEngine] Serper error ${res.status}: ${bodyText}`);
+        await pool.query(
+          `INSERT INTO lead_engine_state (key, value, updated_at) VALUES ('last_serper_error',$1,NOW())
+           ON CONFLICT (key) DO UPDATE SET value=$1, updated_at=NOW()`,
+          [`${res.status}: ${bodyText}`.substring(0, 500)]
+        ).catch(() => {});
+        break;
+      }
+      await pool.query(`DELETE FROM lead_engine_state WHERE key='last_serper_error'`).catch(() => {});
       const data = await res.json();
       const items = data.organic || [];
       if (!items.length) break;
@@ -8924,7 +8934,9 @@ let lastAlertSent = {};
 const ALERT_AFTER_FAILURES = 3; // must fail 3 checks in a row (~45 min) before alerting
 // Checks that still run and show in the dashboard, but never trigger an alert email —
 // use for known/expected issues you're not actively working (e.g. blocked on a manual step elsewhere).
-const ALERT_SILENCED = new Set(['Lead Engine']);
+// Lead Engine was silenced here previously — removed Sep 24, 2026 after this silencing hid a real
+// multi-week Serper API credit outage with zero alerting. Do not re-add without a firm end date.
+const ALERT_SILENCED = new Set([]);
 
 // failureStreak persisted in DB so deploys don't reset the counter
 let failureStreak = {};
@@ -9130,7 +9142,15 @@ async function runHealthChecks() {
       const deadSearch = lastResult && resultHoursSince !== null && resultHoursSince < 25 &&
         lastResult.targets > 0 && lastResult.sent === 0 && lastResult.skipped === 0;
 
-      if (!lastSent) {
+      // Direct signal: the last time Serper itself returned an error (e.g. "Not enough credits"),
+      // surfaced verbatim so the alert email names the real cause instead of just "zero leads found."
+      const serperErrRow = await pool.query(`SELECT value, updated_at FROM lead_engine_state WHERE key='last_serper_error'`).catch(() => ({ rows: [] }));
+      const serperErrHoursSince = serperErrRow.rows[0] ? (Date.now() - new Date(serperErrRow.rows[0].updated_at).getTime()) / 3600000 : null;
+      const serperErrRecent = serperErrHoursSince !== null && serperErrHoursSince < 25 ? serperErrRow.rows[0].value : null;
+
+      if (serperErrRecent) {
+        checks.push({ name: 'Lead Engine', ok: false, error: `Serper API error: ${serperErrRecent}` });
+      } else if (!lastSent) {
         checks.push({ name: 'Lead Engine', ok: false, error: 'No emails sent in last 25h — engine may be stopped' });
       } else if (deadSearch) {
         checks.push({ name: 'Lead Engine', ok: false, error: `Last run found zero leads across ${lastResult.targets} targets (sent 0, skipped 0) — search provider may be down, even though older queued emails are still going out` });
@@ -9140,6 +9160,28 @@ async function runHealthChecks() {
     }
   } catch (e) {
     checks.push({ name: 'Lead Engine', ok: false, error: e.message });
+  }
+
+  // 11b. Social Engine — daily LinkedIn/X/Reddit post job. Runs once/day at 9am CT.
+  try {
+    const runRow = await pool.query(`SELECT value FROM social_engine_state WHERE key='last_run'`).catch(() => ({ rows: [] }));
+    const resultRow = await pool.query(`SELECT value FROM social_engine_state WHERE key='last_result'`).catch(() => ({ rows: [] }));
+    const lastRun = runRow.rows[0]?.value ? new Date(runRow.rows[0].value) : null;
+    const hoursSinceRun = lastRun ? (Date.now() - lastRun.getTime()) / 3600000 : null;
+    let lastResult = null;
+    try { lastResult = resultRow.rows[0] ? JSON.parse(resultRow.rows[0].value) : null; } catch {}
+
+    if (!lastRun) {
+      checks.push({ name: 'Social Engine', ok: false, error: 'Has never run — no last_run recorded' });
+    } else if (hoursSinceRun > 26) {
+      checks.push({ name: 'Social Engine', ok: false, error: `Last run ${hoursSinceRun.toFixed(0)}h ago — should run daily, may be stuck or the cron didn't fire` });
+    } else if (lastResult && !lastResult.ok) {
+      checks.push({ name: 'Social Engine', ok: false, error: lastResult.error || 'Last run failed' });
+    } else {
+      checks.push({ name: 'Social Engine', ok: true, error: null, info: `Last run ${hoursSinceRun.toFixed(0)}h ago` });
+    }
+  } catch (e) {
+    checks.push({ name: 'Social Engine', ok: false, error: e.message });
   }
 
   // 12. Users table — active user count
@@ -9385,11 +9427,33 @@ async function bufferPost(token, channelId, text) {
   return { ok: false, error: JSON.stringify(data2).substring(0, 150) };
 }
 
+(async () => {
+  try {
+    await pool.query(`CREATE TABLE IF NOT EXISTS social_engine_state (key TEXT PRIMARY KEY, value TEXT, updated_at TIMESTAMPTZ DEFAULT NOW())`);
+  } catch (e) {
+    console.warn('[SocialEngine] Could not create social_engine_state table:', e.message);
+  }
+})();
+
+async function writeSocialEngineResult(ok, error) {
+  await pool.query(
+    `INSERT INTO social_engine_state (key, value, updated_at) VALUES ('last_run',$1,NOW())
+     ON CONFLICT (key) DO UPDATE SET value=$1, updated_at=NOW()`,
+    [new Date().toISOString()]
+  ).catch(() => {});
+  await pool.query(
+    `INSERT INTO social_engine_state (key, value, updated_at) VALUES ('last_result',$1,NOW())
+     ON CONFLICT (key) DO UPDATE SET value=$1, updated_at=NOW()`,
+    [JSON.stringify({ ok, error: error || null })]
+  ).catch(() => {});
+}
+
 async function runDailySocialPosts() {
   const bufferToken = process.env.BUFFER_ACCESS_TOKEN;
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   if (!bufferToken || !anthropicKey) {
     console.log('[SocialEngine] Missing BUFFER_ACCESS_TOKEN or ANTHROPIC_API_KEY, skipping');
+    await writeSocialEngineResult(false, 'Missing BUFFER_ACCESS_TOKEN or ANTHROPIC_API_KEY');
     return;
   }
 
@@ -9448,9 +9512,10 @@ Return: first line = subreddit, second line = title, then body.` }]
     console.log(`[SocialEngine] Day ${dayOfYear}, angle: ${angle}`);
 
     // Post LinkedIn
+    let linkedinResult = { ok: false, error: 'LinkedIn channel not configured' };
     if (channels.linkedin) {
-      const r = await bufferPost(bufferToken, channels.linkedin, liPost);
-      console.log(`[SocialEngine] LinkedIn: ${r.ok ? 'OK id=' + r.id : 'FAILED ' + r.error}`);
+      linkedinResult = await bufferPost(bufferToken, channels.linkedin, liPost);
+      console.log(`[SocialEngine] LinkedIn: ${linkedinResult.ok ? 'OK id=' + linkedinResult.id : 'FAILED ' + linkedinResult.error}`);
     }
 
     // Post X/Twitter (only if channel is connected)
@@ -9464,17 +9529,19 @@ Return: first line = subreddit, second line = title, then body.` }]
     // Reddit: email draft to Scott for manual posting (auto-posting gets accounts banned)
     if (rdTitle && rdBody) {
       const rdEmail = `ProofDeed Reddit Draft — post manually at reddit.com/r/${rdSubreddit}/submit\n\nTitle: ${rdTitle}\n\nBody:\n${rdBody}`;
-      await sendEmail('info@proofdeed.com', 'Daily Reddit Post Draft', rdEmail).catch(() => {});
+      await sendEmail({ to: 'info@proofdeed.com', from: 'ProofDeed <info@proofdeed.com>', subject: 'Daily Reddit Post Draft', text: rdEmail }).catch((e) => console.error('[SocialEngine] Reddit draft email failed:', e.message));
       console.log(`[SocialEngine] Reddit draft emailed → r/${rdSubreddit}`);
     }
 
+    await writeSocialEngineResult(linkedinResult.ok, linkedinResult.ok ? null : `LinkedIn post failed: ${linkedinResult.error}`);
   } catch (err) {
     console.error('[SocialEngine] Error:', err.message);
+    await writeSocialEngineResult(false, err.message);
   }
 }
 
-// Run daily at 9am CT (15:00 UTC)
-cron.schedule('0 15 * * *', runDailySocialPosts, { timezone: 'America/Chicago' });
+// Run daily at 9am CT
+cron.schedule('0 9 * * *', runDailySocialPosts, { timezone: 'America/Chicago' });
 
 /* ================================================================
    OUTREACH SEQUENCE ENGINE
