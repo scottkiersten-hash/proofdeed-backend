@@ -3508,6 +3508,22 @@ app.post(['/admin/evidence-timeline/:certId', '/api/admin/evidence-timeline/:cer
   }
 });
 
+/* POST /api/admin/test-ai-content-analysis — Admin-only, direct test of the
+   Claude vision heuristic against an uploaded image, no certification
+   created. For verifying the feature works without needing a customer
+   API key or session. */
+app.post(['/admin/test-ai-content-analysis', '/api/admin/test-ai-content-analysis'], upload.single('file'), async (req, res) => {
+  try {
+    if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
+    const result = await analyzeImageForAIContent(req.file.buffer, req.file.mimetype);
+    res.json({ success: true, mimetype: req.file.mimetype, size: req.file.buffer.length, result });
+  } catch (err) {
+    console.error('[AIContentAnalysis] Admin test error:', err.message);
+    res.status(500).json({ error: 'Test failed.', detail: err.message });
+  }
+});
+
 // GET /api/evidence-timeline-data/:id — public, backs the /evidence-timeline
 // frontend page. Deliberately NOT registered at bare /evidence-timeline/:id —
 // DigitalOcean routes bare (non-/api) paths to the frontend static site, not
