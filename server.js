@@ -4010,6 +4010,21 @@ app.get(["/admin/find-test-accounts", "/api/admin/find-test-accounts"], async (r
   }
 });
 
+app.post(["/admin/clear-fake-billing", "/api/admin/clear-fake-billing"], async (req, res) => {
+  try {
+    if (!verifyAdminAuth(req)) return res.status(401).json({ error: "Unauthorized." });
+    const result = await pool.query(
+      `UPDATE users SET stripe_customer_id = NULL, subscription_id = NULL
+       WHERE subscription_id IS NOT NULL AND subscription_id NOT LIKE 'sub_%'
+       RETURNING email, stripe_customer_id AS old_customer_id`
+    );
+    res.json({ success: true, cleared: result.rowCount, emails: result.rows.map(r => r.email) });
+  } catch (err) {
+    console.error("/api/admin/clear-fake-billing error:", err);
+    res.status(500).json({ error: "Server error.", detail: err.message });
+  }
+});
+
 app.delete(["/admin/purge-account", "/api/admin/purge-account"], async (req, res) => {
   try {
     if (!verifyAdminAuth(req)) return res.status(401).json({ error: "Unauthorized." });
@@ -9186,7 +9201,7 @@ async function runHealthChecks() {
 
   // 12. Users table — active user count
   try {
-    const userRow = await pool.query(`SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE subscription_id IS NOT NULL) AS paid FROM users`);
+    const userRow = await pool.query(`SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE subscription_id LIKE 'sub_%') AS paid FROM users`);
     const r = userRow.rows[0];
     checks.push({ name: 'Users', ok: true, error: null, info: `${r.total} total | ${r.paid} paid` });
   } catch (e) {
