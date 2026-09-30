@@ -3725,6 +3725,30 @@ app.post(["/api/v1/upgrade", "/v1/upgrade"], authenticateApiKeyNoLimit, async (r
   }
 });
 
+/* POST /api/admin/create-individual-price — one-time setup helper. Creates
+   the real Stripe Product+Price for the $12.99 one-time individual
+   certification plan and returns the price ID to put in DigitalOcean as
+   PRICE_INDIVIDUAL_ONETIME. Safe to call more than once - Stripe just
+   creates a new price object each time, so only run this once for real. */
+app.post(['/admin/create-individual-price', '/api/admin/create-individual-price'], async (req, res) => {
+  try {
+    if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
+    const product = await stripe.products.create({
+      name: 'ProofDeed Individual Certification',
+      description: 'One-time certification for individuals — no subscription required.',
+    });
+    const price = await stripe.prices.create({
+      product: product.id,
+      unit_amount: 1299,
+      currency: 'usd',
+    });
+    res.json({ success: true, product_id: product.id, price_id: price.id });
+  } catch (err) {
+    console.error('[Stripe] create-individual-price error:', err.message);
+    res.status(500).json({ error: 'Failed to create price.', detail: err.message });
+  }
+});
+
 /* ---------------- STRIPE CHECKOUT ---------------- */
 app.post(["/create-checkout-session", "/api/create-checkout-session"], async (req, res) => {
   try {
@@ -3745,6 +3769,7 @@ app.post(["/create-checkout-session", "/api/create-checkout-session"], async (re
 
     const oneTimePlans = {
       "government-pilot": process.env.PRICE_GOVERNMENT_PILOT,
+      "individual-onetime": process.env.PRICE_INDIVIDUAL_ONETIME,
     };
 
     const isOneTime = plan in oneTimePlans;
