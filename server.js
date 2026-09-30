@@ -781,9 +781,9 @@ app.post(["/api/v1/certify/file", "/v1/certify/file"], authenticateApiKey, uploa
           forensic_file_type, forensic_declared_created_at, forensic_declared_modified_at,
           forensic_authoring_software, forensic_pdf_version_layers, forensic_post_creation_edits,
           forensic_total_editing_minutes, forensic_anomalies, forensic_assessment, forensic_analyzed_at,
-          ai_content_assessment, ai_content_summary, ai_content_analyzed_at,
+          ai_content_assessment, ai_content_summary, ai_content_analyzed_at, ai_content_method,
           created_at)
-       VALUES ($1,$2,NULL,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,NOW())
+       VALUES ($1,$2,NULL,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,NOW())
        ON CONFLICT (certification_id) DO NOTHING`,
       [
         proofId, documentHash, req.apiKey.email, req.ip || req.headers['x-forwarded-for'] || null,
@@ -801,6 +801,7 @@ app.post(["/api/v1/certify/file", "/v1/certify/file"], authenticateApiKey, uploa
         aiContent?.assessment || null,
         aiContent?.summary || null,
         aiContent ? new Date(aiContent.analyzed_at) : null,
+        aiContent?.method || null,
       ]
     );
 
@@ -828,7 +829,7 @@ app.post(["/api/v1/certify/file", "/v1/certify/file"], authenticateApiKey, uploa
         anomalies: forensics.anomalies,
         assessment: forensics.assessment,
       },
-      ai_content_analysis: aiContent ? { assessment: aiContent.assessment, summary: aiContent.summary } : null,
+      ai_content_analysis: aiContent ? { assessment: aiContent.assessment, summary: aiContent.summary, method: aiContent.method } : null,
     });
 
     // Background blockchain anchor
@@ -877,9 +878,9 @@ app.post(["/api/certify-file", "/certify-file"], upload.single('file'), async (r
           forensic_file_type, forensic_declared_created_at, forensic_declared_modified_at,
           forensic_authoring_software, forensic_pdf_version_layers, forensic_post_creation_edits,
           forensic_total_editing_minutes, forensic_anomalies, forensic_assessment, forensic_analyzed_at,
-          ai_content_assessment, ai_content_summary, ai_content_analyzed_at,
+          ai_content_assessment, ai_content_summary, ai_content_analyzed_at, ai_content_method,
           created_at)
-       VALUES ($1,$2,NULL,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,NOW())
+       VALUES ($1,$2,NULL,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,NOW())
        ON CONFLICT (certification_id) DO NOTHING`,
       [
         proofId, documentHash, user.id, req.file.originalname || null,
@@ -896,6 +897,7 @@ app.post(["/api/certify-file", "/certify-file"], upload.single('file'), async (r
         aiContent?.assessment || null,
         aiContent?.summary || null,
         aiContent ? new Date(aiContent.analyzed_at) : null,
+        aiContent?.method || null,
       ]
     );
 
@@ -914,7 +916,7 @@ app.post(["/api/certify-file", "/certify-file"], upload.single('file'), async (r
         anomalies: forensics.anomalies,
         assessment: forensics.assessment,
       },
-      ai_content_analysis: aiContent ? { assessment: aiContent.assessment, summary: aiContent.summary } : null,
+      ai_content_analysis: aiContent ? { assessment: aiContent.assessment, summary: aiContent.summary, method: aiContent.method } : null,
     });
 
     anchorToPolygon(documentHash).then(async (txHash) => {
@@ -2518,7 +2520,7 @@ app.get(["/verify/:certId", "/api/verify/:certId"], async (req, res) => {
               c.forensic_file_type, c.forensic_declared_created_at, c.forensic_declared_modified_at,
               c.forensic_authoring_software, c.forensic_pdf_version_layers, c.forensic_post_creation_edits,
               c.forensic_total_editing_minutes, c.forensic_anomalies, c.forensic_assessment, c.forensic_analyzed_at,
-              c.ai_content_assessment, c.ai_content_summary, c.ai_content_analyzed_at
+              c.ai_content_assessment, c.ai_content_summary, c.ai_content_analyzed_at, c.ai_content_method
        FROM certifications c
        LEFT JOIN api_keys ak ON ak.email = c.api_key_email
        WHERE c.certification_id = $1`,
@@ -2577,6 +2579,7 @@ app.get(["/verify/:certId", "/api/verify/:certId"], async (req, res) => {
           assessment: cert.ai_content_assessment,
           summary: cert.ai_content_summary,
           analyzed_at: cert.ai_content_analyzed_at,
+          method: cert.ai_content_method,
         } : null,
       }
     });
@@ -4898,6 +4901,7 @@ async function ensureIndexes() {
       ALTER TABLE certifications ADD COLUMN IF NOT EXISTS ai_content_assessment TEXT CHECK (ai_content_assessment IN ('unlikely', 'possible', 'likely', 'inconclusive'));
       ALTER TABLE certifications ADD COLUMN IF NOT EXISTS ai_content_summary TEXT;
       ALTER TABLE certifications ADD COLUMN IF NOT EXISTS ai_content_analyzed_at TIMESTAMPTZ;
+      ALTER TABLE certifications ADD COLUMN IF NOT EXISTS ai_content_method TEXT CHECK (ai_content_method IN ('hive', 'claude-vision'));
 
       CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
       CREATE INDEX IF NOT EXISTS idx_certifications_hash ON certifications(hash);
