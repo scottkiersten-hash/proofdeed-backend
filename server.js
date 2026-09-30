@@ -3405,6 +3405,52 @@ async function gatherEvidenceChain(certificationId) {
   };
 }
 
+/* Shared generation logic — used by both the customer-facing endpoint
+   and the admin trigger below. Throws on hard failures (not found,
+   not configured); returns the stored row's shape on success. */
+async function createEvidenceTimeline(certificationId) {
+  const chain = await gatherEvidenceChain(certificationId);
+  if (!chain) return { error: 'not_found' };
+
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  if (!anthropicKey) return { error: 'not_configured' };
+
+  const anthropic = new Anthropic({ apiKey: anthropicKey });
+  const factPayload = JSON.stringify(chain, null, 2);
+
+  const message = await anthropic.messages.create({
+    model: 'claude-sonnet-5',
+    max_tokens: 1200,
+    system: 'You write factual evidence timelines for certified records. You are given real, structured data: a root record and any related records linked to it, each with real timestamped events. Using ONLY the dates and facts provided, produce a JSON object with two fields: "summary" (a 2-3 sentence plain-English overview) and "timeline" (an array of {date, description} entries in chronological order, one per real event). Never invent a date, a party, or an event that is not explicitly present in the data. If the data is too sparse to build a meaningful timeline, say so plainly in the summary instead of guessing. Respond with ONLY the JSON object, no other text.',
+    messages: [{ role: 'user', content: factPayload }],
+  });
+
+  const raw = message.content?.[0]?.text || '{}';
+  let parsed;
+  try {
+    parsed = JSON.parse(raw.trim().replace(/^```json\s*|\s*```$/g, ''));
+  } catch {
+    parsed = { summary: 'Evidence AI could not produce a valid summary from this record.', timeline: [] };
+  }
+
+  const timelineId = generateTimelineId();
+  await pool.query(
+    `INSERT INTO evidence_timelines (timeline_id, certification_id, summary, timeline, raw_data, model_used)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
+    [timelineId, certificationId, parsed.summary || '', JSON.stringify(parsed.timeline || []), JSON.stringify(chain), 'claude-sonnet-5']
+  );
+
+  logCertEvent(certificationId, 'evidence_ai_generated', 'Evidence Timeline generated');
+
+  return {
+    timeline_id: timelineId,
+    certification_id: certificationId,
+    summary: parsed.summary,
+    timeline: parsed.timeline,
+    evidence_url: `/evidence-timeline/${timelineId}`,
+  };
+}
+
 /* POST /api/v1/evidence-timeline — Authenticated. Generates an AI-narrated
    timeline from a record's certified events and Trust Graph relationships.
    Claude synthesizes a plain-English narrative from real, structured facts
@@ -3416,49 +3462,29 @@ app.post(['/api/v1/evidence-timeline', '/v1/evidence-timeline'], authenticateApi
     const { certification_id } = req.body;
     if (!certification_id) return res.status(400).json({ error: 'certification_id required.' });
 
-    const chain = await gatherEvidenceChain(certification_id);
-    if (!chain) return res.status(404).json({ error: 'Certification not found.' });
+    const result = await createEvidenceTimeline(certification_id);
+    if (result.error === 'not_found') return res.status(404).json({ error: 'Certification not found.' });
+    if (result.error === 'not_configured') return res.status(503).json({ error: 'Evidence AI is not configured.' });
 
-    const anthropicKey = process.env.ANTHROPIC_API_KEY;
-    if (!anthropicKey) return res.status(503).json({ error: 'Evidence AI is not configured.' });
-
-    const anthropic = new Anthropic({ apiKey: anthropicKey });
-    const factPayload = JSON.stringify(chain, null, 2);
-
-    const message = await anthropic.messages.create({
-      model: 'claude-sonnet-5',
-      max_tokens: 1200,
-      system: 'You write factual evidence timelines for certified records. You are given real, structured data: a root record and any related records linked to it, each with real timestamped events. Using ONLY the dates and facts provided, produce a JSON object with two fields: "summary" (a 2-3 sentence plain-English overview) and "timeline" (an array of {date, description} entries in chronological order, one per real event). Never invent a date, a party, or an event that is not explicitly present in the data. If the data is too sparse to build a meaningful timeline, say so plainly in the summary instead of guessing. Respond with ONLY the JSON object, no other text.',
-      messages: [{ role: 'user', content: factPayload }],
-    });
-
-    const raw = message.content?.[0]?.text || '{}';
-    let parsed;
-    try {
-      parsed = JSON.parse(raw.trim().replace(/^```json\s*|\s*```$/g, ''));
-    } catch {
-      parsed = { summary: 'Evidence AI could not produce a valid summary from this record.', timeline: [] };
-    }
-
-    const timelineId = generateTimelineId();
-    await pool.query(
-      `INSERT INTO evidence_timelines (timeline_id, certification_id, summary, timeline, raw_data, model_used)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [timelineId, certification_id, parsed.summary || '', JSON.stringify(parsed.timeline || []), JSON.stringify(chain), 'claude-sonnet-5']
-    );
-
-    logCertEvent(certification_id, 'evidence_ai_generated', 'Evidence Timeline generated');
-
-    res.json({
-      timeline_id: timelineId,
-      certification_id,
-      summary: parsed.summary,
-      timeline: parsed.timeline,
-      evidence_url: `/evidence-timeline/${timelineId}`,
-    });
+    res.json(result);
   } catch (err) {
     console.error('[EvidenceAI] Generate error:', err.message);
     res.status(500).json({ error: 'Evidence Timeline generation failed.' });
+  }
+});
+
+/* POST /api/admin/evidence-timeline/:certId — Admin-triggered generation,
+   for support/testing without a customer API key. Same generation logic. */
+app.post(['/admin/evidence-timeline/:certId', '/api/admin/evidence-timeline/:certId'], async (req, res) => {
+  try {
+    if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
+    const result = await createEvidenceTimeline(req.params.certId);
+    if (result.error === 'not_found') return res.status(404).json({ error: 'Certification not found.' });
+    if (result.error === 'not_configured') return res.status(503).json({ error: 'Evidence AI is not configured.' });
+    res.json(result);
+  } catch (err) {
+    console.error('[EvidenceAI] Admin generate error:', err.message);
+    res.status(500).json({ error: 'Evidence Timeline generation failed.', detail: err.message });
   }
 });
 
