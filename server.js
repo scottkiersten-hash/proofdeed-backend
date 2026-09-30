@@ -3350,6 +3350,189 @@ app.get('/analysis/:id', async (req, res) => {
   }
 });
 
+/* ============================================================
+   EVIDENCE AI — narrative timeline over linked, certified records
+   ============================================================ */
+
+function generateTimelineId() {
+  return 'EAI-' + crypto.randomBytes(6).toString('hex').toUpperCase();
+}
+
+async function gatherEvidenceChain(certificationId) {
+  const rootRes = await pool.query(
+    'SELECT certification_id, label, created_at FROM certifications WHERE certification_id=$1',
+    [certificationId]
+  );
+  if (!rootRes.rows.length) return null;
+  const root = rootRes.rows[0];
+
+  const rootEvents = (await pool.query(
+    'SELECT event_type, event_label, occurred_at FROM certification_events WHERE certification_id=$1 ORDER BY occurred_at ASC',
+    [certificationId]
+  )).rows;
+
+  const entities = (await pool.query(
+    `SELECT te.entity_id, te.name, te.entity_type
+     FROM trust_relationships tr JOIN trust_entities te ON te.entity_id = tr.entity_id
+     WHERE tr.certification_id = $1`,
+    [certificationId]
+  )).rows;
+
+  let relatedRecords = [];
+  if (entities.length) {
+    const entityIds = entities.map(e => e.entity_id);
+    const related = (await pool.query(
+      `SELECT DISTINCT c.certification_id, c.label, c.created_at
+       FROM trust_relationships tr
+       JOIN certifications c ON c.certification_id = tr.certification_id
+       WHERE tr.entity_id = ANY($1) AND c.certification_id != $2`,
+      [entityIds, certificationId]
+    )).rows;
+
+    for (const rec of related) {
+      const events = (await pool.query(
+        'SELECT event_type, event_label, occurred_at FROM certification_events WHERE certification_id=$1 ORDER BY occurred_at ASC',
+        [rec.certification_id]
+      )).rows;
+      relatedRecords.push({ ...rec, events });
+    }
+  }
+
+  return {
+    root: { ...root, events: rootEvents },
+    entities,
+    related_records: relatedRecords,
+  };
+}
+
+/* POST /api/v1/evidence-timeline — Authenticated. Generates an AI-narrated
+   timeline from a record's certified events and Trust Graph relationships.
+   Claude synthesizes a plain-English narrative from real, structured facts
+   only — instructed never to invent anything not present in the data — and
+   the underlying structured data is stored alongside the narrative so it
+   can be checked independently, not taken on the model's word. */
+app.post(['/api/v1/evidence-timeline', '/v1/evidence-timeline'], authenticateApiKeyOrSession, async (req, res) => {
+  try {
+    const { certification_id } = req.body;
+    if (!certification_id) return res.status(400).json({ error: 'certification_id required.' });
+
+    const chain = await gatherEvidenceChain(certification_id);
+    if (!chain) return res.status(404).json({ error: 'Certification not found.' });
+
+    const anthropicKey = process.env.ANTHROPIC_API_KEY;
+    if (!anthropicKey) return res.status(503).json({ error: 'Evidence AI is not configured.' });
+
+    const anthropic = new Anthropic({ apiKey: anthropicKey });
+    const factPayload = JSON.stringify(chain, null, 2);
+
+    const message = await anthropic.messages.create({
+      model: 'claude-sonnet-5',
+      max_tokens: 1200,
+      system: 'You write factual evidence timelines for certified records. You are given real, structured data: a root record and any related records linked to it, each with real timestamped events. Using ONLY the dates and facts provided, produce a JSON object with two fields: "summary" (a 2-3 sentence plain-English overview) and "timeline" (an array of {date, description} entries in chronological order, one per real event). Never invent a date, a party, or an event that is not explicitly present in the data. If the data is too sparse to build a meaningful timeline, say so plainly in the summary instead of guessing. Respond with ONLY the JSON object, no other text.',
+      messages: [{ role: 'user', content: factPayload }],
+    });
+
+    const raw = message.content?.[0]?.text || '{}';
+    let parsed;
+    try {
+      parsed = JSON.parse(raw.trim().replace(/^```json\s*|\s*```$/g, ''));
+    } catch {
+      parsed = { summary: 'Evidence AI could not produce a valid summary from this record.', timeline: [] };
+    }
+
+    const timelineId = generateTimelineId();
+    await pool.query(
+      `INSERT INTO evidence_timelines (timeline_id, certification_id, summary, timeline, raw_data, model_used)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [timelineId, certification_id, parsed.summary || '', JSON.stringify(parsed.timeline || []), JSON.stringify(chain), 'claude-sonnet-5']
+    );
+
+    logCertEvent(certification_id, 'evidence_ai_generated', 'Evidence Timeline generated');
+
+    res.json({
+      timeline_id: timelineId,
+      certification_id,
+      summary: parsed.summary,
+      timeline: parsed.timeline,
+      evidence_url: `/evidence-timeline/${timelineId}`,
+    });
+  } catch (err) {
+    console.error('[EvidenceAI] Generate error:', err.message);
+    res.status(500).json({ error: 'Evidence Timeline generation failed.' });
+  }
+});
+
+/* GET /evidence-timeline/:id — Public report page for a generated Evidence Timeline */
+app.get('/evidence-timeline/:id', async (req, res) => {
+  try {
+    const row = await pool.query('SELECT * FROM evidence_timelines WHERE timeline_id=$1', [req.params.id]);
+    if (!row.rows.length) return res.status(404).send('<h2>Evidence Timeline not found.</h2>');
+    const t = row.rows[0];
+    const events = Array.isArray(t.timeline) ? t.timeline : JSON.parse(t.timeline || '[]');
+
+    const eventsHtml = events.map(e => `
+      <div style="display:flex;gap:14px;padding-bottom:16px;">
+        <div style="flex-shrink:0;width:120px;font-size:12px;color:#6b7280;font-weight:600;padding-top:2px;">${e.date || '—'}</div>
+        <div style="flex:1;font-size:14px;color:#1f2937;line-height:1.5;border-left:2px solid #e5e7eb;padding-left:14px;">${e.description || ''}</div>
+      </div>`).join('') || '<p style="color:#6b7280;font-size:14px">No timeline events available.</p>';
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Evidence Timeline — ${t.timeline_id} | ProofDeed</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f9fafb;color:#111827}
+  .header{background:#0f172a;color:#fff;padding:18px 24px;display:flex;align-items:center;gap:12px}
+  .header-logo{font-size:18px;font-weight:700;letter-spacing:-0.5px}
+  .header-logo span{color:#60a5fa}
+  .container{max-width:720px;margin:32px auto;padding:0 16px 60px}
+  .meta{font-size:13px;color:#6b7280;margin-bottom:24px}
+  .card{background:#fff;border-radius:10px;border:1px solid #e5e7eb;padding:22px;margin-bottom:20px}
+  .card-title{font-size:13px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.07em;margin-bottom:14px}
+  .summary-text{color:#1f2937;line-height:1.65;font-size:15px}
+  .legal{color:#9ca3af;font-size:12px;line-height:1.6;margin-top:28px;padding-top:16px;border-top:1px solid #e5e7eb}
+  .footer{text-align:center;margin-top:32px}
+  .footer a{color:#2563eb;text-decoration:none;font-size:13px}
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="header-logo">Proof<span>Deed</span></div>
+  <div style="color:#94a3b8;font-size:14px">Evidence Timeline</div>
+</div>
+<div class="container">
+  <div class="meta">Timeline ID: ${t.timeline_id} &nbsp;·&nbsp; Root Record: <a href="/verify/${t.certification_id}" style="color:#2563eb">${t.certification_id}</a> &nbsp;·&nbsp; Generated: ${new Date(t.created_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })} UTC</div>
+
+  <div class="card">
+    <div class="card-title">Summary</div>
+    <div class="summary-text">${t.summary || 'No summary available.'}</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Timeline</div>
+    ${eventsHtml}
+  </div>
+
+  <div class="legal">
+    This Evidence Timeline is generated by Claude (Anthropic), narrating only the certified records and timestamped events ProofDeed has on file for this record and any records linked to it via Trust Graph™. It does not independently verify that the underlying documents are true or accurate — only that these are the records and events ProofDeed has certified, and when. It is informational and should be reviewed by a qualified professional before reliance in legal, regulatory, or financial proceedings.
+  </div>
+
+  <div class="footer" style="margin-top:24px">
+    <a href="https://proofdeed.com">ProofDeed Trust Infrastructure Platform</a>
+  </div>
+</div>
+</body>
+</html>`;
+    res.send(html);
+  } catch (err) {
+    console.error('[EvidenceAI] Report page error:', err.message);
+    res.status(500).send('<h2>Error loading Evidence Timeline.</h2>');
+  }
+});
+
 /* ---------------- NOTARY INTAKE ---------------- */
 app.post(["/api/notary/intake"], async (req, res) => {
   try {
@@ -9599,6 +9782,28 @@ app.post(['/api/admin/social-engine/run', '/admin/social-engine/run'], authRateL
     console.log('[SequenceEngine] Tables ready');
   } catch (err) {
     console.error('[SequenceEngine] Schema error:', err.message);
+  }
+})();
+
+// -- Evidence AI table (isolated IIFE so other migrations can't block this)
+(async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS evidence_timelines (
+        id                SERIAL PRIMARY KEY,
+        timeline_id       TEXT UNIQUE NOT NULL,
+        certification_id  TEXT NOT NULL,
+        summary           TEXT,
+        timeline          JSONB DEFAULT '[]',
+        raw_data          JSONB,
+        model_used        TEXT,
+        created_at        TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_evidence_timelines_cert ON evidence_timelines(certification_id);
+    `);
+    console.log('[EvidenceAI] Table ready');
+  } catch (err) {
+    console.error('[EvidenceAI] Schema error:', err.message);
   }
 })();
 
