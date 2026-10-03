@@ -884,6 +884,20 @@ app.post(["/api/certify-file", "/certify-file"], upload.single('file'), async (r
     if (userResult.rows.length === 0) return res.status(401).json({ error: 'User not found.' });
     const user = userResult.rows[0];
 
+    // Same plan limit as /create-proof — without it this endpoint was an unmetered side door.
+    const keyRes = await pool.query("SELECT plan, monthly_limit FROM api_keys WHERE email = $1 AND active = TRUE", [user.email]);
+    const allowPlan = keyRes.rows[0]?.plan || (user.subscription_id ? 'professional-monthly' : 'starter');
+    const allowLimit = keyRes.rows[0]?.monthly_limit || (user.subscription_id ? 250 : 25);
+    const allowUsed = await pool.query(
+      allowPlan === 'individual-onetime'
+        ? 'SELECT COUNT(*) FROM certifications WHERE user_id = $1'
+        : "SELECT COUNT(*) FROM certifications WHERE user_id = $1 AND created_at > date_trunc('month', NOW())",
+      [user.id]
+    );
+    if (parseInt(allowUsed.rows[0].count) >= allowLimit) {
+      return res.status(429).json({ error: 'Certification limit reached. Please upgrade your plan.', limit: allowLimit, plan: allowPlan });
+    }
+
     const fileBuffer = req.file.buffer;
     const mimetype = req.file.mimetype;
     const documentHash = crypto.createHash('sha256').update(fileBuffer).digest('hex');
@@ -2439,6 +2453,13 @@ app.post(["/api/certifications/:certId/ai-check", "/certifications/:certId/ai-ch
     const aiContent = await analyzeImageForAIContent(req.file.buffer, req.file.mimetype);
     if (!aiContent) {
       return res.json({ ai_content_analysis: null });
+    }
+
+    // A check that couldn't actually run (model error, oversized image) has no method.
+    // Show it to the user but don't write it onto the permanent public record, so a
+    // transient failure never stands as the record's answer and can be retried.
+    if (!aiContent.method) {
+      return res.json({ ai_content_analysis: { assessment: aiContent.assessment, summary: aiContent.summary, method: null } });
     }
 
     await pool.query(
