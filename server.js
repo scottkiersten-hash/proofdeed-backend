@@ -3908,27 +3908,34 @@ app.post(['/admin/create-individual-price', '/api/admin/create-individual-price'
   }
 });
 
+// A Stripe price id is a single token. A stray space or typo pasted after it in the
+// hosting dashboard ("price_123 t") makes every checkout fail with "No such price",
+// so keep only the first token.
+function priceEnv(value) {
+  return value ? String(value).trim().split(/\s+/)[0] : value;
+}
+
 /* ---------------- STRIPE CHECKOUT ---------------- */
 app.post(["/create-checkout-session", "/api/create-checkout-session"], async (req, res) => {
   try {
     const { plan, success_url, cancel_url, referral } = req.body;
 
     const subscriptionPlans = {
-      "starter-monthly":       process.env.PRICE_STARTER_MONTHLY,
-      "starter-annual":        process.env.PRICE_STARTER_YEARLY,
-      "pro-monthly":           process.env.PRICE_PRO_MONTHLY,
-      "pro-annual":            process.env.PRICE_PRO_YEARLY,
-      "enterprise":            process.env.PRICE_ENTERPRISE,
-      "professional-monthly":  process.env.PRICE_PROFESSIONAL_MONTHLY,
-      "business-monthly":      process.env.PRICE_BUSINESS_MONTHLY,
-      "enterprise-monthly":    process.env.PRICE_ENTERPRISE_MONTHLY,
-      "government-monthly":    process.env.PRICE_GOVERNMENT_MONTHLY,
-      "api-monthly":           process.env.PRICE_API_MONTHLY,
+      "starter-monthly":       priceEnv(process.env.PRICE_STARTER_MONTHLY),
+      "starter-annual":        priceEnv(process.env.PRICE_STARTER_YEARLY),
+      "pro-monthly":           priceEnv(process.env.PRICE_PRO_MONTHLY),
+      "pro-annual":            priceEnv(process.env.PRICE_PRO_YEARLY),
+      "enterprise":            priceEnv(process.env.PRICE_ENTERPRISE),
+      "professional-monthly":  priceEnv(process.env.PRICE_PROFESSIONAL_MONTHLY),
+      "business-monthly":      priceEnv(process.env.PRICE_BUSINESS_MONTHLY),
+      "enterprise-monthly":    priceEnv(process.env.PRICE_ENTERPRISE_MONTHLY),
+      "government-monthly":    priceEnv(process.env.PRICE_GOVERNMENT_MONTHLY),
+      "api-monthly":           priceEnv(process.env.PRICE_API_MONTHLY),
     };
 
     const oneTimePlans = {
-      "government-pilot": process.env.PRICE_GOVERNMENT_PILOT,
-      "individual-onetime": process.env.PRICE_INDIVIDUAL_ONETIME,
+      "government-pilot": priceEnv(process.env.PRICE_GOVERNMENT_PILOT),
+      "individual-onetime": priceEnv(process.env.PRICE_INDIVIDUAL_ONETIME),
     };
 
     const isOneTime = plan in oneTimePlans;
@@ -9512,6 +9519,7 @@ async function runHealthChecks() {
     { name: 'Checkout business-monthly',     mode: 'subscription', price: process.env.PRICE_BUSINESS_MONTHLY },
     { name: 'Checkout government-monthly',   mode: 'subscription', price: process.env.PRICE_GOVERNMENT_MONTHLY },
     { name: 'Checkout api-monthly',          mode: 'subscription', price: process.env.PRICE_API_MONTHLY },
+    { name: 'Checkout individual-onetime',   mode: 'payment',      price: priceEnv(process.env.PRICE_INDIVIDUAL_ONETIME) },
   ];
   for (const plan of checkoutPlans) {
     try {
