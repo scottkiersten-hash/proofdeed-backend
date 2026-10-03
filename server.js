@@ -3231,18 +3231,22 @@ function runTrustAnalysis({ certRows, passportRows, passportEvents, trustIdRows,
   // More records = higher confidence
   confidenceScore = Math.min(95, 50 + totalRecords * 8 + trustRecords.length * 4);
 
-  // --- Blockchain anchoring ---
+  // --- Network anchoring ---
   const anchored = certRows.filter(c => c.polygon_tx);
   const pending = certRows.filter(c => !c.polygon_tx);
+  // A record created minutes ago is normally still being confirmed — that's not a risk yet.
+  const stalePending = pending.filter(c => !c.created_at || Date.now() - new Date(c.created_at).getTime() > 30 * 60 * 1000);
   if (certRows.length > 0) {
     if (anchored.length === certRows.length) {
       findings.push({ type: 'positive', title: 'Network Anchoring Confirmed', detail: `All ${anchored.length} certification record(s) are anchored on an independent verification network with confirmed transaction hashes.` });
+    } else if (stalePending.length === 0) {
+      findings.push({ type: 'warning', title: 'Network Anchoring In Progress', detail: `${pending.length} record(s) were created in the last 30 minutes and are still being confirmed on the independent verification network. This normally takes a few minutes.` });
     } else if (anchored.length > 0) {
       riskScore += 15;
-      findings.push({ type: 'warning', title: 'Partial Network Anchoring', detail: `${anchored.length} of ${certRows.length} record(s) are confirmed on the independent verification network. ${pending.length} record(s) are still pending confirmation.` });
+      findings.push({ type: 'warning', title: 'Partial Network Anchoring', detail: `${anchored.length} of ${certRows.length} record(s) are confirmed on the independent verification network. ${stalePending.length} record(s) have been waiting more than 30 minutes for confirmation.` });
     } else {
       riskScore += 30;
-      findings.push({ type: 'warning', title: 'Network Anchoring Pending', detail: `${certRows.length} record(s) exist in the ProofDeed system but have not yet been confirmed on an independent verification network. Anchoring is typically completed within minutes of certification.` });
+      findings.push({ type: 'warning', title: 'Network Anchoring Pending', detail: `${stalePending.length} record(s) exist in the ProofDeed system but have not been confirmed on an independent verification network after more than 30 minutes. Contact support if this does not clear.` });
     }
   }
 
@@ -3269,16 +3273,6 @@ function runTrustAnalysis({ certRows, passportRows, passportEvents, trustIdRows,
     findings.push({ type: 'warning', title: 'Document History Shows Some Editing', detail: `${forensicModerate.length} certified document(s) show some signs of editing after creation in their file history.` });
   }
 
-  // --- Field integrity ---
-  const certsWithFields = certRows.filter(c => c.fields && Object.keys(c.fields).length > 0);
-  const certsWithHashes = certRows.filter(c => c.field_hashes && Object.keys(c.field_hashes).length > 0);
-  if (certsWithFields.length > 0 && certsWithHashes.length > 0) {
-    findings.push({ type: 'positive', title: 'Field-Level Integrity Verified', detail: `${certsWithFields.length} record(s) include field-level integrity records, enabling granular tamper detection on a per-field basis.` });
-  } else if (certRows.length > 0) {
-    riskScore += 10;
-    findings.push({ type: 'warning', title: 'No Field-Level Hashing Detected', detail: 'Records were certified at the document level only. Field-level integrity verification is not available for these records.' });
-  }
-
   // --- Asset Passport completeness ---
   if (passportRows.length > 0) {
     const p = passportRows[0];
@@ -3301,7 +3295,7 @@ function runTrustAnalysis({ certRows, passportRows, passportEvents, trustIdRows,
       findings.push({ type: 'warning', title: 'Moderate Evidence Strength', detail: `Trust ID for ${t.entity_name} has an Evidence Strength of ${score}/100. Additional independently-issued records would strengthen this entity's evidence profile.` });
     } else {
       riskScore += 25;
-      findings.push({ type: 'critical', title: 'Low Evidence Strength', detail: `Trust ID for ${t.entity_name} has an Evidence Strength of ${score}/100. This entity has limited or uncorroborated verified history in the ProofDeed system.` });
+      findings.push({ type: 'warning', title: 'Low Evidence Strength', detail: `Trust ID for ${t.entity_name} has an Evidence Strength of ${score}/100. This entity has limited or uncorroborated verified history in the ProofDeed system.` });
     }
     if (trustRecords.length > 0) {
       findings.push({ type: 'positive', title: `${trustRecords.length} Linked Trust Record(s)`, detail: `This entity has ${trustRecords.length} verified record(s) linked to their Trust ID, including: ${trustRecords.slice(0,3).map(r => r.record_label).join(', ')}${trustRecords.length > 3 ? ' and more' : ''}.` });
@@ -3341,6 +3335,10 @@ function runTrustAnalysis({ certRows, passportRows, passportEvents, trustIdRows,
   else if (riskScore <= 30) risk_level = 'medium';
   else if (riskScore <= 50) risk_level = 'high';
   else risk_level = 'critical';
+  // The score alone can under-call a single serious signal (e.g. one likely-AI image), so a
+  // critical finding never reads lower than "high" and any warning never reads "low".
+  if (findings.some(f => f.type === 'critical') && (risk_level === 'low' || risk_level === 'medium')) risk_level = 'high';
+  else if (findings.some(f => f.type === 'warning') && risk_level === 'low') risk_level = 'medium';
 
   // --- Generate summary ---
   const parts = [];
