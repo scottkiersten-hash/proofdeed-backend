@@ -345,6 +345,18 @@ async function authenticateApiKeyOrSession(req, res, next) {
   });
 }
 
+// True if the authenticated account (API key or dashboard session) created this
+// certification. Web-flow records carry user_id; API-flow records carry api_key_email.
+async function accountOwnsCertification(email, certId) {
+  const r = await pool.query(
+    `SELECT 1 FROM certifications c
+     WHERE c.certification_id = $1
+       AND (c.api_key_email = $2 OR c.user_id = (SELECT id FROM users WHERE email = $2))`,
+    [certId, email]
+  );
+  return r.rows.length > 0;
+}
+
 /* ---------------- Usage Notifications ---------------- */
 async function checkAndNotifyUsage(keyData) {
   const { email, api_key, used_this_month, monthly_limit, notified_80, notified_100 } = keyData;
@@ -1181,7 +1193,7 @@ app.post(['/api/v1/asset-passport', '/v1/asset-passport'], authenticateApiKeyOrS
 });
 
 /* POST /api/v1/asset-passport/:id/event — Add a lifecycle event to an existing passport */
-app.post(['/api/v1/asset-passport/:id/event', '/v1/asset-passport/:id/event'], authenticateApiKey, async (req, res) => {
+app.post(['/api/v1/asset-passport/:id/event', '/v1/asset-passport/:id/event'], authenticateApiKeyOrSession, async (req, res) => {
   try {
     const { id } = req.params;
     const { event_type, event_label, fields } = req.body;
@@ -1192,6 +1204,11 @@ app.post(['/api/v1/asset-passport/:id/event', '/v1/asset-passport/:id/event'], a
 
     const passport = await pool.query('SELECT * FROM asset_passports WHERE passport_id=$1', [id]);
     if (!passport.rows[0]) return res.status(404).json({ error: 'Asset Passport not found.' });
+    // Only the account that created a passport may add to its history — otherwise any
+    // customer could write events into someone else's chain of custody.
+    if (passport.rows[0].api_key_email !== req.apiKey.email) {
+      return res.status(403).json({ error: 'Only the account that created this Asset Passport can add events to it.' });
+    }
 
     const proofId = 'PD-APE-' + Date.now() + '-' + crypto.randomBytes(3).toString('hex');
     const { fieldHashes, rootHash } = hashFields(fields);
@@ -1234,6 +1251,9 @@ app.get(['/api/v1/asset-passport/:id', '/v1/asset-passport/:id'], authenticateAp
   try {
     const passport = await pool.query('SELECT * FROM asset_passports WHERE passport_id=$1', [req.params.id]);
     if (!passport.rows[0]) return res.status(404).json({ error: 'Asset Passport not found.' });
+    if (passport.rows[0].api_key_email !== req.apiKey.email) {
+      return res.status(403).json({ error: 'This Asset Passport belongs to another account. Use the public verify link instead.' });
+    }
 
     const events = await pool.query(
       'SELECT * FROM asset_passport_events WHERE passport_id=$1 ORDER BY occurred_at ASC', [req.params.id]
@@ -1489,7 +1509,7 @@ app.post(['/api/v1/trust-id', '/v1/trust-id'], authenticateApiKeyOrSession, asyn
 });
 
 /* POST /api/v1/trust-id/:id/record — Attach a Trust Record to a Trust ID™ */
-app.post(['/api/v1/trust-id/:id/record', '/v1/trust-id/:id/record'], authenticateApiKey, async (req, res) => {
+app.post(['/api/v1/trust-id/:id/record', '/v1/trust-id/:id/record'], authenticateApiKeyOrSession, async (req, res) => {
   try {
     const { id } = req.params;
     const { record_type, record_label, fields, passport_id } = req.body;
@@ -1500,6 +1520,9 @@ app.post(['/api/v1/trust-id/:id/record', '/v1/trust-id/:id/record'], authenticat
 
     const tid = await pool.query('SELECT * FROM trust_ids WHERE trust_id=$1', [id]);
     if (!tid.rows[0]) return res.status(404).json({ error: 'Trust ID not found.' });
+    if (tid.rows[0].api_key_email !== req.apiKey.email) {
+      return res.status(403).json({ error: 'Only the account that created this Trust ID can attach records to it.' });
+    }
 
     const proofId = 'PD-TID-' + Date.now() + '-' + crypto.randomBytes(3).toString('hex');
     const { fieldHashes, rootHash } = hashFields(fields);
@@ -1554,6 +1577,9 @@ app.get(['/api/v1/trust-id/:id', '/v1/trust-id/:id'], authenticateApiKey, async 
   try {
     const tid = await pool.query('SELECT * FROM trust_ids WHERE trust_id=$1', [req.params.id]);
     if (!tid.rows[0]) return res.status(404).json({ error: 'Trust ID not found.' });
+    if (tid.rows[0].api_key_email !== req.apiKey.email) {
+      return res.status(403).json({ error: 'This Trust ID belongs to another account. Use the public verify link instead.' });
+    }
     const records = await pool.query(
       'SELECT * FROM trust_id_records WHERE trust_id=$1 ORDER BY issued_at ASC', [req.params.id]
     );
@@ -2798,9 +2824,16 @@ app.post(['/api/certifications/:certId/relationships', '/certifications/:certId/
 
     const certCheck = await pool.query('SELECT certification_id FROM certifications WHERE certification_id=$1', [certId]);
     if (certCheck.rows.length === 0) return res.status(404).json({ success: false, error: 'Trust Record not found.' });
+    // Links show up on the record's public verify page, so only its owner may add them.
+    if (!(await accountOwnsCertification(req.apiKey.email, certId))) {
+      return res.status(403).json({ success: false, error: 'Only the account that created this Trust Record can link entities to it.' });
+    }
 
-    const entityCheck = await pool.query('SELECT entity_id, name, entity_type FROM trust_entities WHERE entity_id=$1', [entity_id]);
+    const entityCheck = await pool.query('SELECT entity_id, name, entity_type, created_by FROM trust_entities WHERE entity_id=$1', [entity_id]);
     if (entityCheck.rows.length === 0) return res.status(404).json({ success: false, error: 'Entity not found.' });
+    if (entityCheck.rows[0].created_by !== req.apiKey.email) {
+      return res.status(403).json({ success: false, error: 'You can only link entities your account created.' });
+    }
 
     await pool.query(
       `INSERT INTO trust_relationships (certification_id, entity_id, relationship_type, created_by)
@@ -2840,7 +2873,7 @@ app.get(['/api/certifications/:certId/relationships', '/certifications/:certId/r
 app.get(['/api/entities/:entityId', '/entities/:entityId'], async (req, res) => {
   try {
     const { entityId } = req.params;
-    const entity = await pool.query('SELECT * FROM trust_entities WHERE entity_id=$1', [entityId]);
+    const entity = await pool.query('SELECT entity_id, entity_type, name, subtype, metadata, created_at FROM trust_entities WHERE entity_id=$1', [entityId]);
     if (entity.rows.length === 0) return res.status(404).json({ success: false, error: 'Entity not found.' });
 
     const linked = await pool.query(
@@ -2863,7 +2896,11 @@ app.get(['/api/entities/:entityId', '/entities/:entityId'], async (req, res) => 
 // the legacy server-rendered HTML route above, which wins route-matching by registration order.
 app.get('/passport-data/:id', async (req, res) => {
   try {
-    const passport = await pool.query('SELECT * FROM asset_passports WHERE passport_id=$1', [req.params.id]);
+    // Public page: deliberately omits owner_email / api_key_email.
+    const passport = await pool.query(
+      `SELECT passport_id, asset_type, asset_identifier, label, owner_name, fields, field_hashes, root_hash,
+              polygon_tx, proof_id, created_at, updated_at
+       FROM asset_passports WHERE passport_id=$1`, [req.params.id]);
     if (!passport.rows[0]) return res.status(404).json({ success: false, error: 'Asset Passport not found.' });
     const events = await pool.query(
       'SELECT event_type, event_label, fields, root_hash, polygon_tx, occurred_at FROM asset_passport_events WHERE passport_id=$1 ORDER BY occurred_at ASC',
@@ -2880,7 +2917,10 @@ app.get('/passport-data/:id', async (req, res) => {
 // server-rendered HTML route and is unreachable externally either way.
 app.get('/trust-data/:id', async (req, res) => {
   try {
-    const tid = await pool.query('SELECT * FROM trust_ids WHERE trust_id=$1', [req.params.id]);
+    // Public page: deliberately omits entity_email / api_key_email.
+    const tid = await pool.query(
+      `SELECT trust_id, entity_type, entity_name, entity_org, metadata, record_count, trust_score, created_at, updated_at
+       FROM trust_ids WHERE trust_id=$1`, [req.params.id]);
     if (!tid.rows[0]) return res.status(404).json({ success: false, error: 'Trust ID not found.' });
     const records = await pool.query(
       'SELECT record_type, record_label, proof_id, passport_id, root_hash, polygon_tx, issued_at FROM trust_id_records WHERE trust_id=$1 ORDER BY issued_at ASC',
@@ -2927,7 +2967,7 @@ app.get(['/api/my/trust-graph', '/my/trust-graph'], authenticateApiKeyOrSession,
        JOIN trust_entities te ON te.entity_id = tr.entity_id
        LEFT JOIN certifications c ON c.certification_id = tr.certification_id
        WHERE tr.entity_id IN (SELECT entity_id FROM trust_entities WHERE created_by = $1)
-          OR tr.certification_id IN (SELECT certification_id FROM certifications WHERE user_id = (SELECT id FROM users WHERE email = $1))
+          OR tr.certification_id IN (SELECT certification_id FROM certifications WHERE api_key_email = $1 OR user_id = (SELECT id FROM users WHERE email = $1))
        ORDER BY tr.created_at DESC LIMIT 200`,
       [email]
     );
@@ -3183,14 +3223,37 @@ function runTrustAnalysis({ certRows, passportRows, passportEvents, trustIdRows,
   const pending = certRows.filter(c => !c.polygon_tx);
   if (certRows.length > 0) {
     if (anchored.length === certRows.length) {
-      findings.push({ type: 'positive', title: 'Blockchain Anchoring Confirmed', detail: `All ${anchored.length} certification record(s) are anchored on an independent verification network with confirmed transaction hashes.` });
+      findings.push({ type: 'positive', title: 'Network Anchoring Confirmed', detail: `All ${anchored.length} certification record(s) are anchored on an independent verification network with confirmed transaction hashes.` });
     } else if (anchored.length > 0) {
       riskScore += 15;
-      findings.push({ type: 'warning', title: 'Partial Blockchain Anchoring', detail: `${anchored.length} of ${certRows.length} record(s) are confirmed on-chain. ${pending.length} record(s) are still pending blockchain confirmation.` });
+      findings.push({ type: 'warning', title: 'Partial Network Anchoring', detail: `${anchored.length} of ${certRows.length} record(s) are confirmed on the independent verification network. ${pending.length} record(s) are still pending confirmation.` });
     } else {
       riskScore += 30;
-      findings.push({ type: 'warning', title: 'Blockchain Anchoring Pending', detail: `${certRows.length} record(s) exist in the ProofDeed system but have not yet been confirmed on an independent verification network. Anchoring is typically completed within minutes of certification.` });
+      findings.push({ type: 'warning', title: 'Network Anchoring Pending', detail: `${certRows.length} record(s) exist in the ProofDeed system but have not yet been confirmed on an independent verification network. Anchoring is typically completed within minutes of certification.` });
     }
+  }
+
+  // --- AI Fraud Detection / document forensics results stored on the certified files ---
+  const aiLikely = certRows.filter(c => c.ai_content_assessment === 'likely');
+  const aiPossible = certRows.filter(c => c.ai_content_assessment === 'possible');
+  const aiClear = certRows.filter(c => c.ai_content_assessment === 'unlikely');
+  if (aiLikely.length) {
+    riskScore += 30;
+    findings.push({ type: 'critical', title: 'Image Likely AI-Generated or Manipulated', detail: `AI Fraud Detection flagged ${aiLikely.length} certified image(s) as likely AI-generated or manipulated. This is a supporting signal, so have a person review the image before relying on it.` });
+  } else if (aiPossible.length) {
+    riskScore += 15;
+    findings.push({ type: 'warning', title: 'Image May Be AI-Generated or Edited', detail: `AI Fraud Detection found possible signs of AI generation or editing in ${aiPossible.length} certified image(s). Review before relying on them.` });
+  } else if (aiClear.length) {
+    findings.push({ type: 'positive', title: 'No Signs of AI Generation', detail: `AI Fraud Detection found no visual signs of AI generation in ${aiClear.length} certified image(s).` });
+  }
+  const forensicHigh = certRows.filter(c => c.forensic_assessment === 'high');
+  const forensicModerate = certRows.filter(c => c.forensic_assessment === 'moderate');
+  if (forensicHigh.length) {
+    riskScore += 25;
+    findings.push({ type: 'critical', title: 'Document History Shows Strong Signs of Editing', detail: `${forensicHigh.length} certified document(s) show strong signs of editing after creation in their file history.` });
+  } else if (forensicModerate.length) {
+    riskScore += 10;
+    findings.push({ type: 'warning', title: 'Document History Shows Some Editing', detail: `${forensicModerate.length} certified document(s) show some signs of editing after creation in their file history.` });
   }
 
   // --- Field integrity ---
@@ -3241,11 +3304,21 @@ function runTrustAnalysis({ certRows, passportRows, passportEvents, trustIdRows,
   ].filter(Boolean).map(d => new Date(d)).filter(d => !isNaN(d));
 
   if (allDates.length >= 2) {
-    const sorted = allDates.sort((a, b) => a - b);
+    const sorted = [...allDates].sort((a, b) => a - b);
     const earliest = sorted[0];
     const latest = sorted[sorted.length - 1];
     const spanDays = Math.round((latest - earliest) / 86400000);
-    findings.push({ type: 'positive', title: 'Timeline Consistent', detail: `Records span ${spanDays === 0 ? 'a single day' : `${spanDays} day(s)`} from ${earliest.toLocaleDateString('en-US', { dateStyle: 'medium' })} to ${latest.toLocaleDateString('en-US', { dateStyle: 'medium' })}. No chronological anomalies detected.` });
+    const fiveMin = 5 * 60 * 1000;
+    const futureDated = allDates.filter(d => d.getTime() > Date.now() + fiveMin).length;
+    const beforeParent =
+      (passportRows.length ? passportEvents.filter(e => new Date(e.occurred_at).getTime() < new Date(passportRows[0].created_at).getTime() - fiveMin).length : 0) +
+      (trustIdRows.length ? trustRecords.filter(r => new Date(r.issued_at).getTime() < new Date(trustIdRows[0].created_at).getTime() - fiveMin).length : 0);
+    if (futureDated || beforeParent) {
+      riskScore += 25;
+      findings.push({ type: 'warning', title: 'Timeline Problem', detail: `${futureDated ? `${futureDated} entr${futureDated === 1 ? 'y is' : 'ies are'} dated in the future. ` : ''}${beforeParent ? `${beforeParent} entr${beforeParent === 1 ? 'y is' : 'ies are'} dated before the record they belong to was created. ` : ''}The history should be reviewed.` });
+    } else {
+      findings.push({ type: 'positive', title: 'Timeline Consistent', detail: `Records span ${spanDays === 0 ? 'a single day' : `${spanDays} day(s)`} from ${earliest.toLocaleDateString('en-US', { dateStyle: 'medium' })} to ${latest.toLocaleDateString('en-US', { dateStyle: 'medium' })}. No future-dated or out-of-sequence entries.` });
+    }
   }
 
   // --- Determine final risk level ---
@@ -3264,12 +3337,12 @@ function runTrustAnalysis({ certRows, passportRows, passportEvents, trustIdRows,
   const recordDesc = parts.join(', ');
   const anchorStatus = anchored.length === certRows.length && certRows.length > 0
     ? 'all records are confirmed on an independent verification network'
-    : certRows.length > 0 ? 'blockchain anchoring is pending for some records' : 'no direct certification records were analyzed';
+    : certRows.length > 0 ? 'network anchoring is pending for some records' : 'no direct certification records were analyzed';
 
   const summary = `This analysis covers ${recordDesc}. At the time of analysis, ${anchorStatus}. Overall integrity risk is assessed as ${risk_level.toUpperCase()} based on ${findings.length} evaluated signal(s).`;
 
   const recommendation = risk_level === 'low'
-    ? 'These records meet ProofDeed integrity standards and can be relied upon as legally defensible under FRE Rule 901.'
+    ? 'No integrity issues were found. These records are consistent with authentic, unaltered originals.'
     : risk_level === 'medium'
     ? 'Review the flagged warnings before relying on these records in legal or financial proceedings.'
     : 'Do not rely on these records without first resolving the identified integrity issues.';
@@ -3288,7 +3361,9 @@ app.post(['/api/v1/trust-analysis', '/v1/trust-analysis'], authenticateApiKeyOrS
     let certRows = [], passportRows = [], passportEvents = [], trustIdRows = [], trustRecords = [];
 
     if (proof_id) {
-      const cr = await pool.query('SELECT hash, created_at, polygon_tx FROM certifications WHERE hash=$1 OR id::text=$1 LIMIT 5', [proof_id]);
+      const cr = await pool.query(
+        `SELECT certification_id, hash, created_at, polygon_tx, ai_content_assessment, ai_content_summary, forensic_assessment
+         FROM certifications WHERE certification_id=$1 OR hash=$1 ORDER BY created_at DESC LIMIT 5`, [proof_id]);
       certRows = cr.rows;
     }
 
