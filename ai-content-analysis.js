@@ -132,10 +132,10 @@ export async function analyzeImageForAIContent(buffer, mimetype) {
   if (!imageType) return null;
   if (!process.env.HIVE_API_KEY && !process.env.ANTHROPIC_API_KEY) return null;
 
-  // Vision requests get expensive/slow on very large images — cap at 10MB,
-  // consistent with typical multer upload limits elsewhere in this app.
-  if (buffer.length > 10 * 1024 * 1024) {
-    return { assessment: "inconclusive", summary: "Image too large to analyze for this check.", method: null, analyzed_at: new Date().toISOString() };
+  // Claude's vision API rejects images over 5MB, and without this cap every
+  // 5–10MB photo (most phone photos) would fail and come back "inconclusive".
+  if (buffer.length > 5 * 1024 * 1024) {
+    return { assessment: "inconclusive", summary: "This image is over 5MB, which is too large for the AI check.", method: null, analyzed_at: new Date().toISOString() };
   }
 
   if (process.env.HIVE_API_KEY) {

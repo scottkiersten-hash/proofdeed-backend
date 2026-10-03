@@ -143,7 +143,7 @@ app.set("trust proxy", 1);
 
 // Log a provenance event for a certification — fire-and-forget, never throws
 function logCertEvent(certId, eventType, eventLabel, metadata = {}) {
-  pool.query(
+  return pool.query(
     `INSERT INTO certification_events (certification_id, event_type, event_label, metadata, occurred_at)
      VALUES ($1, $2, $3, $4, NOW())`,
     [certId, eventType, eventLabel, JSON.stringify(metadata)]
@@ -2281,6 +2281,7 @@ app.post(["/create-proof", "/api/create-proof"], async (req, res) => {
        ON CONFLICT (certification_id) DO NOTHING`,
       [proofId, documentHash, null, userId]
     );
+    logCertEvent(proofId, 'created', 'Trust Record Created');
 
     // Respond immediately — anchor to blockchain in background
     res.json({
@@ -2333,6 +2334,7 @@ app.post(["/create-proof", "/api/create-proof"], async (req, res) => {
         "UPDATE certifications SET polygon_tx = $1 WHERE certification_id = $2",
         [txHash, proofId]
       );
+      logCertEvent(proofId, 'anchored', 'Provenance Anchored', { tx: txHash });
       console.log("Blockchain anchor confirmed for", proofId, txHash);
     }).catch((err) => {
       console.error("Background blockchain anchor failed for", proofId, err.message);
@@ -2340,6 +2342,77 @@ app.post(["/create-proof", "/api/create-proof"], async (req, res) => {
 
   } catch (error) {
     console.error("Create proof error:", error);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// POST /api/certifications/:certId/ai-check — the AI Fraud Detection step for the
+// browser upload flow. /create-proof only ever receives a fingerprint, so without
+// this the AI check never ran for web customers. The browser sends the image a
+// second time (images only — documents never leave the device) and we:
+//   1. confirm the caller owns the record,
+//   2. confirm the uploaded bytes hash to the exact fingerprint that was certified
+//      (so a result can't be attached to a record for a different file),
+//   3. run the check and store the result on the record.
+// Idempotent: an already-analyzed record returns its stored result without
+// spending another model call.
+const aiCheckRateLimit = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 60,
+  message: { error: "Too many AI checks. Please wait and try again." }
+});
+app.post(["/api/certifications/:certId/ai-check", "/certifications/:certId/ai-check"], aiCheckRateLimit, upload.single('file'), async (req, res) => {
+  try {
+    const authHeader = req.headers["authorization"];
+    if (!authHeader) return res.status(401).json({ error: "Authentication required." });
+    let decoded;
+    try {
+      decoded = jwt.verify(authHeader.split(" ")[1], process.env.JWT_SECRET);
+    } catch {
+      return res.status(401).json({ error: "Invalid or expired session. Please sign in again." });
+    }
+
+    const userResult = await pool.query("SELECT id FROM users WHERE email = $1", [decoded.email]);
+    if (userResult.rows.length === 0) return res.status(401).json({ error: "User not found." });
+
+    const certResult = await pool.query(
+      `SELECT certification_id, hash, user_id, ai_content_assessment, ai_content_summary, ai_content_method
+       FROM certifications WHERE certification_id = $1`,
+      [req.params.certId]
+    );
+    const cert = certResult.rows[0];
+    if (!cert || cert.user_id !== userResult.rows[0].id) {
+      return res.status(404).json({ error: "Record not found." });
+    }
+
+    if (cert.ai_content_assessment) {
+      return res.json({
+        ai_content_analysis: { assessment: cert.ai_content_assessment, summary: cert.ai_content_summary, method: cert.ai_content_method }
+      });
+    }
+
+    if (!req.file) return res.status(400).json({ error: "No image uploaded." });
+    const uploadedHash = crypto.createHash("sha256").update(req.file.buffer).digest("hex");
+    if (uploadedHash !== cert.hash) {
+      return res.status(400).json({ error: "This image does not match the certified record." });
+    }
+
+    const aiContent = await analyzeImageForAIContent(req.file.buffer, req.file.mimetype);
+    if (!aiContent) {
+      return res.json({ ai_content_analysis: null });
+    }
+
+    await pool.query(
+      `UPDATE certifications
+       SET ai_content_assessment = $1, ai_content_summary = $2, ai_content_analyzed_at = $3, ai_content_method = $4
+       WHERE certification_id = $5`,
+      [aiContent.assessment, aiContent.summary, new Date(aiContent.analyzed_at), aiContent.method, cert.certification_id]
+    );
+    logCertEvent(cert.certification_id, "ai_content_analyzed", "AI Content Analysis Completed", { assessment: aiContent.assessment }).catch(() => {});
+
+    res.json({ ai_content_analysis: { assessment: aiContent.assessment, summary: aiContent.summary, method: aiContent.method } });
+  } catch (err) {
+    console.error("AI check error:", err);
     res.status(500).json({ error: "Internal server error." });
   }
 });
