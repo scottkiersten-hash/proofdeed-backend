@@ -50,3 +50,12 @@ export async function anchorToPolygon(hash) {
     throw error;
   }
 }
+
+// Read-only status used by the daily health check: can we reach the RPC, and does the
+// anchoring wallet still have gas? Without gas every anchor silently fails and every
+// record stays "Pending" forever.
+export async function getAnchorWalletStatus() {
+  const signer = getPolygonWallet();
+  const balance = await signer.provider.getBalance(signer.address);
+  return { address: signer.address, balanceMatic: parseFloat(ethers.formatEther(balance)) };
+}

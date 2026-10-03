@@ -45,7 +45,7 @@ function getTOTPUri(secret) {
   });
   return totp.toString();
 }
-import { anchorToPolygon } from "./polygon.js";
+import { anchorToPolygon, getAnchorWalletStatus } from "./polygon.js";
 import { analyzeDocument } from "./forensics.js";
 import { analyzeImageForAIContent } from "./ai-content-analysis.js";
 import multer from 'multer';
@@ -509,14 +509,18 @@ app.get(["/auth/verify", "/api/auth/verify"], authRateLimit, async (req, res) =>
     const userResult = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
     const user = userResult.rows[0];
 
+    const keyRow = await pool.query("SELECT plan, monthly_limit FROM api_keys WHERE email = $1 AND active = TRUE", [email]);
+    const apiKeyForUser = keyRow.rows[0];
+    const plan = apiKeyForUser?.plan || (user?.subscription_id ? "professional-monthly" : "starter");
+    const certLimit = apiKeyForUser?.monthly_limit || (user?.subscription_id ? 250 : 25);
+
     const certCount = await pool.query(
-      "SELECT COUNT(*) FROM certifications WHERE user_id = $1 AND created_at > date_trunc('month', NOW())",
+      plan === "individual-onetime"
+        ? "SELECT COUNT(*) FROM certifications WHERE user_id = $1"
+        : "SELECT COUNT(*) FROM certifications WHERE user_id = $1 AND created_at > date_trunc('month', NOW())",
       [user?.id || 0]
     );
-
     const used = parseInt(certCount.rows[0].count) || 0;
-    const plan = user?.subscription_id ? "pro" : "starter";
-    const certLimit = plan === "pro" ? 70 : 25;
 
     const jwtToken = jwt.sign(
       { email, userId: user?.id, plan },
@@ -555,14 +559,15 @@ app.get(["/user/certifications", "/api/user/certifications"], authenticateToken,
       [user?.id || 0]
     );
 
-    const certCount = await pool.query(
-      "SELECT COUNT(*) FROM certifications WHERE user_id = $1 AND created_at > date_trunc('month', NOW())",
-      [user?.id || 0]
-    );
-
-    const used = parseInt(certCount.rows[0].count) || 0;
     const plan = apiKey?.plan || (user?.subscription_id ? "professional-monthly" : "starter");
     const limit = apiKey?.monthly_limit || (user?.subscription_id ? 250 : 25);
+    const certCount = await pool.query(
+      plan === "individual-onetime"
+        ? "SELECT COUNT(*) FROM certifications WHERE user_id = $1"
+        : "SELECT COUNT(*) FROM certifications WHERE user_id = $1 AND created_at > date_trunc('month', NOW())",
+      [user?.id || 0]
+    );
+    const used = parseInt(certCount.rows[0].count) || 0;
 
     res.json({ certifications: certs.rows, used, limit, plan });
 
@@ -600,9 +605,13 @@ app.get(["/api/user/profile", "/user/profile"], authenticateToken, async (req, r
     ]);
 
     const apiKey = apiKeyRow.rows[0] || null;
-    const used = parseInt(certCount.rows[0].count) || 0;
     const plan = apiKey?.plan || (user?.subscription_id ? "professional-monthly" : "starter");
     const limit = apiKey?.monthly_limit || (user?.subscription_id ? 250 : 25);
+    let used = parseInt(certCount.rows[0].count) || 0;
+    if (plan === "individual-onetime") {
+      const lifetime = await pool.query("SELECT COUNT(*) FROM certifications WHERE user_id = $1", [userId]);
+      used = parseInt(lifetime.rows[0].count) || 0;
+    }
 
     res.json({
       email,
@@ -2284,8 +2293,12 @@ app.post(["/create-proof", "/api/create-proof"], async (req, res) => {
     // Enforce real plan limits from api_keys table
     const plan = apiKey?.plan || (user.subscription_id ? "professional-monthly" : "starter");
     const certLimit = apiKey?.monthly_limit || (user.subscription_id ? 250 : 25);
+    // Individual one-time credits are lifetime, not monthly — otherwise one purchase would
+    // grant one certification every month.
     const usedCount = await pool.query(
-      "SELECT COUNT(*) FROM certifications WHERE user_id = $1 AND created_at > date_trunc('month', NOW())",
+      plan === "individual-onetime"
+        ? "SELECT COUNT(*) FROM certifications WHERE user_id = $1"
+        : "SELECT COUNT(*) FROM certifications WHERE user_id = $1 AND created_at > date_trunc('month', NOW())",
       [userId]
     );
     const used = parseInt(usedCount.rows[0].count) || 0;
@@ -3940,7 +3953,8 @@ app.post(["/create-checkout-session", "/api/create-checkout-session"], async (re
 
   } catch (err) {
     console.error("Stripe error:", err);
-    res.status(500).json({ error: "Internal server error." });
+    // Stripe's own error text (e.g. "No such price") is safe to show and saves a trip to the logs.
+    res.status(500).json({ error: "Internal server error.", ...(err?.type?.startsWith("Stripe") ? { detail: err.message } : {}) });
   }
 });
 
@@ -4003,10 +4017,61 @@ app.post(["/stripe-webhook", "/api/stripe-webhook"], express.raw({ type: "applic
             text: "Your top-up has been applied.\n\n1,000 additional certifications have been added to your monthly limit. Your API is active and ready.\n\nView your updated usage:\nhttps://proofdeed.com/api-dashboard\n\nProofDeed\nhttps://proofdeed.com"
           });
         }
-        return;
+        return res.json({ received: true });
       }
 
-      if (isOneTime) {
+      if (isOneTime && session.metadata?.plan === "individual-onetime") {
+        // Individual one-time purchase: $12.99 = one certification credit (all five products included).
+        if (session.payment_status !== "paid") {
+          console.log("Individual checkout not yet paid, ignoring for now:", session.id);
+          return res.json({ received: true }); // must ack, or Stripe retries
+        }
+        const firstTime = await pool.query(
+          `INSERT INTO individual_purchases (session_id, email) VALUES ($1, $2) ON CONFLICT (session_id) DO NOTHING RETURNING session_id`,
+          [session.id, email]
+        );
+        if (firstTime.rows.length === 0) {
+          console.log("Individual purchase already processed:", session.id);
+          return res.json({ received: true });
+        }
+        await pool.query(
+          `INSERT INTO api_keys (email, api_key, plan, monthly_limit, used_this_month, active, created_at)
+           VALUES ($1, $2, 'individual-onetime', 1, 0, TRUE, NOW())
+           ON CONFLICT (email) DO UPDATE
+           SET monthly_limit = api_keys.monthly_limit + 1,
+               active = TRUE,
+               plan = CASE WHEN api_keys.plan = 'government-pilot-pending' THEN 'individual-onetime' ELSE api_keys.plan END`,
+          [email, "pd_live_" + crypto.randomBytes(24).toString("hex")]
+        );
+        await pool.query(`UPDATE users SET revenue_generated = COALESCE(revenue_generated, 0) + $1 WHERE email = $2`, [session.amount_total || 1299, email]).catch(() => {});
+
+        // Sign-in link good for 24h so the buyer can go straight to certifying.
+        const loginToken = crypto.randomBytes(32).toString("hex");
+        await pool.query(
+          "INSERT INTO magic_links (email, token, expires_at) VALUES ($1, $2, $3)",
+          [email, loginToken, new Date(Date.now() + 24 * 60 * 60 * 1000)]
+        );
+        console.log("Individual purchase credited:", email);
+        await sendEmail({
+          to: email,
+          subject: "Your ProofDeed certification is ready",
+          text: [
+            "Thank you for your purchase. You can certify your document now.",
+            "",
+            "Sign in and upload your document (this link works for 24 hours):",
+            "https://proofdeed.com/auth/verify?token=" + loginToken,
+            "",
+            "After that, sign in any time at https://proofdeed.com/login with this email address.",
+            "",
+            "Documents never leave your device. Only their fingerprint is recorded.",
+            "",
+            "Questions? Reply to this email or write info@proofdeed.com.",
+            "",
+            "ProofDeed\nhttps://proofdeed.com"
+          ].join("\n")
+        });
+
+      } else if (isOneTime) {
         // Government pilot — pending ACH
         const paymentIntentId = session.payment_intent;
         await pool.query(
@@ -5103,6 +5168,21 @@ ensureIndexes();
     if (err.code !== "42710" /* constraint already exists */) {
       console.warn("[Migration] Could not add api_keys.email unique constraint (non-fatal):", err.message);
     }
+  }
+})();
+
+// One row per paid $12.99 Individual checkout, keyed by Stripe session id, so a replayed
+// webhook can never grant the same certification credit twice.
+(async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS individual_purchases (
+        session_id TEXT PRIMARY KEY,
+        email      TEXT NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )`);
+  } catch (err) {
+    console.warn("[Migration] Could not create individual_purchases (non-fatal):", err.message);
   }
 })();
 
@@ -9483,6 +9563,27 @@ async function runHealthChecks() {
     checks.push({ name: 'Usage tracking (certifications table)', ok: true, error: null, info: `${totalCerts} total certs` });
   } catch (e) {
     checks.push({ name: 'Usage tracking (certifications table)', ok: false, error: e.message });
+  }
+
+  // 9b. Blockchain anchoring — wallet needs gas, and real records must not sit unanchored
+  try {
+    const wallet = await getAnchorWalletStatus();
+    const stuckRow = await pool.query(
+      `SELECT COUNT(*) FROM certifications
+       WHERE polygon_tx IS NULL
+         AND created_at < NOW() - INTERVAL '30 minutes' AND created_at > NOW() - INTERVAL '7 days'
+         AND COALESCE(api_key_email, '') <> 'demo@proofdeed.com'`
+    );
+    const stuck = parseInt(stuckRow.rows[0].count);
+    const lowGas = wallet.balanceMatic < 0.05;
+    checks.push({
+      name: 'Blockchain anchoring',
+      ok: !lowGas && stuck === 0,
+      error: lowGas ? `Anchoring wallet is nearly out of gas (${wallet.balanceMatic.toFixed(4)} POL) — records will stay Pending` : (stuck > 0 ? `${stuck} real record(s) from the last 7 days are still unanchored after 30+ minutes` : null),
+      info: `Wallet ${wallet.address.slice(0, 8)}… holds ${wallet.balanceMatic.toFixed(4)} POL; ${stuck} stuck record(s)`
+    });
+  } catch (e) {
+    checks.push({ name: 'Blockchain anchoring', ok: false, error: e.message });
   }
 
   // 10. CRM — outreach pipeline stats
