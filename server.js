@@ -3438,7 +3438,7 @@ app.post(['/api/v1/trust-analysis', '/v1/trust-analysis'], authenticateApiKeyOrS
        JSON.stringify({ proof_id, passport_id, trust_id })]
     );
 
-    return res.json({ analysis_id, risk_level, confidence, summary, recommendation, findings, analysis_url: `/analysis/${analysis_id}` });
+    return res.json({ analysis_id, risk_level, confidence, summary, recommendation, findings, analysis_url: `https://proofdeed.com/api/analysis/${analysis_id}` });
   } catch (err) {
     console.error('Trust Analysis error:', err.message);
     return res.status(500).json({ error: 'Analysis failed. Please try again.' });
@@ -3664,6 +3664,10 @@ app.post(['/api/v1/evidence-timeline', '/v1/evidence-timeline'], authenticateApi
   try {
     const { certification_id } = req.body;
     if (!certification_id) return res.status(400).json({ error: 'certification_id required.' });
+    // Each timeline is a paid model call, so only the record's owner can generate one.
+    if (!(await accountOwnsCertification(req.apiKey.email, certification_id))) {
+      return res.status(404).json({ error: 'Certification not found.' });
+    }
 
     const result = await createEvidenceTimeline(certification_id);
     if (result.error === 'not_found') return res.status(404).json({ error: 'Certification not found.' });
@@ -4021,7 +4025,7 @@ app.post(["/stripe-webhook", "/api/stripe-webhook"], express.raw({ type: "applic
         'professional-monthly': 250, 'professional-annual': 250,
         'business-monthly': 2500,    'business-annual': 2500,
         'enterprise-monthly': 25000, 'enterprise-annual': 25000,
-        'government-monthly': 50000, 'government-annual': 50000,
+        'government-monthly': 25000, 'government-annual': 25000,
         'api-monthly': 100000,
         'starter-monthly': 250,      'starter-annual': 250,
         'pro-monthly': 2500,         'pro-annual': 2500,
@@ -9637,19 +9641,14 @@ async function runHealthChecks() {
     checks.push({ name: 'CRM (outreach_contacts)', ok: false, error: e.message });
   }
 
-  // 11. Lead engine — Mon-Fri CT only. Weekends: always OK (engine is intentionally off).
-  // Weekdays: fail if no email was sent in the last 25h (covers overnight gaps between runs),
+  // 11. Lead engine — runs every day (8am and 1pm CT). Fail if no email was sent in the last 25h (covers overnight gaps between runs),
   // OR if the most recent run found zero leads despite having targets to search. The second
   // check exists because a backlog of already-found leads can keep the "email sent" signal
   // green for days even while new lead discovery is completely dead (this is exactly how the
   // Google Custom Search outage went unnoticed for over a week) -- checking the actual
   // targets/sent/skipped counts from the last run catches a dead search provider immediately.
   try {
-    const ctDay = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', weekday: 'long' }).format(new Date());
-    const isWeekend = ctDay === 'Saturday' || ctDay === 'Sunday';
-    if (isWeekend) {
-      checks.push({ name: 'Lead Engine', ok: true, error: null, info: 'Engine paused weekends — skipping check' });
-    } else {
+    {
       const leRow = await pool.query(`SELECT MAX(last_contact_at) AS last_sent FROM outreach_contacts WHERE last_contact_at > NOW() - INTERVAL '25 hours'`);
       const lastSent = leRow.rows[0].last_sent;
       const hoursSince = lastSent ? (Date.now() - new Date(lastSent).getTime()) / 3600000 : null;
