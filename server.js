@@ -3973,7 +3973,7 @@ app.post(["/create-checkout-session", "/api/create-checkout-session"], async (re
 
     const sessionParams = {
       mode: isOneTime ? "payment" : "subscription",
-      ...(isOneTime ? {} : { payment_method_types: ["card"] }),
+      ...(isOneTime ? {} : { payment_method_types: ["card"], allow_promotion_codes: true }),
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: success_url || "https://proofdeed.com/success",
       cancel_url: cancel_url || "https://proofdeed.com",
