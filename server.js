@@ -455,7 +455,7 @@ app.post(["/auth/magic-link", "/api/auth/magic-link"], authRateLimit, async (req
     const userCheck = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
 
     if (userCheck.rows.length === 0) {
-      return res.status(404).json({ error: "No account found for this email. Please purchase a plan first." });
+      return res.status(404).json({ error: "No account found for this email. Choose a plan at proofdeed.com/solutions#pricing, or email info@proofdeed.com." });
     }
 
     const token = crypto.randomBytes(32).toString("hex");
@@ -477,7 +477,7 @@ app.post(["/auth/magic-link", "/api/auth/magic-link"], authRateLimit, async (req
       res.json({ success: true });
     } catch (emailErr) {
       console.error("Magic link email FAILED for " + email + ":", emailErr.message);
-      res.status(500).json({ error: "Failed to send sign-in email. Please try again or contact support@proofdeed.com." });
+      res.status(500).json({ error: "Failed to send sign-in email. Please try again or contact info@proofdeed.com." });
     }
 
   } catch (error) {
