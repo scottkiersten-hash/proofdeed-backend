@@ -792,6 +792,8 @@ app.post(["/api/v1/certify/file", "/v1/certify/file"], authenticateApiKey, uploa
     // Run forensic analysis (non-blocking for response but awaited for DB write)
     const forensics = await analyzeDocument(fileBuffer, mimetype);
     const aiContent = await analyzeImageForAIContent(fileBuffer, mimetype);
+    // Only a check that actually ran is written to the permanent record; a failed one can be retried.
+    const aiStored = aiContent && aiContent.method ? aiContent : null;
 
     const proofId = "PD-" + Date.now();
     const timestamp = new Date().toISOString();
@@ -819,10 +821,10 @@ app.post(["/api/v1/certify/file", "/v1/certify/file"], authenticateApiKey, uploa
         JSON.stringify(forensics.anomalies),
         forensics.assessment,
         new Date(forensics.analyzed_at),
-        aiContent?.assessment || null,
-        aiContent?.summary || null,
-        aiContent ? new Date(aiContent.analyzed_at) : null,
-        aiContent?.method || null,
+        aiStored?.assessment || null,
+        aiStored?.summary || null,
+        aiStored ? new Date(aiStored.analyzed_at) : null,
+        aiStored?.method || null,
       ]
     );
 
@@ -903,6 +905,8 @@ app.post(["/api/certify-file", "/certify-file"], upload.single('file'), async (r
     const documentHash = crypto.createHash('sha256').update(fileBuffer).digest('hex');
     const forensics = await analyzeDocument(fileBuffer, mimetype);
     const aiContent = await analyzeImageForAIContent(fileBuffer, mimetype);
+    // Only a check that actually ran is written to the permanent record; a failed one can be retried.
+    const aiStored = aiContent && aiContent.method ? aiContent : null;
 
     const proofId = "PD-" + Date.now();
     const timestamp = new Date().toISOString();
@@ -929,10 +933,10 @@ app.post(["/api/certify-file", "/certify-file"], upload.single('file'), async (r
         JSON.stringify(forensics.anomalies),
         forensics.assessment,
         new Date(forensics.analyzed_at),
-        aiContent?.assessment || null,
-        aiContent?.summary || null,
-        aiContent ? new Date(aiContent.analyzed_at) : null,
-        aiContent?.method || null,
+        aiStored?.assessment || null,
+        aiStored?.summary || null,
+        aiStored ? new Date(aiStored.analyzed_at) : null,
+        aiStored?.method || null,
       ]
     );
 

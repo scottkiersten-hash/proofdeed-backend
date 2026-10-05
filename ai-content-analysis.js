@@ -15,11 +15,9 @@
  *      Key" from portal.thehive.ai > Service API Keys) is set. Request/response shape
  *      taken from Hive's own docs (docs.thehive.ai, Oct 2026) and unit-tested against
  *      their example response; not yet exercised with a live key. $6 per 1,000 images.
- *      Any Hive failure falls back to Claude, and the admin test endpoint reports why.
- *   2. Claude vision (Anthropic) — a general-purpose model's calibrated
- *      opinion. Always available as long as ANTHROPIC_API_KEY is set
- *      (same key the rest of this app already uses). This is the
- *      verified, tested default.
+ *      A Hive failure means the image is reported as not checked; the admin test endpoint says why.
+ *   2. Claude vision (Anthropic) — OFF by default because it costs far more per image.
+ *      Only used if AI_CHECK_ALLOW_CLAUDE=true is set on purpose.
  *
  * Supported: JPEG, PNG (same image types forensics.js handles)
  */
@@ -145,36 +143,40 @@ async function analyzeWithClaude(buffer, imageType) {
 export async function analyzeImageForAIContent(buffer, mimetype, { debug = false } = {}) {
   const imageType = detectImageType(buffer, mimetype);
   if (!imageType) return null;
-  if (!process.env.HIVE_API_KEY && !process.env.ANTHROPIC_API_KEY) return null;
 
-  // Claude's vision API rejects images over 5MB, and without this cap every
-  // 5–10MB photo (most phone photos) would fail and come back "inconclusive".
-  if (buffer.length > 5 * 1024 * 1024) {
-    return { assessment: "inconclusive", summary: "This image is over 5MB, which is too large for the AI check.", method: null, analyzed_at: new Date().toISOString() };
+  // Hive is the check. Claude vision costs far more per image, so it only runs when
+  // AI_CHECK_ALLOW_CLAUDE=true is set on purpose; by default a Hive problem means "not checked".
+  const allowClaude = process.env.AI_CHECK_ALLOW_CLAUDE === "true" && !!process.env.ANTHROPIC_API_KEY;
+  if (!process.env.HIVE_API_KEY && !allowClaude) return null;
+
+  // 10MB matches the upload limit in server.js. Claude's vision API itself rejects over 5MB.
+  if (buffer.length > 10 * 1024 * 1024) {
+    return { assessment: "inconclusive", summary: "This image is over 10MB, which is too large for the AI check.", method: null, analyzed_at: new Date().toISOString() };
   }
 
-  // With debug on (admin test endpoint only), say whether Hive was tried and why it failed.
-  // Otherwise a bad Hive key would silently fall back to Claude and look like it worked.
+  // With debug on (admin test endpoint only), say whether Hive was tried and why it failed,
+  // so a bad key can't hide behind a fallback.
   let hiveNote = null;
   if (process.env.HIVE_API_KEY) {
     try {
       const hiveResult = await analyzeWithHive(buffer, imageType);
       if (hiveResult) return { ...hiveResult, analyzed_at: new Date().toISOString(), ...(debug ? { hive_attempted: true } : {}) };
     } catch (err) {
-      console.error("[AIContentAnalysis] Hive failed, falling back to Claude:", err.message);
+      console.error("[AIContentAnalysis] Hive failed:", err.message);
       hiveNote = err.message.slice(0, 300);
     }
   }
   const debugInfo = debug ? { hive_attempted: !!process.env.HIVE_API_KEY, hive_error: hiveNote } : {};
 
-  try {
-    const claudeResult = await analyzeWithClaude(buffer, imageType);
-    if (claudeResult) return { ...claudeResult, analyzed_at: new Date().toISOString(), ...debugInfo };
-  } catch (err) {
-    console.error("[AIContentAnalysis] Claude failed:", err.message);
+  if (allowClaude && buffer.length <= 5 * 1024 * 1024) {
+    try {
+      const claudeResult = await analyzeWithClaude(buffer, imageType);
+      if (claudeResult) return { ...claudeResult, analyzed_at: new Date().toISOString(), ...debugInfo };
+    } catch (err) {
+      console.error("[AIContentAnalysis] Claude failed:", err.message);
+    }
   }
 
-  // Both backends unavailable or failed, but analysis was genuinely
-  // attempted — say so honestly rather than disappearing silently.
+  // The check was genuinely attempted but did not run. Say so rather than disappearing silently.
   return { assessment: "inconclusive", summary: "AI content analysis failed to run for this image.", method: null, analyzed_at: new Date().toISOString(), ...debugInfo };
 }
