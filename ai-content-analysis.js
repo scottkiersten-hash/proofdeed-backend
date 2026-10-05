@@ -10,11 +10,12 @@
  * as a supporting signal, never a guarantee.
  *
  * Two backends, tried in this order:
- *   1. Hive AI (thehive.ai) — a purpose-built, trained AI-content
- *      classifier. Only used if HIVE_API_KEY is set. UNVERIFIED as of
- *      this writing — built from Hive's published docs but never
- *      exercised against a real Hive account/API key. Needs a live
- *      test with a real key before being trusted in production.
+ *   1. Hive AI (thehive.ai) V3 "AI-Generated & Deepfake Content Detection" model —
+ *      a purpose-built, trained classifier. Used only if HIVE_API_KEY (a V3 "Secret
+ *      Key" from portal.thehive.ai > Service API Keys) is set. Request/response shape
+ *      taken from Hive's own docs (docs.thehive.ai, Oct 2026) and unit-tested against
+ *      their example response; not yet exercised with a live key. $6 per 1,000 images.
+ *      Any Hive failure falls back to Claude, and the admin test endpoint reports why.
  *   2. Claude vision (Anthropic) — a general-purpose model's calibrated
  *      opinion. Always available as long as ANTHROPIC_API_KEY is set
  *      (same key the rest of this app already uses). This is the
@@ -33,50 +34,60 @@ function detectImageType(buffer, mimetype) {
   return null;
 }
 
-// Hive's response uses a binary ai_generated/not_ai_generated class pair with
-// a 0-1 score for whichever class it picked. Map that to our 4-value scale.
-function mapHiveScoreToAssessment(aiGeneratedScore) {
-  if (aiGeneratedScore == null) return "inconclusive";
-  if (aiGeneratedScore >= 0.85) return "likely";
-  if (aiGeneratedScore >= 0.4) return "possible";
+// Hive scores the two generation classes (ai_generated / not_ai_generated) so they sum to 1,
+// and separately scores "deepfake" for manipulated faces. Map the higher of the two relevant
+// scores onto our 4-value scale.
+function mapHiveScoreToAssessment(score) {
+  if (score == null) return "inconclusive";
+  if (score >= 0.85) return "likely";
+  if (score >= 0.4) return "possible";
   return "unlikely";
+}
+
+// Exported only so it can be unit-tested against Hive's documented response.
+export function parseHiveV3Response(json) {
+  // V3 shape: { output: [ { classes: [ { class: "ai_generated", value: 0.02 }, ... ] } ] }
+  const classes = json?.output?.[0]?.classes || [];
+  const valueOf = (name) => {
+    const c = classes.find((x) => x.class === name);
+    return c && typeof c.value === "number" ? c.value : null;
+  };
+  const aiScore = valueOf("ai_generated");
+  const deepfakeScore = valueOf("deepfake");
+
+  // If the response has no ai_generated class, don't record an empty "hive" answer:
+  // throw so the caller falls back to Claude.
+  if (aiScore == null) {
+    throw new Error("Hive response had no ai_generated class: " + JSON.stringify(json).slice(0, 200));
+  }
+
+  const worst = Math.max(aiScore, deepfakeScore ?? 0);
+  let summary = `Hive's AI-content classifier scored this image ${(aiScore * 100).toFixed(1)}% likely to be AI-generated.`;
+  if (deepfakeScore != null && deepfakeScore >= 0.4) {
+    summary += ` It also scored ${(deepfakeScore * 100).toFixed(1)}% likely to contain a deepfaked face.`;
+  }
+  return { assessment: mapHiveScoreToAssessment(worst), summary, method: "hive" };
 }
 
 async function analyzeWithHive(buffer, imageType) {
   const hiveKey = process.env.HIVE_API_KEY;
   if (!hiveKey) return null;
 
+  // Multipart upload with a "media" field, per Hive's V3 docs (limit 200MB; our own cap is 5MB).
   const form = new FormData();
-  // Field name per Hive's docs ("Use this key to send a binary file through
-  // a post request"); UNVERIFIED against a live account — if this field
-  // name is wrong, Hive will reject the request and we fall back to Claude.
-  form.append("media", new Blob([buffer], { type: imageType }));
+  form.append("media", new Blob([buffer], { type: imageType }), imageType === "image/png" ? "image.png" : "image.jpg");
 
-  const res = await fetch("https://api.thehive.ai/api/v2/task/sync", {
+  const res = await fetch("https://api.thehive.ai/api/v3/hive/ai-generated-and-deepfake-content-detection", {
     method: "POST",
-    headers: { authorization: `token ${hiveKey}` },
+    headers: { Authorization: `Bearer ${hiveKey}` },
     body: form,
   });
 
   if (!res.ok) {
-    throw new Error(`Hive API returned ${res.status}: ${await res.text().catch(() => "")}`);
+    throw new Error(`Hive API returned ${res.status}: ${(await res.text().catch(() => "")).slice(0, 200)}`);
   }
 
-  const json = await res.json();
-  const classes = json?.status?.[0]?.response?.output?.[0]?.classes || [];
-  const aiGeneratedClass = classes.find((c) => c.class === "ai_generated");
-
-  // Per Hive's docs the two generation classes' scores sum to 1. If the response doesn't
-  // contain one, don't record an empty "hive" answer: throw so the caller falls back to Claude.
-  if (!aiGeneratedClass || typeof aiGeneratedClass.score !== "number") {
-    throw new Error("Hive response had no ai_generated class: " + JSON.stringify(json).slice(0, 200));
-  }
-
-  return {
-    assessment: mapHiveScoreToAssessment(aiGeneratedClass.score),
-    summary: `Hive's AI-content classifier scored this image ${(aiGeneratedClass.score * 100).toFixed(1)}% likely to be AI-generated.`,
-    method: "hive",
-  };
+  return parseHiveV3Response(await res.json());
 }
 
 async function analyzeWithClaude(buffer, imageType) {
