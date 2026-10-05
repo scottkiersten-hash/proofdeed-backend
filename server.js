@@ -3703,7 +3703,7 @@ app.post(['/admin/test-ai-content-analysis', '/api/admin/test-ai-content-analysi
   try {
     if (!verifyAdminAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
     if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
-    const result = await analyzeImageForAIContent(req.file.buffer, req.file.mimetype);
+    const result = await analyzeImageForAIContent(req.file.buffer, req.file.mimetype, { debug: true });
     res.json({ success: true, mimetype: req.file.mimetype, size: req.file.buffer.length, result });
   } catch (err) {
     console.error('[AIContentAnalysis] Admin test error:', err.message);

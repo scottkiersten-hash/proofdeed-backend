@@ -66,11 +66,15 @@ async function analyzeWithHive(buffer, imageType) {
   const classes = json?.status?.[0]?.response?.output?.[0]?.classes || [];
   const aiGeneratedClass = classes.find((c) => c.class === "ai_generated");
 
+  // Per Hive's docs the two generation classes' scores sum to 1. If the response doesn't
+  // contain one, don't record an empty "hive" answer: throw so the caller falls back to Claude.
+  if (!aiGeneratedClass || typeof aiGeneratedClass.score !== "number") {
+    throw new Error("Hive response had no ai_generated class: " + JSON.stringify(json).slice(0, 200));
+  }
+
   return {
-    assessment: mapHiveScoreToAssessment(aiGeneratedClass?.score),
-    summary: aiGeneratedClass
-      ? `Hive's AI-content classifier scored this image ${(aiGeneratedClass.score * 100).toFixed(1)}% likely to be AI-generated.`
-      : "Hive's classifier returned a result that could not be interpreted.",
+    assessment: mapHiveScoreToAssessment(aiGeneratedClass.score),
+    summary: `Hive's AI-content classifier scored this image ${(aiGeneratedClass.score * 100).toFixed(1)}% likely to be AI-generated.`,
     method: "hive",
   };
 }
@@ -127,7 +131,7 @@ async function analyzeWithClaude(buffer, imageType) {
  *   analyzed_at: string,
  * }
  */
-export async function analyzeImageForAIContent(buffer, mimetype) {
+export async function analyzeImageForAIContent(buffer, mimetype, { debug = false } = {}) {
   const imageType = detectImageType(buffer, mimetype);
   if (!imageType) return null;
   if (!process.env.HIVE_API_KEY && !process.env.ANTHROPIC_API_KEY) return null;
@@ -138,23 +142,28 @@ export async function analyzeImageForAIContent(buffer, mimetype) {
     return { assessment: "inconclusive", summary: "This image is over 5MB, which is too large for the AI check.", method: null, analyzed_at: new Date().toISOString() };
   }
 
+  // With debug on (admin test endpoint only), say whether Hive was tried and why it failed.
+  // Otherwise a bad Hive key would silently fall back to Claude and look like it worked.
+  let hiveNote = null;
   if (process.env.HIVE_API_KEY) {
     try {
       const hiveResult = await analyzeWithHive(buffer, imageType);
-      if (hiveResult) return { ...hiveResult, analyzed_at: new Date().toISOString() };
+      if (hiveResult) return { ...hiveResult, analyzed_at: new Date().toISOString(), ...(debug ? { hive_attempted: true } : {}) };
     } catch (err) {
       console.error("[AIContentAnalysis] Hive failed, falling back to Claude:", err.message);
+      hiveNote = err.message.slice(0, 300);
     }
   }
+  const debugInfo = debug ? { hive_attempted: !!process.env.HIVE_API_KEY, hive_error: hiveNote } : {};
 
   try {
     const claudeResult = await analyzeWithClaude(buffer, imageType);
-    if (claudeResult) return { ...claudeResult, analyzed_at: new Date().toISOString() };
+    if (claudeResult) return { ...claudeResult, analyzed_at: new Date().toISOString(), ...debugInfo };
   } catch (err) {
     console.error("[AIContentAnalysis] Claude failed:", err.message);
   }
 
   // Both backends unavailable or failed, but analysis was genuinely
   // attempted — say so honestly rather than disappearing silently.
-  return { assessment: "inconclusive", summary: "AI content analysis failed to run for this image.", method: null, analyzed_at: new Date().toISOString() };
+  return { assessment: "inconclusive", summary: "AI content analysis failed to run for this image.", method: null, analyzed_at: new Date().toISOString(), ...debugInfo };
 }
