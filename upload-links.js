@@ -47,7 +47,7 @@ function safeEqual(a, b) {
 }
 
 export function registerUploadLinks(app, deps) {
-  const { pool, upload, authenticateToken, sendEmail, logCertEvent, anchorToPolygon, analyzeImageForAIContent } = deps;
+  const { pool, upload, authenticateToken, sendEmail, logCertEvent, anchorToPolygon, analyzeImageForAIContent, saveContentCredentials, contentCredentialsView } = deps;
 
   const submitLimiter = rateLimit({
     windowMs: 60 * 60 * 1000,
@@ -149,7 +149,7 @@ export function registerUploadLinks(app, deps) {
       const subs = ids.length
         ? await pool.query(
             `SELECT s.link_id, s.certification_id, s.sender_name, s.sender_note, s.file_name, s.file_type, s.file_size, s.created_at,
-                    c.polygon_tx, c.ai_content_assessment, c.ai_content_summary
+                    c.polygon_tx, c.ai_content_assessment, c.ai_content_summary, c.content_credentials
              FROM upload_link_submissions s
              LEFT JOIN certifications c ON c.certification_id = s.certification_id
              WHERE s.link_id = ANY($1)
@@ -161,7 +161,11 @@ export function registerUploadLinks(app, deps) {
       const byLink = new Map();
       for (const s of subs.rows) {
         const list = byLink.get(s.link_id) || [];
-        if (list.length < 50) list.push({ ...s, link_id: undefined });
+        if (list.length < 50) {
+          const { content_credentials: cc, ...rest } = s;
+          // Only what the list needs: whether a credential was found, and whether it declares AI.
+          list.push({ ...rest, link_id: undefined, credentials_status: cc?.status || null, credentials_ai: !!cc?.ai_declared });
+        }
         byLink.set(s.link_id, list);
       }
       res.json({
@@ -391,10 +395,13 @@ export function registerUploadLinks(app, deps) {
         return res.status(400).json({ error: "This image does not match the file that was certified." });
       }
 
+      // The photo's Content Credentials are read here, with no outside service.
+      const credentials = contentCredentialsView(await saveContentCredentials(row.certification_id, req.file.buffer));
+
       const result = await analyzeImageForAIContent(req.file.buffer, req.file.mimetype);
-      if (!result) return res.json({ ai_content_analysis: null });
+      if (!result) return res.json({ ai_content_analysis: null, content_credentials: credentials });
       // A check that could not run is shown but never written to the permanent record.
-      if (!result.method) return res.json({ ai_content_analysis: { assessment: result.assessment, summary: result.summary, method: null } });
+      if (!result.method) return res.json({ ai_content_analysis: { assessment: result.assessment, summary: result.summary, method: null }, content_credentials: credentials });
 
       await pool.query(
         `UPDATE certifications
@@ -403,7 +410,7 @@ export function registerUploadLinks(app, deps) {
         [result.assessment, result.summary, new Date(result.analyzed_at), result.method, row.certification_id]
       );
       logCertEvent(row.certification_id, "ai_content_analyzed", "AI Content Analysis Completed", { assessment: result.assessment });
-      res.json({ ai_content_analysis: { assessment: result.assessment, summary: result.summary, method: result.method } });
+      res.json({ ai_content_analysis: { assessment: result.assessment, summary: result.summary, method: result.method }, content_credentials: credentials });
     } catch (err) {
       console.error("[UploadLinks] photo check error:", err);
       res.status(500).json({ error: "Internal server error." });

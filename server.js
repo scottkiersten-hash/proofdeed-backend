@@ -49,6 +49,7 @@ import { anchorToPolygon, getAnchorWalletStatus } from "./polygon.js";
 import { analyzeDocument } from "./forensics.js";
 import { analyzeImageForAIContent } from "./ai-content-analysis.js";
 import { registerUploadLinks } from "./upload-links.js";
+import { readContentCredentials, describeContentCredentials } from "./content-credentials.js";
 import multer from 'multer';
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -149,6 +150,29 @@ function logCertEvent(certId, eventType, eventLabel, metadata = {}) {
      VALUES ($1, $2, $3, $4, NOW())`,
     [certId, eventType, eventLabel, JSON.stringify(metadata)]
   ).catch(() => {});
+}
+
+// Read a JPEG photo's Content Credentials (C2PA) and keep the result on its record.
+// Never throws: a photo that cannot be read simply has no stored result.
+async function saveContentCredentials(certId, buffer) {
+  try {
+    const cc = readContentCredentials(buffer);
+    if (!cc) return null;
+    await pool.query(
+      "UPDATE certifications SET content_credentials = $1, content_credentials_checked_at = NOW() WHERE certification_id = $2",
+      [JSON.stringify(cc), certId]
+    );
+    return cc;
+  } catch (err) {
+    console.error("[ContentCredentials] save failed for", certId, err.message);
+    return null;
+  }
+}
+
+// What an API or page shows for a stored result: the result plus plain-language wording.
+function contentCredentialsView(cc) {
+  if (!cc) return null;
+  return { ...cc, ...describeContentCredentials(cc) };
 }
 
 // Generate a scan-to-verify QR PNG buffer for a ProofDeed verification path, e.g. "/verify/PD-123"
@@ -835,6 +859,7 @@ app.post(["/api/v1/certify/file", "/v1/certify/file"], authenticateApiKey, uploa
     );
 
     logCertEvent(proofId, 'created', 'Trust Record Created', { forensic_assessment: forensics.assessment }).catch(() => {});
+    const contentCredentials = await saveContentCredentials(proofId, fileBuffer);
 
     res.json({
       proofId,
@@ -854,6 +879,7 @@ app.post(["/api/v1/certify/file", "/v1/certify/file"], authenticateApiKey, uploa
         assessment: forensics.assessment,
       },
       ai_content_analysis: aiContent ? { assessment: aiContent.assessment, summary: aiContent.summary, method: aiContent.method } : null,
+      content_credentials: contentCredentialsView(contentCredentials),
     });
 
     // Background blockchain anchor
@@ -942,6 +968,7 @@ app.post(["/api/certify-file", "/certify-file"], upload.single('file'), async (r
     );
 
     logCertEvent(proofId, 'created', 'Trust Record Created', { forensic_assessment: forensics.assessment }).catch(() => {});
+    const contentCredentials = await saveContentCredentials(proofId, fileBuffer);
 
     res.json({
       proofId,
@@ -957,6 +984,7 @@ app.post(["/api/certify-file", "/certify-file"], upload.single('file'), async (r
         assessment: forensics.assessment,
       },
       ai_content_analysis: aiContent ? { assessment: aiContent.assessment, summary: aiContent.summary, method: aiContent.method } : null,
+      content_credentials: contentCredentialsView(contentCredentials),
     });
 
     anchorToPolygon(documentHash).then(async (txHash) => {
@@ -2434,7 +2462,7 @@ app.post(["/api/certifications/:certId/ai-check", "/certifications/:certId/ai-ch
     if (userResult.rows.length === 0) return res.status(401).json({ error: "User not found." });
 
     const certResult = await pool.query(
-      `SELECT certification_id, hash, user_id, ai_content_assessment, ai_content_summary, ai_content_method
+      `SELECT certification_id, hash, user_id, ai_content_assessment, ai_content_summary, ai_content_method, content_credentials
        FROM certifications WHERE certification_id = $1`,
       [req.params.certId]
     );
@@ -2445,7 +2473,8 @@ app.post(["/api/certifications/:certId/ai-check", "/certifications/:certId/ai-ch
 
     if (cert.ai_content_assessment) {
       return res.json({
-        ai_content_analysis: { assessment: cert.ai_content_assessment, summary: cert.ai_content_summary, method: cert.ai_content_method }
+        ai_content_analysis: { assessment: cert.ai_content_assessment, summary: cert.ai_content_summary, method: cert.ai_content_method },
+        content_credentials: contentCredentialsView(cert.content_credentials),
       });
     }
 
@@ -2455,16 +2484,19 @@ app.post(["/api/certifications/:certId/ai-check", "/certifications/:certId/ai-ch
       return res.status(400).json({ error: "This image does not match the certified record." });
     }
 
+    // Content Credentials are read on this server, with no outside service, as part of the photo check.
+    const contentCredentials = cert.content_credentials || await saveContentCredentials(cert.certification_id, req.file.buffer);
+
     const aiContent = await analyzeImageForAIContent(req.file.buffer, req.file.mimetype);
     if (!aiContent) {
-      return res.json({ ai_content_analysis: null });
+      return res.json({ ai_content_analysis: null, content_credentials: contentCredentialsView(contentCredentials) });
     }
 
     // A check that couldn't actually run (model error, oversized image) has no method.
     // Show it to the user but don't write it onto the permanent public record, so a
     // transient failure never stands as the record's answer and can be retried.
     if (!aiContent.method) {
-      return res.json({ ai_content_analysis: { assessment: aiContent.assessment, summary: aiContent.summary, method: null } });
+      return res.json({ ai_content_analysis: { assessment: aiContent.assessment, summary: aiContent.summary, method: null }, content_credentials: contentCredentialsView(contentCredentials) });
     }
 
     await pool.query(
@@ -2475,7 +2507,7 @@ app.post(["/api/certifications/:certId/ai-check", "/certifications/:certId/ai-ch
     );
     logCertEvent(cert.certification_id, "ai_content_analyzed", "AI Content Analysis Completed", { assessment: aiContent.assessment }).catch(() => {});
 
-    res.json({ ai_content_analysis: { assessment: aiContent.assessment, summary: aiContent.summary, method: aiContent.method } });
+    res.json({ ai_content_analysis: { assessment: aiContent.assessment, summary: aiContent.summary, method: aiContent.method }, content_credentials: contentCredentialsView(contentCredentials) });
   } catch (err) {
     console.error("AI check error:", err);
     res.status(500).json({ error: "Internal server error." });
@@ -2484,7 +2516,7 @@ app.post(["/api/certifications/:certId/ai-check", "/certifications/:certId/ai-ch
 
 // Certified upload links: a customer sends a link, whoever opens it sends a file, and the record
 // lands in the customer's account. See upload-links.js.
-registerUploadLinks(app, { pool, upload, authenticateToken, sendEmail, logCertEvent, anchorToPolygon, analyzeImageForAIContent });
+registerUploadLinks(app, { pool, upload, authenticateToken, sendEmail, logCertEvent, anchorToPolygon, analyzeImageForAIContent, saveContentCredentials, contentCredentialsView });
 
 /* ---------------- VERIFY CERTIFICATE ---------------- */
 /* ---------------- PUBLIC DEMO CERTIFY ---------------- */
@@ -2662,7 +2694,8 @@ app.get(["/verify/:certId", "/api/verify/:certId"], async (req, res) => {
               c.forensic_file_type, c.forensic_declared_created_at, c.forensic_declared_modified_at,
               c.forensic_authoring_software, c.forensic_pdf_version_layers, c.forensic_post_creation_edits,
               c.forensic_total_editing_minutes, c.forensic_anomalies, c.forensic_assessment, c.forensic_analyzed_at,
-              c.ai_content_assessment, c.ai_content_summary, c.ai_content_analyzed_at, c.ai_content_method
+              c.ai_content_assessment, c.ai_content_summary, c.ai_content_analyzed_at, c.ai_content_method,
+              c.content_credentials
        FROM certifications c
        LEFT JOIN api_keys ak ON ak.email = c.api_key_email
        WHERE c.certification_id = $1`,
@@ -2723,6 +2756,8 @@ app.get(["/verify/:certId", "/api/verify/:certId"], async (req, res) => {
           analyzed_at: cert.ai_content_analyzed_at,
           method: cert.ai_content_method,
         } : null,
+        // Shown only when a credential was found; "none found" says nothing either way.
+        content_credentials: cert.content_credentials && cert.content_credentials.status !== 'none' ? contentCredentialsView(cert.content_credentials) : null,
       }
     });
 
@@ -3293,6 +3328,21 @@ function runTrustAnalysis({ certRows, passportRows, passportEvents, trustIdRows,
   } else if (aiClear.length) {
     findings.push({ type: 'positive', title: 'No Signs of AI Generation', detail: `AI Fraud Detection found no visual signs of AI generation in ${aiClear.length} certified image(s).` });
   }
+  // --- Content Credentials read from the photo itself. Only the adverse results count against a
+  // record: a credential that declares AI generation, or one that no longer matches its photo.
+  // A credential that checks out is not shown as a strength, because anyone can sign with a
+  // certificate carrying any name, and a missing credential proves nothing.
+  const ccRows = certRows.filter(c => c.content_credentials && typeof c.content_credentials === 'object');
+  const ccAi = ccRows.filter(c => c.content_credentials.ai_declared);
+  const ccBroken = ccRows.filter(c => c.content_credentials.status === 'invalid');
+  if (ccAi.length) {
+    riskScore += 30;
+    findings.push({ type: 'critical', title: 'Photo Says It Was Made With AI', detail: `${ccAi.length} certified photo(s) carry Content Credentials that declare AI generation. The photo itself says so, so no outside opinion is needed.` });
+  }
+  if (ccBroken.length) {
+    riskScore += 20;
+    findings.push({ type: 'warning', title: 'Content Credentials Do Not Match the Photo', detail: `${ccBroken.length} certified photo(s) carry Content Credentials that fail verification, which means the photo or its credential was changed after it was signed. Review before relying on them.` });
+  }
   const forensicHigh = certRows.filter(c => c.forensic_assessment === 'high');
   const forensicModerate = certRows.filter(c => c.forensic_assessment === 'moderate');
   if (forensicHigh.length) {
@@ -3403,7 +3453,7 @@ app.post(['/api/v1/trust-analysis', '/v1/trust-analysis'], authenticateApiKeyOrS
 
     if (proof_id) {
       const cr = await pool.query(
-        `SELECT certification_id, hash, created_at, polygon_tx, ai_content_assessment, ai_content_summary, forensic_assessment
+        `SELECT certification_id, hash, created_at, polygon_tx, ai_content_assessment, ai_content_summary, forensic_assessment, content_credentials
          FROM certifications WHERE certification_id=$1 OR hash=$1 ORDER BY created_at DESC LIMIT 5`, [proof_id]);
       certRows = cr.rows;
     }
@@ -10112,6 +10162,19 @@ app.post(['/api/admin/social-engine/run', '/admin/social-engine/run'], authRateL
     console.log('[SequenceEngine] Tables ready');
   } catch (err) {
     console.error('[SequenceEngine] Schema error:', err.message);
+  }
+})();
+
+// -- Content Credentials result on a record (isolated IIFE so other migrations can't block this)
+(async () => {
+  try {
+    await pool.query(`
+      ALTER TABLE certifications ADD COLUMN IF NOT EXISTS content_credentials JSONB;
+      ALTER TABLE certifications ADD COLUMN IF NOT EXISTS content_credentials_checked_at TIMESTAMPTZ;
+    `);
+    console.log('[ContentCredentials] Columns ready');
+  } catch (err) {
+    console.error('[ContentCredentials] Schema error:', err.message);
   }
 })();
 
