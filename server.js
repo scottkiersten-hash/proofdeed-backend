@@ -48,6 +48,7 @@ function getTOTPUri(secret) {
 import { anchorToPolygon, getAnchorWalletStatus } from "./polygon.js";
 import { analyzeDocument } from "./forensics.js";
 import { analyzeImageForAIContent } from "./ai-content-analysis.js";
+import { registerUploadLinks } from "./upload-links.js";
 import multer from 'multer';
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -2480,6 +2481,10 @@ app.post(["/api/certifications/:certId/ai-check", "/certifications/:certId/ai-ch
     res.status(500).json({ error: "Internal server error." });
   }
 });
+
+// Certified upload links: a customer sends a link, whoever opens it sends a file, and the record
+// lands in the customer's account. See upload-links.js.
+registerUploadLinks(app, { pool, upload, authenticateToken, sendEmail, logCertEvent, anchorToPolygon, analyzeImageForAIContent });
 
 /* ---------------- VERIFY CERTIFICATE ---------------- */
 /* ---------------- PUBLIC DEMO CERTIFY ---------------- */
@@ -10107,6 +10112,46 @@ app.post(['/api/admin/social-engine/run', '/admin/social-engine/run'], authRateL
     console.log('[SequenceEngine] Tables ready');
   } catch (err) {
     console.error('[SequenceEngine] Schema error:', err.message);
+  }
+})();
+
+// -- Certified upload links (isolated IIFE so other migrations can't block this)
+(async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS upload_links (
+        id              SERIAL PRIMARY KEY,
+        token           TEXT UNIQUE NOT NULL,
+        owner_user_id   INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        owner_email     TEXT NOT NULL,
+        title           TEXT NOT NULL,
+        instructions    TEXT,
+        requester_name  TEXT,
+        ai_check        BOOLEAN NOT NULL DEFAULT TRUE,
+        max_uploads     INTEGER NOT NULL DEFAULT 25,
+        expires_at      TIMESTAMPTZ NOT NULL,
+        revoked_at      TIMESTAMPTZ,
+        created_at      TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_upload_links_owner ON upload_links(owner_user_id);
+      CREATE TABLE IF NOT EXISTS upload_link_submissions (
+        id                SERIAL PRIMARY KEY,
+        link_id           INTEGER REFERENCES upload_links(id) ON DELETE CASCADE,
+        certification_id  TEXT NOT NULL,
+        sender_name       TEXT,
+        sender_note       TEXT,
+        file_name         TEXT,
+        file_type         TEXT,
+        file_size         BIGINT,
+        receipt_key       TEXT NOT NULL,
+        created_at        TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_upload_link_submissions_link ON upload_link_submissions(link_id);
+      CREATE INDEX IF NOT EXISTS idx_upload_link_submissions_cert ON upload_link_submissions(certification_id);
+    `);
+    console.log('[UploadLinks] Tables ready');
+  } catch (err) {
+    console.error('[UploadLinks] Schema error:', err.message);
   }
 })();
 

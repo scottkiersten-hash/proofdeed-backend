@@ -451,3 +451,32 @@ CREATE INDEX IF NOT EXISTS idx_trust_records_status        ON trust_records(stat
 CREATE INDEX IF NOT EXISTS idx_record_versions_record_id   ON record_versions(trust_record_id);
 CREATE INDEX IF NOT EXISTS idx_record_events_record_id     ON record_events(trust_record_id);
 CREATE INDEX IF NOT EXISTS idx_record_events_type          ON record_events(event_type);
+
+-- Certified upload links (created at startup in server.js; kept here for reference)
+CREATE TABLE IF NOT EXISTS upload_links (
+  id              SERIAL PRIMARY KEY,
+  token           TEXT UNIQUE NOT NULL,
+  owner_user_id   INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  owner_email     TEXT NOT NULL,
+  title           TEXT NOT NULL,
+  instructions    TEXT,
+  requester_name  TEXT,
+  ai_check        BOOLEAN NOT NULL DEFAULT TRUE,
+  max_uploads     INTEGER NOT NULL DEFAULT 25,
+  expires_at      TIMESTAMPTZ NOT NULL,
+  revoked_at      TIMESTAMPTZ,
+  created_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS upload_link_submissions (
+  id                SERIAL PRIMARY KEY,
+  link_id           INTEGER REFERENCES upload_links(id) ON DELETE CASCADE,
+  certification_id  TEXT NOT NULL,
+  sender_name       TEXT,
+  sender_note       TEXT,
+  file_name         TEXT,
+  file_type         TEXT,
+  file_size         BIGINT,
+  receipt_key       TEXT NOT NULL,
+  created_at        TIMESTAMPTZ DEFAULT NOW()
+);
