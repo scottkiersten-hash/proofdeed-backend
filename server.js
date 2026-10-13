@@ -6258,9 +6258,9 @@ app.post(['/api/admin/import/send-pending', '/admin/import/send-pending'], authR
             real_estate: 'real_estate_ops', university_research: 'university_research',
             gov_regulator: 'gov_regulator', construction_detail: 'construction_eng',
           }[contact.industry] || 'compliance';
-          const emailBody = isUAE
+          const emailBody = withTrialOffer(isUAE
             ? UAE_EMAIL(contact.name, contact.company, contact.role || 'uae_redev')
-            : INITIAL_EMAIL(contact.name, contact.company, contact.industry, contact.role || industryDefaultRole);
+            : INITIAL_EMAIL(contact.name, contact.company, contact.industry, contact.role || industryDefaultRole), contact.industry);
           const subject = isUAE
             ? `Aligning ${contact.company} with Dubai's 2026 Paperless Mandate`
             : [
@@ -8315,6 +8315,19 @@ Founder & CEO, ProofDeed
 info@proofdeed.com | proofdeed.com`;
 };
 
+// P.S. added to every product-pitch outreach email (Scott, Oct 13, 2026): the first month is free.
+// Government offices get the 60-day trial the /government page advertises; everyone else gets 30
+// days. It is redeemed by replying and set up by hand, so it does not depend on the PARTNER30
+// promo code (capped at 5 redemptions in Stripe). Affiliate emails are not product pitches and do
+// not get it.
+const withTrialOffer = (body, industry) => {
+  const gov = industry === 'government' || industry === 'gov_regulator';
+  const ps = gov
+    ? "P.S. The first 60 days are free for government offices, no card needed. Reply to this email and I'll set it up."
+    : "P.S. The first 30 days are free. Reply to this email and I'll set up your account.";
+  return `${body}\n\n${ps}`;
+};
+
 const INITIAL_EMAIL = (name, company, industry, role) => {
   const rawFirst = name.split(' ')[0];
   // Guard: never greet as "Hi Team," — use title-cased first name only if it looks real
@@ -9344,13 +9357,14 @@ async function runLeadEngine(targetsPerRun = 3) {
           const isUAE = ['uae_realestate','uae_auto'].includes(target.industry);
           const sandboxRoles = new Set(['auto_remarketing2','auto_warranty','auto_dds','auto_coo','auto_blockchain','inst_ethics','inst_fund','inst_ma','inst_aml','inst_digital_assets','pharma_gxp','pharma_trial','pharma_serial','pharma_lims','pharma_coldchain','aviation_airworthy','aviation_logistics','aviation_cdo','aviation_sms','aviation_records']);
           const isSandbox = sandboxRoles.has(target.role);
-          const emailBody = isAffiliate
+          const pitchBody = isAffiliate
             ? AFFILIATE_EMAIL(lead.name, lead.company, target.role)
             : isUAE
               ? UAE_EMAIL(lead.name, lead.company, target.role)
               : isSandbox
                 ? SANDBOX_EMAIL(lead.name, lead.company, target.role)
                 : INITIAL_EMAIL(lead.name, lead.company, lead.industry || target.industry, target.role);
+          const emailBody = isAffiliate ? pitchBody : withTrialOffer(pitchBody, target.industry);
           const subject = isAffiliate
             ? `Revenue share idea for ${lead.company}`
             : isUAE
