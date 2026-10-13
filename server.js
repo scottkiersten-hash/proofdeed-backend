@@ -4022,13 +4022,22 @@ app.post(["/create-checkout-session", "/api/create-checkout-session"], async (re
       "individual-onetime": priceEnv(process.env.PRICE_INDIVIDUAL_ONETIME),
     };
 
+    // Self-serve plans that start with a 30-day card-required trial. Government has its own 60-day trial.
+    const trialPlans = new Set(["professional-monthly", "business-monthly", "enterprise-monthly"]);
     const isOneTime = plan in oneTimePlans;
     const priceId = isOneTime ? oneTimePlans[plan] : subscriptionPlans[plan];
     if (!priceId) return res.status(400).json({ error: "Invalid plan: " + plan });
 
     const sessionParams = {
       mode: isOneTime ? "payment" : "subscription",
-      ...(isOneTime ? {} : { payment_method_types: ["card"], allow_promotion_codes: true }),
+      ...(isOneTime ? {} : { payment_method_types: ["card"], allow_promotion_codes: !trialPlans.has(plan) }),
+      ...(trialPlans.has(plan) ? {
+        // 30-day trial for everyone on the self-serve plans. A card is required up front and the
+        // trial converts to a paid subscription unless cancelled, so the checkout page says so plainly.
+        payment_method_collection: "always",
+        subscription_data: { trial_period_days: 30 },
+        custom_text: { submit: { message: "Your 30-day free trial starts today. Your card will be charged automatically when the trial ends, unless you cancel before then. You can cancel any time before the trial ends and you will not be charged. To cancel, email info@proofdeed.com or use the billing link in your confirmation email." } },
+      } : {}),
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: success_url || "https://proofdeed.com/success",
       cancel_url: cancel_url || "https://proofdeed.com",
@@ -10037,7 +10046,7 @@ async function writeSocialEngineResult(ok, error) {
 // The one claim, in the same words in every post, with the live check as the proof (Scott, Oct 13, 2026).
 // Added in code, not left to the model, so the wording never drifts.
 const SOCIAL_CLAIM = 'Change one character. Watch it fail.';
-const SOCIAL_CLAIM_URL = 'proofdeed.com/challenge';
+const SOCIAL_CLAIM_URL = 'proofdeed.com/#see-it-happen';
 function addClaimToLinkedInPost(text) {
   const lines = text.trim().split('\n');
   const closing = `${SOCIAL_CLAIM}\nTry the live check: ${SOCIAL_CLAIM_URL}`;
@@ -10108,7 +10117,7 @@ Return: first line = subreddit, second line = title, then body.` }]
     const rdLines = rdRaw.split('\n').filter(l => l.trim());
     const rdSubreddit = rdLines[0].replace(/^r\//, '').trim();
     const rdTitle = rdLines[1] || '';
-    const rdBody  = `${rdLines.slice(2).join('\n').trim()}\n\n${SOCIAL_CLAIM} Anyone can try it: https://${SOCIAL_CLAIM_URL}`;
+    const rdBody  = `${rdLines.slice(2).join('\n').trim()}\n\n${SOCIAL_CLAIM} You can try it yourself: https://${SOCIAL_CLAIM_URL}`;
 
     console.log(`[SocialEngine] Day ${dayOfYear}, angle: ${angle}`);
 
