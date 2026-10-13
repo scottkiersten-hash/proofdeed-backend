@@ -10034,6 +10034,21 @@ async function writeSocialEngineResult(ok, error) {
   ).catch(() => {});
 }
 
+// The one claim, in the same words in every post, with the live check as the proof (Scott, Oct 13, 2026).
+// Added in code, not left to the model, so the wording never drifts.
+const SOCIAL_CLAIM = 'Change one character. Watch it fail.';
+const SOCIAL_CLAIM_URL = 'proofdeed.com/challenge';
+function addClaimToLinkedInPost(text) {
+  const lines = text.trim().split('\n');
+  const closing = `${SOCIAL_CLAIM}\nTry the live check: ${SOCIAL_CLAIM_URL}`;
+  // Hashtags sit on the last line; put the claim above them.
+  if (lines.length && lines[lines.length - 1].trim().startsWith('#')) {
+    const tags = lines.pop();
+    return `${lines.join('\n').trim()}\n\n${closing}\n\n${tags}`;
+  }
+  return `${lines.join('\n').trim()}\n\n${closing}`;
+}
+
 async function runDailySocialPosts() {
   const bufferToken = process.env.BUFFER_ACCESS_TOKEN;
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
@@ -10064,7 +10079,7 @@ async function runDailySocialPosts() {
         messages: [{ role: 'user', content: `Write a LinkedIn post for ProofDeed (proofdeed.com).
 Core idea: "${idea}"
 ${banned}
-Rules: 160-220 words. First line is a sharp hook — no emoji, no hashtag. Short paragraphs, no bullets. End with 3-4 hashtags on their own line. Sound like a founder who understands the problem deeply, not a marketer.
+Rules: 160-220 words. First line is a sharp hook — no emoji, no hashtag. Short paragraphs, no bullets. Do not write a call to action or a link; one is added for you. End with 3-4 hashtags on their own line. Sound like a founder who understands the problem deeply, not a marketer.
 Return only the post text.` }]
       }),
       // X/Twitter: punchy, 240 chars max, no hashtag spam
@@ -10073,7 +10088,7 @@ Return only the post text.` }]
         messages: [{ role: 'user', content: `Write a tweet for ProofDeed (proofdeed.com).
 Core idea: "${idea}"
 ${banned}
-Rules: Max 240 characters total including any hashtags. One sharp sentence or two short ones. Max 2 hashtags. No em dashes. No fluff. Punchy.
+Rules: Max 190 characters total including any hashtags (a closing line and link are added for you). One sharp sentence or two short ones. Max 2 hashtags. No em dashes. No fluff. Punchy.
 Return only the tweet text.` }]
       }),
       // Reddit: discussion framing, no promotion
@@ -10087,13 +10102,13 @@ Return: first line = subreddit, second line = title, then body.` }]
       })
     ]);
 
-    const liPost = liMsg.content[0].text.trim();
-    const twPost = twMsg.content[0].text.trim().substring(0, 280);
+    const liPost = addClaimToLinkedInPost(liMsg.content[0].text);
+    const twPost = `${twMsg.content[0].text.trim().substring(0, 190)}\n${SOCIAL_CLAIM} ${SOCIAL_CLAIM_URL}`;
     const rdRaw  = rdMsg.content[0].text.trim();
     const rdLines = rdRaw.split('\n').filter(l => l.trim());
     const rdSubreddit = rdLines[0].replace(/^r\//, '').trim();
     const rdTitle = rdLines[1] || '';
-    const rdBody  = rdLines.slice(2).join('\n').trim();
+    const rdBody  = `${rdLines.slice(2).join('\n').trim()}\n\n${SOCIAL_CLAIM} Anyone can try it: https://${SOCIAL_CLAIM_URL}`;
 
     console.log(`[SocialEngine] Day ${dayOfYear}, angle: ${angle}`);
 
