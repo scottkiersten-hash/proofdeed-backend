@@ -4036,7 +4036,7 @@ app.post(["/create-checkout-session", "/api/create-checkout-session"], async (re
         // trial converts to a paid subscription unless cancelled, so the checkout page says so plainly.
         payment_method_collection: "always",
         subscription_data: { trial_period_days: 30 },
-        custom_text: { submit: { message: "Your 30-day free trial starts today. Your card will be charged automatically when the trial ends, unless you cancel before then. You can cancel any time before the trial ends and you will not be charged. To cancel, email info@proofdeed.com or use the billing link in your confirmation email." } },
+        custom_text: { submit: { message: "Your 30-day free trial starts today. Your card will be charged automatically when the trial ends, unless you cancel before then. You can cancel any time before the trial ends and you will not be charged. To cancel, use Manage billing at proofdeed.com/api-dashboard or email info@proofdeed.com." } },
       } : {}),
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: success_url || "https://proofdeed.com/success",
