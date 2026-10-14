@@ -8805,6 +8805,51 @@ function isLeadEmail(email) {
   return true;
 }
 
+// ── Lead quality filters (Scott, Oct 14, 2026) ────────────────────────────────
+// The scraper was sending to page-title "companies" (Staff Directory, Team, Purchasing), made-up
+// example addresses (john.doe@, f.last@) copied from lead-gen sites, and web-host vendor addresses.
+// Those emails read as broken ("How does Staff Directory prove a record hasn't been altered?"),
+// hurt the sending reputation and never get replies.
+const GENERIC_COMPANY_WORDS = new Set(('staff directory team contact contacts us about home welcome to the our departments department ' +
+  'services news faq information freedom of act purchasing procurement code compliance clerk commission meet employee employees list ' +
+  'listing officials elected personnel page site website official directory contacts bids rfp rfps forms ' +
+  'county city deputy chief search records record tax assessor recorder master commissioners commissioner board treasurer auditor registrar deeds').split(' '));
+function isGenericCompany(str) {
+  const c = String(str || '').trim().toLowerCase();
+  if (!c) return true;
+  if (/^(welcome|home|about|contact|meet|our|staff|employee|trabajos|jobs|careers|search)\b/.test(c)) return true;
+  const words = c.match(/[a-z']+/g) || [];
+  return words.length === 0 || words.every(w => GENERIC_COMPANY_WORDS.has(w));
+}
+// Pick the first segment of a page title that is a real organization name, e.g.
+// "Staff Directory | Butler County, Ohio" -> "Butler County". Returns '' if every segment is generic.
+function companyFromTitle(title) {
+  const parts = String(title || '').split(/\s*[-|–—:]\s*|\s*,\s*/).map(x => x.trim()).filter(Boolean);
+  for (const raw of parts) {
+    const part = raw.replace(/^welcome to\s+/i, '').trim();
+    if (part.length >= 3 && !/^\[/.test(part) && !isGenericCompany(part)) return part;
+  }
+  return '';
+}
+const PLACEHOLDER_LOCAL = /^(john|jane)[._]?(doe|smith|public)$|^j[._]?doe$|^f[._]?last$|^first[._]?last$|^firstname[._]?lastname$|^first[._]?name$|^last[._]?name$|^your[._]?name$|^flast$|^jdoe$|^jsmith$|^name$|^someone$/i;
+const VENDOR_DOMAINS = new Set(['revize.com', 'civicplus.com', 'granicus.com', 'municode.com', 'wixpress.com', 'sentry.io', 'squarespace.com', 'godaddy.com', 'wordpress.com']);
+const LEADGEN_SOURCES = /(^|\.)(leadiq|zoominfo|rocketreach|signalhire|contactout|apollo|lusha|clearbit|hunter|datanyze|adapt)\.(com|co|io)$/i;
+const ROLE_NAME = /\b(director|manager|department|office|team|staff|directory|clerk|administrator|coordinator|recorder|assessor|treasurer|supervisor|attorney|officer|board|commission|committee|services|information|deputy|chief|president|head|executive|specialist|analyst|compliance|purchasing|innovation|development|police|digital)\b/i;
+// Returns a short reason string when a lead should NOT be emailed, or '' when it looks usable.
+function leadJunkReason(lead, target) {
+  const [local, domain = ''] = String(lead.email || '').toLowerCase().split('@');
+  if (PLACEHOLDER_LOCAL.test(local)) return 'placeholder-address';
+  if (VENDOR_DOMAINS.has(domain)) return 'vendor-address';
+  try { if (LEADGEN_SOURCES.test(new URL(lead.source).hostname)) return 'leadgen-source'; } catch { /* no source url */ }
+  if (isGenericCompany(lead.company)) return 'generic-company';
+  return '';
+}
+// True when the "name" is really a job title (the scraper falls back to the target's title).
+function nameLooksLikeRole(name, target) {
+  const n = String(name || '').trim();
+  return !n || n === target?.title || ROLE_NAME.test(n);
+}
+
 function extractNameFromContext(html, email) {
   const idx = html.indexOf(email);
   if (idx === -1) return null;
@@ -8940,11 +8985,11 @@ async function searchLeadsViaSerper(target, targetIndex = 0) {
         const isPdf = /\.pdf(\?.*)?$/i.test(item.link) || /^\[PDF\]/i.test(item.title || '');
         if (isPdf) continue;
 
-        const rawCompany = item.title
-          ? item.title.split(/[-|–,]/)[0].trim()
-          : domainToCompany(domain);
+        // Use the first real organization name in the page title; "Staff Directory | Butler County"
+        // gives "Butler County", and a title that is all generic words is skipped.
+        const rawCompany = item.title ? companyFromTitle(item.title) : domainToCompany(domain);
         // Skip if company name looks like garbage (starts with bracket, all caps gibberish, very short)
-        if (/^\[/.test(rawCompany) || rawCompany.length < 3) continue;
+        if (!rawCompany || /^\[/.test(rawCompany) || rawCompany.length < 3) continue;
         const company = rawCompany;
 
         // ① Quick pass — emails visible in snippet
@@ -9347,10 +9392,16 @@ async function runLeadEngine(targetsPerRun = 3) {
         }
 
         let sent = 0, skipped = 0;
+        const perDomainThisRun = {};
         for (const lead of leads) {
           if (dailySentSoFar + totalSent >= DAILY_SEND_CAP) { skipped++; continue; } // daily cap guard
           if (!lead.email || !lead.name || !lead.company) { skipped++; continue; }
           const emailDomain = lead.email.split('@')[1]?.toLowerCase() || '';
+          const junkReason = leadJunkReason(lead, target);
+          if (junkReason) { skipped++; console.log(`[LeadEngine] Skipped (${junkReason}): ${lead.email} / ${lead.company}`); continue; }
+          // At most 2 emails per company domain per run (guessed patterns at one domain looked like spam)
+          perDomainThisRun[emailDomain] = (perDomainThisRun[emailDomain] || 0) + 1;
+          if (perDomainThisRun[emailDomain] > 2) { skipped++; continue; }
           if (emailDomain.endsWith('.mil') || emailDomain.endsWith('.gov')) {
             skipped++;
             console.log(`[LeadEngine] Skipped (government domain — manual outreach only): ${lead.email}`);
@@ -9373,7 +9424,9 @@ async function runLeadEngine(targetsPerRun = 3) {
               : isSandbox
                 ? SANDBOX_EMAIL(lead.name, lead.company, target.role)
                 : INITIAL_EMAIL(lead.name, lead.company, lead.industry || target.industry, target.role);
-          const emailBody = isAffiliate ? pitchBody : withTrialOffer(pitchBody, target.industry);
+          // When the "name" is only a job title, "Hi Land," reads badly; greet without a name instead.
+          const greetedBody = nameLooksLikeRole(lead.name, target) ? pitchBody.replace(/^Hi [^,\n]+,/, 'Hello,') : pitchBody;
+          const emailBody = isAffiliate ? greetedBody : withTrialOffer(greetedBody, target.industry);
           const subject = isAffiliate
             ? `Revenue share idea for ${lead.company}`
             : isUAE
