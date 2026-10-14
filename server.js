@@ -4395,7 +4395,9 @@ app.post(["/stripe-webhook", "/api/stripe-webhook"], express.raw({ type: "applic
     }
   }
 
-  if (event.type === "invoice.paid") {
+  // The Stripe endpoint is subscribed to invoice.payment_succeeded (not invoice.paid), so accept both.
+  // Only one of the two is ever delivered to this endpoint, so revenue is not double counted.
+  if (event.type === "invoice.paid" || event.type === "invoice.payment_succeeded") {
     const invoice = event.data.object;
     const email = invoice.customer_email;
     const amountCents = invoice.amount_paid || 0;
