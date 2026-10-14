@@ -4127,7 +4127,9 @@ function priceEnv(value) {
 /* ---------------- STRIPE CHECKOUT ---------------- */
 app.post(["/create-checkout-session", "/api/create-checkout-session"], async (req, res) => {
   try {
-    const { plan, success_url, cancel_url, referral } = req.body;
+    const { plan, success_url, cancel_url, referral, email } = req.body;
+    // The phone app passes the signed-in email so the purchase lands on that account (Stripe still lets the buyer edit it).
+    const prefillEmail = typeof email === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) && email.length <= 254 ? email.trim().toLowerCase() : undefined;
 
     const subscriptionPlans = {
       "starter-monthly":       priceEnv(process.env.PRICE_STARTER_MONTHLY),
@@ -4167,6 +4169,7 @@ app.post(["/create-checkout-session", "/api/create-checkout-session"], async (re
       success_url: success_url || "https://proofdeed.com/success",
       cancel_url: cancel_url || "https://proofdeed.com",
       client_reference_id: referral ? referral : undefined,
+      ...(prefillEmail ? { customer_email: prefillEmail } : {}),
       metadata: { plan },
     };
 
