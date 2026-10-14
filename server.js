@@ -584,8 +584,9 @@ const appCodeVerifyLimit = rateLimit({
 });
 // App Store reviewers cannot read an inbox: set APP_REVIEW_EMAIL and APP_REVIEW_CODE in DigitalOcean
 // (a real non-government test account) and that one pair signs in without an email.
+const sameText = (a, b) => { const x = Buffer.from(String(a)), y = Buffer.from(String(b)); return x.length === y.length && crypto.timingSafeEqual(x, y); };
 const isAppReview = (email, code) => !!process.env.APP_REVIEW_EMAIL && email === process.env.APP_REVIEW_EMAIL.toLowerCase()
-  && (code === undefined || (!!process.env.APP_REVIEW_CODE && code === process.env.APP_REVIEW_CODE));
+  && (code === undefined || (!!process.env.APP_REVIEW_CODE && sameText(code, process.env.APP_REVIEW_CODE)));
 const APP_BLOCKED_PLAN = /^(government|gov-)|pilot|trial/i;
 
 app.post(["/auth/app-code", "/api/auth/app-code"], appCodeRequestLimit, async (req, res) => {
@@ -605,14 +606,14 @@ app.post(["/auth/app-code", "/api/auth/app-code"], appCodeRequestLimit, async (r
     if (isAppReview(email)) return res.json({ success: true });
 
     const recent = await pool.query(
-      "SELECT 1 FROM magic_links WHERE token LIKE $1 AND created_at > NOW() - INTERVAL '60 seconds' LIMIT 1",
-      ["APP:" + email + ":%"]
+      "SELECT 1 FROM magic_links WHERE LEFT(token, LENGTH($1::text)) = $1::text AND created_at > NOW() - INTERVAL '60 seconds' LIMIT 1",
+      ["APP:" + email + ":"]
     );
     if (recent.rows.length) return res.status(429).json({ error: "A code was just sent. Please wait a minute before asking for another." });
 
     let code = null;
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-    await pool.query("UPDATE magic_links SET used = TRUE WHERE token LIKE $1 AND used = FALSE", ["APP:" + email + ":%"]);
+    await pool.query("UPDATE magic_links SET used = TRUE WHERE LEFT(token, LENGTH($1::text)) = $1::text AND used = FALSE", ["APP:" + email + ":"]);
     for (let i = 0; i < 5 && !code; i++) {
       const candidate = String(crypto.randomInt(0, 1000000)).padStart(6, "0");
       try {
