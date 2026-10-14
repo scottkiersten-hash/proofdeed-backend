@@ -567,6 +567,130 @@ app.get(["/auth/verify", "/api/auth/verify"], authRateLimit, async (req, res) =>
   }
 });
 
+/* ---------------- MOBILE APP SIGN-IN (6-digit code) ----------------
+   The phone app cannot open the emailed web link, so it signs in with a code.
+   Government plans are not offered in the app. */
+// Wrong-code counter is kept in memory, so it resets when the server restarts.
+const appCodeFailures = new Map(); // email -> { count, resetAt }
+// Limits are per email, not per internet address: many phones share one mobile-network address.
+const appEmailKey = (req) => String(req.body?.email || "").trim().toLowerCase() || "none";
+const appCodeRequestLimit = rateLimit({
+  windowMs: 15 * 60 * 1000, max: 10, keyGenerator: appEmailKey, validate: false,
+  message: { error: "Too many codes requested. Please wait a few minutes and try again." }
+});
+const appCodeVerifyLimit = rateLimit({
+  windowMs: 15 * 60 * 1000, max: 20, keyGenerator: appEmailKey, validate: false,
+  message: { error: "Too many attempts. Please wait a few minutes and try again." }
+});
+// App Store reviewers cannot read an inbox: set APP_REVIEW_EMAIL and APP_REVIEW_CODE in DigitalOcean
+// (a real non-government test account) and that one pair signs in without an email.
+const isAppReview = (email, code) => !!process.env.APP_REVIEW_EMAIL && email === process.env.APP_REVIEW_EMAIL.toLowerCase()
+  && (code === undefined || (!!process.env.APP_REVIEW_CODE && code === process.env.APP_REVIEW_CODE));
+const APP_BLOCKED_PLAN = /^(government|gov-)|pilot|trial/i;
+
+app.post(["/auth/app-code", "/api/auth/app-code"], appCodeRequestLimit, async (req, res) => {
+  try {
+    const email = String(req.body?.email || "").trim().toLowerCase();
+    if (!email.includes("@")) return res.status(400).json({ error: "Valid email required." });
+
+    const userCheck = await pool.query("SELECT id FROM users WHERE LOWER(email) = $1", [email]);
+    if (userCheck.rows.length === 0) {
+      return res.status(404).json({ error: "No account found for this email. Choose a plan at proofdeed.com/solutions#pricing, or email info@proofdeed.com." });
+    }
+    const keyRow = await pool.query("SELECT plan FROM api_keys WHERE LOWER(email) = $1 AND active = TRUE", [email]);
+    if (keyRow.rows[0]?.plan && APP_BLOCKED_PLAN.test(keyRow.rows[0].plan)) {
+      return res.status(403).json({ error: "The app is not available for Government accounts. Please sign in at proofdeed.com." });
+    }
+
+    if (isAppReview(email)) return res.json({ success: true });
+
+    const recent = await pool.query(
+      "SELECT 1 FROM magic_links WHERE token LIKE $1 AND created_at > NOW() - INTERVAL '60 seconds' LIMIT 1",
+      ["APP:" + email + ":%"]
+    );
+    if (recent.rows.length) return res.status(429).json({ error: "A code was just sent. Please wait a minute before asking for another." });
+
+    let code = null;
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    await pool.query("UPDATE magic_links SET used = TRUE WHERE token LIKE $1 AND used = FALSE", ["APP:" + email + ":%"]);
+    for (let i = 0; i < 5 && !code; i++) {
+      const candidate = String(crypto.randomInt(0, 1000000)).padStart(6, "0");
+      try {
+        await pool.query("INSERT INTO magic_links (email, token, expires_at) VALUES ($1, $2, $3)", [email, "APP:" + email + ":" + candidate, expiresAt]);
+        code = candidate;
+      } catch (e) {
+        if (e.code !== "23505") throw e; // same email + same code already exists: try another
+      }
+    }
+    if (!code) return res.status(500).json({ error: "Could not make a code. Please try again." });
+    try {
+      await sendEmail({
+        to: email,
+        subject: "Your ProofDeed sign-in code",
+        text: "Your ProofDeed sign-in code is " + code + ".\n\nIt expires in 10 minutes. If you did not request this, ignore this email.\n\nProofDeed\nhttps://proofdeed.com"
+      });
+      res.json({ success: true });
+    } catch (emailErr) {
+      console.error("App code email FAILED for " + email + ":", emailErr.message);
+      res.status(500).json({ error: "Failed to send the code. Please try again or contact info@proofdeed.com." });
+    }
+  } catch (error) {
+    console.error("App code error:", error);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+app.post(["/auth/app-code/verify", "/api/auth/app-code/verify"], appCodeVerifyLimit, async (req, res) => {
+  try {
+    const email = String(req.body?.email || "").trim().toLowerCase();
+    const code = String(req.body?.code || "").trim();
+    if (!email.includes("@") || !/^\d{6}$/.test(code)) return res.status(400).json({ error: "Enter the 6-digit code." });
+
+    const fail = appCodeFailures.get(email);
+    if (fail && fail.resetAt > Date.now() && fail.count >= 5) {
+      return res.status(429).json({ error: "Too many wrong codes. Request a new code in a few minutes." });
+    }
+
+    const reviewLogin = isAppReview(email, code);
+    const result = reviewLogin
+      ? { rows: [{ id: null }] }
+      : await pool.query(
+          "SELECT id FROM magic_links WHERE token = $1 AND used = FALSE AND expires_at > NOW()",
+          ["APP:" + email + ":" + code]
+        );
+    if (result.rows.length === 0) {
+      const cur = fail && fail.resetAt > Date.now() ? fail : { count: 0, resetAt: Date.now() + 10 * 60 * 1000 };
+      cur.count += 1;
+      appCodeFailures.set(email, cur);
+      return res.status(401).json({ error: "Wrong or expired code." });
+    }
+    if (result.rows[0].id) await pool.query("UPDATE magic_links SET used = TRUE WHERE id = $1", [result.rows[0].id]);
+    appCodeFailures.delete(email);
+
+    const userResult = await pool.query("SELECT * FROM users WHERE LOWER(email) = $1", [email]);
+    const user = userResult.rows[0];
+    if (!user) return res.status(401).json({ error: "Account not found." });
+    const keyRow = await pool.query("SELECT plan, monthly_limit FROM api_keys WHERE LOWER(email) = $1 AND active = TRUE", [email]);
+    const plan = keyRow.rows[0]?.plan || (user.subscription_id ? "professional-monthly" : "starter");
+    if (APP_BLOCKED_PLAN.test(plan)) {
+      return res.status(403).json({ error: "The app is not available for Government accounts. Please sign in at proofdeed.com." });
+    }
+    const certLimit = keyRow.rows[0]?.monthly_limit || (user.subscription_id ? 250 : 25);
+    const used = parseInt((await pool.query(
+      plan === "individual-onetime"
+        ? "SELECT COUNT(*) FROM certifications WHERE user_id = $1"
+        : "SELECT COUNT(*) FROM certifications WHERE user_id = $1 AND created_at > date_trunc('month', NOW())",
+      [user.id]
+    )).rows[0].count) || 0;
+
+    const jwtToken = jwt.sign({ email: user.email, userId: user.id, plan }, process.env.JWT_SECRET, { expiresIn: "30d" });
+    res.json({ jwt: jwtToken, email: user.email, plan, certifications_used: used, certifications_limit: certLimit });
+  } catch (error) {
+    console.error("App code verify error:", error);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
 /* ---------------- USER CERTIFICATIONS ---------------- */
 app.get(["/user/certifications", "/api/user/certifications"], authenticateToken, async (req, res) => {
   try {
