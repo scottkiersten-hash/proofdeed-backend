@@ -585,9 +585,49 @@ const appCodeVerifyLimit = rateLimit({
 // App Store reviewers cannot read an inbox: set APP_REVIEW_EMAIL and APP_REVIEW_CODE in DigitalOcean
 // (a real non-government test account) and that one pair signs in without an email.
 const sameText = (a, b) => { const x = Buffer.from(String(a)), y = Buffer.from(String(b)); return x.length === y.length && crypto.timingSafeEqual(x, y); };
-const isAppReview = (email, code) => !!process.env.APP_REVIEW_EMAIL && email === process.env.APP_REVIEW_EMAIL.toLowerCase()
+const isAppReviewEnv = (email, code) => !!process.env.APP_REVIEW_EMAIL && email === process.env.APP_REVIEW_EMAIL.toLowerCase()
   && (code === undefined || (!!process.env.APP_REVIEW_CODE && sameText(code, process.env.APP_REVIEW_CODE)));
+// The reviewer pair can also live in the database (set with POST /api/admin/app-review), so no DigitalOcean
+// edit is needed. Only a keyed hash of the code is stored, never the code itself.
+const reviewHash = (email, code) => crypto.createHmac("sha256", process.env.JWT_SECRET || "").update(email + ":" + code).digest("hex");
+(async () => {
+  try { await pool.query("CREATE TABLE IF NOT EXISTS app_review_login (email TEXT PRIMARY KEY, code_hash TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW())"); }
+  catch (e) { console.error("app_review_login table:", e.message); }
+})();
+const isAppReview = async (email, code) => {
+  if (isAppReviewEnv(email, code)) return true;
+  try {
+    const r = await pool.query("SELECT code_hash FROM app_review_login WHERE email = $1", [email]);
+    if (!r.rows.length) return false;
+    if (code === undefined) return true;
+    return sameText(reviewHash(email, code), r.rows[0].code_hash);
+  } catch { return false; }
+};
 const APP_BLOCKED_PLAN = /^(government|gov-)|pilot|trial/i;
+
+app.post(["/admin/app-review", "/api/admin/app-review"], authRateLimit, async (req, res) => {
+  try {
+    if (!verifyAdminAuth(req)) return res.status(401).json({ error: "Unauthorized." });
+    const email = String(req.body?.email || "").trim().toLowerCase();
+    const code = String(req.body?.code || "").trim();
+    if (!email.includes("@")) return res.status(400).json({ error: "Valid email required." });
+    if (req.body?.remove) {
+      await pool.query("DELETE FROM app_review_login WHERE email = $1", [email]);
+      return res.json({ success: true, removed: email });
+    }
+    if (!/^\d{6}$/.test(code)) return res.status(400).json({ error: "Code must be 6 digits." });
+    const user = await pool.query("SELECT id FROM users WHERE LOWER(email) = $1", [email]);
+    if (!user.rows.length) return res.status(404).json({ error: "Create the user first." });
+    await pool.query(
+      "INSERT INTO app_review_login (email, code_hash) VALUES ($1, $2) ON CONFLICT (email) DO UPDATE SET code_hash = EXCLUDED.code_hash, created_at = NOW()",
+      [email, reviewHash(email, code)]
+    );
+    res.json({ success: true, email });
+  } catch (err) {
+    console.error("/api/admin/app-review error:", err);
+    res.status(500).json({ error: "Server error." });
+  }
+});
 
 app.post(["/auth/app-code", "/api/auth/app-code"], appCodeRequestLimit, async (req, res) => {
   try {
@@ -603,7 +643,7 @@ app.post(["/auth/app-code", "/api/auth/app-code"], appCodeRequestLimit, async (r
       return res.status(403).json({ error: "The app is not available for Government accounts. Please sign in at proofdeed.com." });
     }
 
-    if (isAppReview(email)) return res.json({ success: true });
+    if (await isAppReview(email)) return res.json({ success: true });
 
     const recent = await pool.query(
       "SELECT 1 FROM magic_links WHERE LEFT(token, LENGTH($1::text)) = $1::text AND created_at > NOW() - INTERVAL '60 seconds' LIMIT 1",
@@ -652,7 +692,7 @@ app.post(["/auth/app-code/verify", "/api/auth/app-code/verify"], appCodeVerifyLi
       return res.status(429).json({ error: "Too many wrong codes. Request a new code in a few minutes." });
     }
 
-    const reviewLogin = isAppReview(email, code);
+    const reviewLogin = await isAppReview(email, code);
     const result = reviewLogin
       ? { rows: [{ id: null }] }
       : await pool.query(
